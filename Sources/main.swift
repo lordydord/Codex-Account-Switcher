@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import UserNotifications
 
-struct CodexAccount {
+struct CodexAccount: Equatable {
     let selector: String
     let email: String
     let plan: String
@@ -29,8 +29,416 @@ struct CommandResult {
     let output: String
 }
 
+final class AccountSwitcherPanelView: NSView {
+    private let accounts: [CodexAccount]
+    private let activeAccount: CodexAccount?
+    private let lastUpdatedText: String
+    private let lastError: String?
+    private let isSwitching: Bool
+    private let launchAtLoginEnabled: Bool
+    private let labelForAccount: (CodexAccount) -> String
+    private let compactEmail: (String) -> String
+    private let switchAccount: (String) -> Void
+    private let refresh: () -> Void
+    private let showSettings: (NSView) -> Void
+    private let close: () -> Void
+    private let toggleLaunchAtLogin: () -> Void
+
+    init(
+        accounts: [CodexAccount],
+        activeAccount: CodexAccount?,
+        lastUpdatedText: String,
+        lastError: String?,
+        isSwitching: Bool,
+        launchAtLoginEnabled: Bool,
+        labelForAccount: @escaping (CodexAccount) -> String,
+        compactEmail: @escaping (String) -> String,
+        switchAccount: @escaping (String) -> Void,
+        refresh: @escaping () -> Void,
+        showSettings: @escaping (NSView) -> Void,
+        close: @escaping () -> Void,
+        toggleLaunchAtLogin: @escaping () -> Void
+    ) {
+        self.accounts = accounts
+        self.activeAccount = activeAccount
+        self.lastUpdatedText = lastUpdatedText
+        self.lastError = lastError
+        self.isSwitching = isSwitching
+        self.launchAtLoginEnabled = launchAtLoginEnabled
+        self.labelForAccount = labelForAccount
+        self.compactEmail = compactEmail
+        self.switchAccount = switchAccount
+        self.refresh = refresh
+        self.showSettings = showSettings
+        self.close = close
+        self.toggleLaunchAtLogin = toggleLaunchAtLogin
+        super.init(frame: NSRect(x: 0, y: 0, width: 390, height: 500))
+        wantsLayer = true
+        layer?.cornerRadius = 20
+        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        build()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    private func build() {
+        let header = makeHeader()
+        addSubview(header)
+
+        let separator = NSBox(frame: NSRect(x: 20, y: 70, width: 350, height: 1))
+        separator.boxType = .separator
+        addSubview(separator)
+
+        if accounts.isEmpty {
+            addSubview(emptyStateCard())
+        } else {
+            let orderedAccounts = accounts.sorted { left, right in
+                let leftPriority = panelSortPriority(for: left)
+                let rightPriority = panelSortPriority(for: right)
+                if leftPriority != rightPriority {
+                    return leftPriority < rightPriority
+                }
+                return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
+            }
+            let columns = min(orderedAccounts.count, 2)
+            let cardWidth = columns == 1 ? 350 : 171
+            for (index, account) in orderedAccounts.prefix(2).enumerated() {
+                let x = columns == 1 ? 20 : 20 + CGFloat(index) * 179
+                addSubview(accountCard(account, frame: NSRect(x: x, y: 90, width: CGFloat(cardWidth), height: 278)))
+            }
+        }
+
+        addSubview(bottomBar(frame: NSRect(x: 20, y: 420, width: 350, height: 48)))
+    }
+
+    private func makeHeader() -> NSView {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 390, height: 70))
+
+        let icon = CircleIconView(frame: NSRect(x: 22, y: 17, width: 36, height: 36), color: .systemBlue, symbol: "chevron.left.forwardslash.chevron.right")
+        view.addSubview(icon)
+
+        let title = label("Codex Control", frame: NSRect(x: 72, y: 15, width: 210, height: 25), size: 20, weight: .semibold, color: .labelColor)
+        view.addSubview(title)
+
+        let subtitleText = activeAccount.map { "Active account \(labelForAccount($0))" } ?? (lastError ?? "No active account")
+        let subtitle = label(subtitleText, frame: NSRect(x: 73, y: 40, width: 220, height: 19), size: 13, weight: .medium, color: activeAccount == nil ? .systemOrange : .systemBlue)
+        subtitle.lineBreakMode = .byTruncatingTail
+        view.addSubview(subtitle)
+
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 290, y: 20, width: 30, height: 30), action: #selector(refreshPressed))
+        view.addSubview(refreshButton)
+
+        let settingsButton = iconButton(symbol: "gearshape.fill", frame: NSRect(x: 326, y: 18, width: 34, height: 34), action: #selector(settingsPressed(_:)))
+        view.addSubview(settingsButton)
+
+        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: 360, y: 20, width: 30, height: 30), action: #selector(closePressed))
+        view.addSubview(closeButton)
+
+        return view
+    }
+
+    private func accountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
+        let weeklyPercent = account.weeklyUsedPercent
+        let fiveHourPercent = account.fiveHourUsedPercent
+        let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
+        let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
+        let card = RoundedPanelView(frame: frame, fillColor: NSColor.controlBackgroundColor)
+        let labelText = labelForAccount(account)
+
+        let metric = label("Weekly", frame: NSRect(x: 16, y: 16, width: 70, height: 17), size: 11, weight: .medium, color: .secondaryLabelColor)
+        card.addSubview(metric)
+        let weeklyValue = label(weeklyPercent.map { "\($0)%" } ?? "--", frame: NSRect(x: frame.width - 76, y: 16, width: 58, height: 17), size: 11, weight: .medium, color: .secondaryLabelColor, alignment: .right)
+        card.addSubview(weeklyValue)
+
+        let progress = ProgressLineView(frame: NSRect(x: 16, y: 39, width: frame.width - 32, height: 7), color: weeklyColor, percent: CGFloat(weeklyPercent ?? 0) / 100)
+        card.addSubview(progress)
+
+        let ringSize: CGFloat = columnsFitWide(frame.width) ? 110 : 98
+        let ringX = (frame.width - ringSize) / 2
+        card.addSubview(label("5H", frame: NSRect(x: ringX + 24, y: 60, width: ringSize - 48, height: 16), size: 11, weight: .semibold, color: .secondaryLabelColor, alignment: .center))
+        let ring = UsageRingView(frame: NSRect(x: ringX, y: 80, width: ringSize, height: ringSize), color: fiveHourColor, percent: CGFloat(fiveHourPercent ?? 0) / 100)
+        card.addSubview(ring)
+        card.addSubview(label(fiveHourPercent.map { "\($0)" } ?? "--", frame: NSRect(x: ringX + 24, y: 110, width: ringSize - 48, height: 31), size: 27, weight: .semibold, color: fiveHourColor, alignment: .center))
+        card.addSubview(label("%", frame: NSRect(x: ringX + 24, y: 144, width: ringSize - 48, height: 16), size: 12, weight: .semibold, color: .secondaryLabelColor.withAlphaComponent(0.75), alignment: .center))
+
+        card.addSubview(label(labelText, frame: NSRect(x: 16, y: 182, width: 40, height: 32), size: 28, weight: .semibold, color: fiveHourColor))
+        let status = account.isActive ? "Active" : "Ready"
+        card.addSubview(label(status, frame: NSRect(x: frame.width - 74, y: 190, width: 56, height: 18), size: 11, weight: .semibold, color: fiveHourColor, alignment: .right))
+
+        let buttonTitle = account.isActive ? "Active" : (isSwitching ? "Switching..." : "Switch")
+        let buttonColor = account.isActive ? usageColor(for: fiveHourPercent) : NSColor.systemGray.withAlphaComponent(0.42)
+        let switchButton = PillButton(frame: NSRect(x: 16, y: 230, width: frame.width - 32, height: 30), title: buttonTitle, color: buttonColor)
+        switchButton.target = self
+        switchButton.action = #selector(accountSwitchPressed(_:))
+        switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
+        switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
+        card.addSubview(switchButton)
+        return card
+    }
+
+    private func columnsFitWide(_ width: CGFloat) -> Bool {
+        width > 260
+    }
+
+    private func panelSortPriority(for account: CodexAccount) -> Int {
+        switch labelForAccount(account) {
+        case "L":
+            return 0
+        case "A":
+            return 1
+        default:
+            return 10
+        }
+    }
+
+    private func emptyStateCard() -> NSView {
+        let card = RoundedPanelView(frame: NSRect(x: 20, y: 90, width: 350, height: 278), fillColor: NSColor.controlBackgroundColor)
+        card.addSubview(label("No accounts available", frame: NSRect(x: 22, y: 30, width: 220, height: 26), size: 20, weight: .semibold, color: .labelColor))
+        card.addSubview(label(lastError ?? "Open settings to add an account.", frame: NSRect(x: 22, y: 66, width: 292, height: 44), size: 13, weight: .medium, color: .secondaryLabelColor))
+        return card
+    }
+
+    private func bottomBar(frame: NSRect) -> NSView {
+        let bar = RoundedPanelView(frame: frame, fillColor: NSColor.controlBackgroundColor)
+        bar.addSubview(label("Updated \(lastUpdatedText)", frame: NSRect(x: 16, y: 13, width: 160, height: 22), size: 12, weight: .medium, color: .secondaryLabelColor))
+        bar.addSubview(label("Launch", frame: NSRect(x: 210, y: 13, width: 64, height: 22), size: 12, weight: .medium, color: .secondaryLabelColor, alignment: .right))
+        let startupSwitch = NSSwitch(frame: NSRect(x: 284, y: 10, width: 46, height: 28))
+        startupSwitch.state = launchAtLoginEnabled ? .on : .off
+        startupSwitch.target = self
+        startupSwitch.action = #selector(launchAtLoginPressed)
+        bar.addSubview(startupSwitch)
+        return bar
+    }
+
+    private func usageColor(for percent: Int?) -> NSColor {
+        guard let percent else { return .systemBlue }
+        if percent >= 50 { return .systemGreen }
+        if percent >= 20 { return .systemOrange }
+        return .systemRed
+    }
+
+    private func accentColor(for percent: Int?, isActive: Bool) -> NSColor {
+        guard isActive else { return NSColor.systemGray.withAlphaComponent(0.32) }
+        return usageColor(for: percent)
+    }
+
+    private func label(_ string: String, frame: NSRect, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) -> NSTextField {
+        let field = NSTextField(labelWithString: string)
+        field.frame = frame
+        field.font = .systemFont(ofSize: size, weight: weight)
+        field.textColor = color
+        field.alignment = alignment
+        field.lineBreakMode = .byTruncatingTail
+        return field
+    }
+
+    private func iconButton(symbol: String, frame: NSRect, action: Selector) -> NSButton {
+        let button = NSButton(frame: frame)
+        button.bezelStyle = .regularSquare
+        button.isBordered = false
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        button.imagePosition = .imageOnly
+        button.contentTintColor = .secondaryLabelColor
+        button.target = self
+        button.action = action
+        return button
+    }
+
+    @objc private func refreshPressed() {
+        refresh()
+    }
+
+    @objc private func settingsPressed(_ sender: NSButton) {
+        showSettings(sender)
+    }
+
+    @objc private func closePressed() {
+        close()
+    }
+
+    @objc private func launchAtLoginPressed() {
+        toggleLaunchAtLogin()
+    }
+
+    @objc private func accountSwitchPressed(_ sender: NSButton) {
+        guard let email = sender.identifier?.rawValue, !email.isEmpty else { return }
+        switchAccount(email)
+    }
+}
+
+final class RoundedPanelView: NSView {
+    private let fillColor: NSColor
+
+    init(frame: NSRect, fillColor: NSColor) {
+        self.fillColor = fillColor
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.backgroundColor = fillColor.cgColor
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.22).cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.05
+        layer?.shadowRadius = 10
+        layer?.shadowOffset = NSSize(width: 0, height: -4)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+final class CircleIconView: NSView {
+    private let color: NSColor
+    private let symbol: String
+
+    init(frame: NSRect, color: NSColor, symbol: String) {
+        self.color = color
+        self.symbol = symbol
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        color.withAlphaComponent(0.14).setFill()
+        bounds.insetBy(dx: 1, dy: 1).roundedPath(radius: bounds.width / 2).fill()
+        if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
+            image.isTemplate = true
+            color.set()
+            image.draw(in: bounds.insetBy(dx: 10, dy: 10))
+        }
+    }
+}
+
+final class ProgressLineView: NSView {
+    private let color: NSColor
+    private let percent: CGFloat
+
+    init(frame: NSRect, color: NSColor, percent: CGFloat) {
+        self.color = color
+        self.percent = max(0, min(1, percent))
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let track = bounds.insetBy(dx: 0, dy: 2)
+        NSColor.separatorColor.withAlphaComponent(0.42).setFill()
+        track.roundedPath(radius: track.height / 2).fill()
+        let fill = NSRect(x: track.minX, y: track.minY, width: track.width * percent, height: track.height)
+        color.setFill()
+        fill.roundedPath(radius: track.height / 2).fill()
+    }
+}
+
+final class UsageRingView: NSView {
+    private let color: NSColor
+    private let percent: CGFloat
+
+    init(frame: NSRect, color: NSColor, percent: CGFloat) {
+        self.color = color
+        self.percent = max(0, min(1, percent))
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rect = bounds.insetBy(dx: 6, dy: 6)
+        let lineWidth: CGFloat = 6
+        let center = NSPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        let track = NSBezierPath()
+        track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+        track.lineWidth = lineWidth
+        NSColor.separatorColor.withAlphaComponent(0.18).setStroke()
+        track.stroke()
+
+        let fill = NSBezierPath()
+        fill.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - (360 * percent), clockwise: true)
+        fill.lineWidth = lineWidth
+        fill.lineCapStyle = .round
+        color.setStroke()
+        fill.stroke()
+    }
+}
+
+final class PillButton: NSButton {
+    private let pillColor: NSColor
+    private var trackingArea: NSTrackingArea?
+
+    init(frame: NSRect, title: String, color: NSColor) {
+        self.pillColor = color
+        super.init(frame: frame)
+        self.title = title
+        bezelStyle = .rounded
+        isBordered = false
+        font = .systemFont(ofSize: 13, weight: .semibold)
+        contentTintColor = .white
+        wantsLayer = true
+        layer?.cornerRadius = frame.height / 2
+        layer?.backgroundColor = pillColor.cgColor
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard isEnabled else { return }
+        layer?.backgroundColor = pillColor.blended(withFraction: 0.16, of: .white)?.cgColor ?? pillColor.cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.12
+        layer?.shadowRadius = 6
+        layer?.shadowOffset = NSSize(width: 0, height: -2)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        layer?.backgroundColor = pillColor.cgColor
+        layer?.shadowOpacity = 0
+    }
+}
+
+private extension NSRect {
+    func roundedPath(radius: CGFloat) -> NSBezierPath {
+        NSBezierPath(roundedRect: self, xRadius: radius, yRadius: radius)
+    }
+}
+
+final class AccountFloatingPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let accountPanelSize = NSSize(width: 390, height: 500)
+    private var accountPanel: NSPanel?
     private let timerTickInterval: TimeInterval = 5
     private let labelsDefaultsKey = "accountDisplayLabels"
     private let remindersEnabledDefaultsKey = "usageReminderEnabled"
@@ -61,6 +469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let statusPulseFrames = ["·", "•", "·", " "]
     private var notifiedLowUsageKeys = Set<String>()
     private var notifiedAutoSwitchPauseKeys = Set<String>()
+    private var settingsMenu = NSMenu()
     private var remindersEnabled: Bool {
         get {
             if UserDefaults.standard.object(forKey: remindersEnabledDefaultsKey) == nil {
@@ -143,12 +552,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             UserDefaults.standard.set(newValue.rawValue, forKey: toolbarDisplayStyleDefaultsKey)
         }
     }
+    private var demoMode: Bool {
+        ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_DEMO"] == "1"
+    }
+    private var showPanelOnLaunch: Bool {
+        ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_SHOW_PANEL"] == "1"
+    }
+    private var showSettingsOnLaunch: Bool {
+        ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_SHOW_SETTINGS"] == "1"
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         configureNotifications()
         configureStatusButton()
         refreshAccounts(force: true)
+        if showPanelOnLaunch {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.showAccountPanel()
+            }
+            if showSettingsOnLaunch {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                    self?.showSettingsMenuForScreenshot()
+                }
+            }
+        }
         let timer = Timer(timeInterval: timerTickInterval, repeats: true) { [weak self] _ in
             self?.refreshAccountsIfNeeded()
         }
@@ -187,6 +615,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         button.toolTip = "Codex Account Switcher"
         button.image = nil
         button.imagePosition = .noImage
+        button.target = self
+        button.action = #selector(toggleAccountPanel)
     }
 
     private func loadCodexIcon() -> NSImage? {
@@ -221,6 +651,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func refreshAccounts(force: Bool = false) {
         guard !isSwitching else { return }
+        if demoMode {
+            accounts = demoAccounts()
+            lastError = nil
+            lastUpdatedAt = Date()
+            rebuildMenu()
+            return
+        }
         guard !isRefreshing else {
             if force { pendingForceRefresh = true }
             return
@@ -241,17 +678,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let parsed = result.status == 0 ? self.parseAccounts(result.output) : []
             DispatchQueue.main.async {
                 self.isRefreshing = false
+                let newAccounts: [CodexAccount]
+                let newError: String?
                 if result.status == 0 {
-                    self.accounts = parsed
-                    self.lastError = parsed.isEmpty ? "No codex-auth accounts found." : nil
-                    self.lastUpdatedAt = Date()
+                    newAccounts = parsed
+                    newError = parsed.isEmpty ? "No codex-auth accounts found." : nil
                 } else {
-                    self.accounts = []
-                    self.lastError = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    newAccounts = []
+                    newError = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
-                self.checkUsageReminder()
-                self.checkAutoSwitch()
-                self.rebuildMenu()
+
+                let stateChanged = newAccounts != self.accounts || newError != self.lastError
+                if stateChanged || force {
+                    self.accounts = newAccounts
+                    self.lastError = newError
+                    self.lastUpdatedAt = Date()
+                    self.checkUsageReminder()
+                    self.checkAutoSwitch()
+                    self.rebuildMenu()
+                }
+
                 if self.pendingForceRefresh {
                     self.pendingForceRefresh = false
                     self.refreshAccounts(force: true)
@@ -267,7 +713,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if !isSwitching {
                 updateStatusTitle()
             }
-            menu.addItem(headerItem("Active: \(active.email) (\(displayPlan(active.plan)))"))
+            menu.addItem(headerItem("Active: \(compactEmail(active.email)) (\(displayPlan(active.plan)))"))
         } else {
             if !isSwitching {
                 statusItem.button?.title = ""
@@ -278,27 +724,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         menu.addItem(headerItem("Updated: \(lastUpdatedText())"))
         menu.addItem(.separator())
 
-        if !accounts.isEmpty {
-            let usageHeader = headerItem("5hr remaining")
-            usageHeader.image = NSImage(systemSymbolName: "gauge.with.dots.needle.bottom.50percent", accessibilityDescription: "Usage remaining")
-            menu.addItem(usageHeader)
-            for account in toolbarAccounts() {
-                menu.addItem(fiveHourUsageItem(for: account))
-            }
-            menu.addItem(.separator())
-        }
-
         if accounts.isEmpty {
             let item = NSMenuItem(title: lastError ?? "No accounts available", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            menu.addItem(headerItem("Accounts:"))
-            for account in accounts {
+            menu.addItem(accountColumnsHeaderItem())
+            for account in toolbarAccounts() {
                 let item = NSMenuItem(title: "", action: #selector(switchAccount(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = account.email
-                item.attributedTitle = accountAttributedTitle(label: displayLabel(for: account), email: account.email)
+                item.attributedTitle = accountAttributedTitle(for: account)
                 item.state = account.isActive ? .on : .off
                 item.toolTip = "Plan \(account.plan), 5h \(account.fiveHourUsage), weekly \(account.weeklyUsage)"
                 item.isEnabled = !isSwitching
@@ -327,100 +763,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         menu.addItem(addDevice)
 
         if !accounts.isEmpty {
-            let labelsItem = NSMenuItem(title: "Account Display Labels", action: nil, keyEquivalent: "")
-            let labelsMenu = NSMenu()
-            for account in accounts {
-                let setItem = NSMenuItem(title: "Set \(account.selector) (\(account.email))...", action: #selector(setAccountLabel(_:)), keyEquivalent: "")
-                setItem.target = self
-                setItem.representedObject = account.email
-                labelsMenu.addItem(setItem)
-
-                let clearItem = NSMenuItem(title: "Clear \(account.selector)", action: #selector(clearAccountLabel(_:)), keyEquivalent: "")
-                clearItem.target = self
-                clearItem.representedObject = account.email
-                clearItem.isEnabled = customLabel(forEmail: account.email) != nil
-                labelsMenu.addItem(clearItem)
-            }
-            labelsItem.submenu = labelsMenu
+            let labelsItem = NSMenuItem(title: "Account Display Labels", action: #selector(showAccountDisplayLabelsDialog), keyEquivalent: "")
+            labelsItem.target = self
             menu.addItem(labelsItem)
 
-            let displayItem = NSMenuItem(title: "Menu Bar Display", action: nil, keyEquivalent: "")
-            let displayMenu = NSMenu()
-            displayMenu.addItem(toolbarDisplayStyleItem(title: "Large with Percentage", style: .detailed))
-            displayMenu.addItem(toolbarDisplayStyleItem(title: "Small Number Only", style: .compact))
-            displayItem.submenu = displayMenu
+            let displayItem = NSMenuItem(title: "Menu Bar Display", action: #selector(showMenuBarDisplayDialog), keyEquivalent: "")
+            displayItem.target = self
             menu.addItem(displayItem)
 
-            let removeItem = NSMenuItem(title: "Remove Account", action: nil, keyEquivalent: "")
-            let removeMenu = NSMenu()
-            for account in accounts {
-                let item = NSMenuItem(title: "\(displayLabel(for: account))  \(account.email)", action: #selector(removeAccount(_:)), keyEquivalent: "")
-                item.target = self
-                item.representedObject = account.email
-                item.isEnabled = !isSwitching
-                removeMenu.addItem(item)
-            }
-            removeItem.submenu = removeMenu
+            let removeItem = NSMenuItem(title: "Remove Account", action: #selector(showRemoveAccountDialog), keyEquivalent: "")
+            removeItem.target = self
+            removeItem.isEnabled = !isSwitching
             menu.addItem(removeItem)
         }
 
-        let reminderItem = NSMenuItem(title: "Usage Reminder", action: nil, keyEquivalent: "")
-        let reminderMenu = NSMenu()
-        let enableReminder = NSMenuItem(title: "Notify below \(reminderThreshold)%", action: #selector(toggleUsageReminder), keyEquivalent: "")
-        enableReminder.target = self
-        enableReminder.state = remindersEnabled ? .on : .off
-        reminderMenu.addItem(enableReminder)
-
-        let autoSwitch = NSMenuItem(title: "Auto-switch 5hr below \(autoSwitchThreshold)%", action: #selector(toggleAutoSwitch), keyEquivalent: "")
-        autoSwitch.target = self
-        autoSwitch.state = autoSwitchEnabled ? .on : .off
-        autoSwitch.isEnabled = accounts.count > 1 && !isSwitching
-        reminderMenu.addItem(autoSwitch)
-
-        let protectSwitch = NSMenuItem(title: "Do not auto-switch while Codex is frontmost", action: #selector(toggleProtectFrontmostCodex), keyEquivalent: "")
-        protectSwitch.target = self
-        protectSwitch.state = protectFrontmostCodex ? .on : .off
-        protectSwitch.isEnabled = autoSwitchEnabled
-        reminderMenu.addItem(protectSwitch)
-
-        reminderMenu.addItem(.separator())
-
-        let setThreshold = NSMenuItem(title: "Set Notification Percentage...", action: #selector(setReminderThreshold), keyEquivalent: "")
-        setThreshold.target = self
-        reminderMenu.addItem(setThreshold)
-
-        let setAutoSwitchThreshold = NSMenuItem(title: "Set Auto-switch Percentage...", action: #selector(setAutoSwitchThreshold), keyEquivalent: "")
-        setAutoSwitchThreshold.target = self
-        reminderMenu.addItem(setAutoSwitchThreshold)
-
-        let testNotification = NSMenuItem(title: "Test Notification", action: #selector(testUsageReminder), keyEquivalent: "")
-        testNotification.target = self
-        testNotification.isEnabled = remindersEnabled
-        reminderMenu.addItem(testNotification)
-        reminderItem.submenu = reminderMenu
+        let reminderItem = NSMenuItem(title: "Usage Reminder", action: #selector(showUsageReminderDialog), keyEquivalent: "")
+        reminderItem.target = self
         menu.addItem(reminderItem)
 
-        let refreshSettings = NSMenuItem(title: "Refresh Settings", action: nil, keyEquivalent: "")
-        let refreshMenu = NSMenu()
-        for seconds in [5, 15, 30, 60] {
-            let item = NSMenuItem(title: "When Codex is active: \(seconds)s", action: #selector(setActiveRefreshInterval(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = seconds
-            item.state = activeRefreshInterval == seconds ? .on : .off
-            refreshMenu.addItem(item)
-        }
-        refreshMenu.addItem(.separator())
-        for seconds in [15, 30, 60] {
-            let item = NSMenuItem(title: "When idle: \(seconds)s", action: #selector(setIdleRefreshInterval(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = seconds
-            item.state = idleRefreshInterval == seconds ? .on : .off
-            refreshMenu.addItem(item)
-        }
-        refreshSettings.submenu = refreshMenu
+        let refreshSettings = NSMenuItem(title: "Refresh Settings", action: #selector(showRefreshSettingsDialog), keyEquivalent: "")
+        refreshSettings.target = self
         menu.addItem(refreshSettings)
 
-        let refresh = NSMenuItem(title: "Force Usage Refresh", action: #selector(refreshNow), keyEquivalent: "r")
+        let refresh = NSMenuItem(title: "Force Usage Refresh", action: #selector(refreshNow), keyEquivalent: "")
         refresh.target = self
         refresh.isEnabled = !isSwitching
         menu.addItem(refresh)
@@ -430,15 +795,136 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         cleanBackups.isEnabled = !isSwitching
         menu.addItem(cleanBackups)
 
-        let launchAtLogin = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchAtLogin.target = self
-        launchAtLogin.state = launchAtLoginEnabled() ? .on : .off
-        menu.addItem(launchAtLogin)
-
-        let quit = NSMenuItem(title: "Quit Account Switcher", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit Account Switcher", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         menu.addItem(quit)
 
-        statusItem.menu = menu
+        settingsMenu = menu
+        statusItem.menu = nil
+        if accountPanel?.isVisible == true {
+            refreshAccountPanelContent()
+        } else {
+            accountPanel = nil
+        }
+    }
+
+    @objc private func toggleAccountPanel() {
+        if accountPanel?.isVisible == true {
+            closeAccountPanel()
+            return
+        }
+        showAccountPanel()
+    }
+
+    private func showAccountPanel() {
+        let panel = accountPanel ?? makeAccountPanel()
+        accountPanel = panel
+        refreshAccountPanelContent()
+        positionAccountPanel()
+        NSApp.activate(ignoringOtherApps: true)
+        panel.orderFrontRegardless()
+        panel.makeKey()
+    }
+
+    private func makeAccountPanel() -> NSPanel {
+        let panel = AccountFloatingPanel(
+            contentRect: NSRect(origin: .zero, size: accountPanelSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.level = .statusBar
+        panel.collectionBehavior = [.canJoinAllSpaces, .transient]
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        return panel
+    }
+
+    private func refreshAccountPanelContent() {
+        let panel = AccountSwitcherPanelView(
+            accounts: toolbarAccounts(),
+            activeAccount: accounts.first(where: { $0.isActive }),
+            lastUpdatedText: lastUpdatedText(),
+            lastError: lastError,
+            isSwitching: isSwitching,
+            launchAtLoginEnabled: launchAtLoginEnabled(),
+            labelForAccount: { [weak self] account in
+                self?.toolbarLabel(for: account) ?? String(account.selector.prefix(1))
+            },
+            compactEmail: { [weak self] email in
+                self?.compactEmail(email) ?? email
+            },
+            switchAccount: { [weak self] email in
+                self?.closeAccountPanel()
+                self?.switchTo(query: email)
+            },
+            refresh: { [weak self] in
+                self?.refreshAccounts(force: true)
+            },
+            showSettings: { [weak self] sender in
+                self?.showSettingsMenu(from: sender)
+            },
+            close: { [weak self] in
+                self?.closeAccountPanel()
+            },
+            toggleLaunchAtLogin: { [weak self] in
+                self?.toggleLaunchAtLogin()
+            }
+        )
+        let controller = NSViewController()
+        controller.view = panel
+        accountPanel?.contentViewController = controller
+    }
+
+    private func positionAccountPanel() {
+        guard let panel = accountPanel else { return }
+
+        guard let button = statusItem.button,
+              let window = button.window,
+              let screen = window.screen ?? NSScreen.main else {
+            positionAccountPanelAtScreenFallback(panel)
+            return
+        }
+
+        let buttonFrameInWindow = button.convert(button.bounds, to: nil)
+        let buttonFrame = window.convertToScreen(buttonFrameInWindow)
+        let visibleFrame = screen.visibleFrame
+        let margin: CGFloat = 8
+
+        var x = buttonFrame.midX - accountPanelSize.width / 2
+        x = max(visibleFrame.minX + margin, min(x, visibleFrame.maxX - accountPanelSize.width - margin))
+
+        var y = buttonFrame.minY - accountPanelSize.height - margin
+        if y < visibleFrame.minY + margin {
+            y = min(buttonFrame.maxY + margin, visibleFrame.maxY - accountPanelSize.height - margin)
+        }
+
+        panel.setFrame(NSRect(x: x, y: y, width: accountPanelSize.width, height: accountPanelSize.height), display: true)
+    }
+
+    private func positionAccountPanelAtScreenFallback(_ panel: NSPanel) {
+        guard let screen = NSScreen.main else { return }
+        let visibleFrame = screen.visibleFrame
+        let margin: CGFloat = 12
+        let x = visibleFrame.maxX - accountPanelSize.width - margin
+        let y = visibleFrame.maxY - accountPanelSize.height - margin
+        panel.setFrame(NSRect(x: x, y: y, width: accountPanelSize.width, height: accountPanelSize.height), display: true)
+    }
+
+    private func closeAccountPanel() {
+        accountPanel?.orderOut(nil)
+    }
+
+    private func showSettingsMenu(from sender: NSView) {
+        settingsMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    private func showSettingsMenuForScreenshot() {
+        guard demoMode, let panel = accountPanel else { return }
+        let point = NSPoint(x: panel.frame.maxX - 190, y: panel.frame.maxY - 96)
+        settingsMenu.popUp(positioning: nil, at: point, in: nil)
     }
 
     private func advanceStatusAnimation() {
@@ -559,16 +1045,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return item
     }
 
-    private func fiveHourUsageItem(for account: CodexAccount) -> NSMenuItem {
-        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        item.attributedTitle = usageAttributedTitle(
-            title: toolbarLabel(for: account),
-            percent: remainingPercentText(fromUsed: account.fiveHourUsedPercent),
-            reset: resetTimeText(from: account.fiveHourUsage)
-        )
-        item.state = account.isActive ? .on : .off
-        item.toolTip = account.email
-        return item
+    private func accountPopup(width: CGFloat) -> NSPopUpButton {
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
+        for account in toolbarAccounts() {
+            addPopupItem(
+                to: popup,
+                title: "\(toolbarLabel(for: account))  \(compactEmail(account.email))",
+                representedObject: account.email
+            )
+        }
+        if let active = accounts.first(where: { $0.isActive }) {
+            popup.selectItem(withTitle: "\(toolbarLabel(for: active))  \(compactEmail(active.email))")
+        }
+        return popup
+    }
+
+    private func refreshIntervalPopup(width: CGFloat, values: [Int], selected: Int) -> NSPopUpButton {
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
+        for value in values {
+            addPopupItem(to: popup, title: "\(value)s", representedObject: value)
+        }
+        popup.selectItem(withTitle: "\(selected)s")
+        return popup
+    }
+
+    private func addPopupItem(to popup: NSPopUpButton, title: String, representedObject: Any) {
+        popup.addItem(withTitle: title)
+        popup.lastItem?.representedObject = representedObject
+    }
+
+    private func selectedAccountEmail(from popup: NSPopUpButton) -> String? {
+        popup.selectedItem?.representedObject as? String
+    }
+
+    private func settingsRow(label: String, control: NSView) -> NSView {
+        let labelView = NSTextField(labelWithString: label)
+        labelView.frame = NSRect(x: 0, y: 0, width: 110, height: 24)
+        let row = NSStackView(views: [labelView, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        row.frame = NSRect(x: 0, y: 0, width: 250, height: 26)
+        return row
     }
 
     private func usageAttributedTitle(title: String, percent: String, reset: String) -> NSAttributedString {
@@ -580,10 +1098,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
     }
 
-    private func accountAttributedTitle(label: String, email: String) -> NSAttributedString {
-        attributedColumns(
-            "\(limitedLabel(label))\t\(email)",
-            tabs: [86],
+    private func accountColumnsHeaderItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        item.attributedTitle = attributedColumns(
+            "\tAccounts:\t5H\tReset\tWeekly",
+            tabs: [18, 178, 226, 308],
+            font: NSFont.menuFont(ofSize: 0),
+            color: .secondaryLabelColor
+        )
+        return item
+    }
+
+    private func accountAttributedTitle(for account: CodexAccount) -> NSAttributedString {
+        let label = toolbarLabel(for: account)
+        let fiveHourPercent = remainingPercentText(fromUsed: account.fiveHourUsedPercent)
+        let fiveHourReset = resetTimeText(from: account.fiveHourUsage)
+        let weeklyPercent = remainingPercentText(fromUsed: account.weeklyUsedPercent)
+        return attributedColumns(
+            "\(label)\t\(compactEmail(account.email))\t\(fiveHourPercent)\t\(fiveHourReset)\t\(weeklyPercent)",
+            tabs: [18, 178, 226, 308],
             font: NSFont.menuFont(ofSize: 0),
             color: .labelColor
         )
@@ -711,6 +1245,169 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
               let style = ToolbarDisplayStyle(rawValue: rawValue) else { return }
         toolbarDisplayStyle = style
         rebuildMenu()
+    }
+
+    @objc private func showAccountDisplayLabelsDialog() {
+        guard !accounts.isEmpty else { return }
+        let popup = accountPopup(width: 300)
+        let selectedEmail = selectedAccountEmail(from: popup)
+        let selectedAccount = selectedEmail.flatMap { email in accounts.first(where: { $0.email == email }) }
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        if let selectedAccount {
+            field.stringValue = displayLabel(for: selectedAccount)
+        }
+        field.placeholderString = "L"
+
+        let stack = NSStackView(views: [popup, field])
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 300, height: 58)
+
+        let alert = NSAlert()
+        alert.messageText = "Account display label"
+        alert.informativeText = "Choose an account and set the short menu-bar label. Leave it blank to clear the custom label."
+        alert.accessoryView = stack
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Clear")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        guard let email = selectedAccountEmail(from: popup) else { return }
+        if response == .alertFirstButtonReturn {
+            let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.isEmpty {
+                clearCustomLabel(forEmail: email)
+            } else {
+                setCustomLabel(limitedLabel(value), forEmail: email)
+            }
+            rebuildMenu()
+        } else if response == .alertSecondButtonReturn {
+            clearCustomLabel(forEmail: email)
+            rebuildMenu()
+        }
+    }
+
+    @objc private func showMenuBarDisplayDialog() {
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26), pullsDown: false)
+        addPopupItem(to: popup, title: "Large with Percentage", representedObject: ToolbarDisplayStyle.detailed.rawValue)
+        addPopupItem(to: popup, title: "Small Number Only", representedObject: ToolbarDisplayStyle.compact.rawValue)
+        popup.selectItem(withTitle: toolbarDisplayStyle == .detailed ? "Large with Percentage" : "Small Number Only")
+
+        let alert = NSAlert()
+        alert.messageText = "Menu bar display"
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let rawValue = popup.selectedItem?.representedObject as? String,
+           let style = ToolbarDisplayStyle(rawValue: rawValue) {
+            toolbarDisplayStyle = style
+            rebuildMenu()
+        }
+    }
+
+    @objc private func showRemoveAccountDialog() {
+        guard !accounts.isEmpty else { return }
+        let popup = accountPopup(width: 320)
+        let alert = NSAlert()
+        alert.messageText = "Remove account?"
+        alert.informativeText = "Remove the selected account from codex-auth switching."
+        alert.alertStyle = .warning
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let email = selectedAccountEmail(from: popup) {
+            runAccountMaintenance(title: "Removing account", args: ["remove", email])
+        }
+    }
+
+    @objc private func showUsageReminderDialog() {
+        let notifyCheck = NSButton(checkboxWithTitle: "Notify on low usage", target: nil, action: nil)
+        notifyCheck.state = remindersEnabled ? .on : .off
+
+        let autoSwitchCheck = NSButton(checkboxWithTitle: "Auto-switch on low 5H", target: nil, action: nil)
+        autoSwitchCheck.state = autoSwitchEnabled ? .on : .off
+        autoSwitchCheck.isEnabled = accounts.count > 1 && !isSwitching
+
+        let protectCheck = NSButton(checkboxWithTitle: "Do not auto-switch while Codex is frontmost", target: nil, action: nil)
+        protectCheck.state = protectFrontmostCodex ? .on : .off
+
+        let notifyField = NSTextField(frame: NSRect(x: 0, y: 0, width: 70, height: 24))
+        notifyField.stringValue = "\(reminderThreshold)"
+        let autoSwitchField = NSTextField(frame: NSRect(x: 0, y: 0, width: 70, height: 24))
+        autoSwitchField.stringValue = "\(autoSwitchThreshold)"
+
+        let notifyRow = settingsRow(label: "Notify %", control: notifyField)
+        let autoSwitchRow = settingsRow(label: "Switch %", control: autoSwitchField)
+        let stack = NSStackView(views: [notifyCheck, notifyRow, autoSwitchCheck, autoSwitchRow, protectCheck])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 320, height: 138)
+
+        let alert = NSAlert()
+        alert.messageText = "Usage reminder"
+        alert.accessoryView = stack
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Test")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn {
+            testUsageReminder()
+            return
+        }
+        guard response == .alertFirstButtonReturn else { return }
+
+        let notifyValue = Int(notifyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        let switchValue = Int(autoSwitchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let notifyValue, (1...99).contains(notifyValue),
+              let switchValue, (1...99).contains(switchValue) else {
+            showAlert(title: "Invalid percentage", message: "Enter numbers from 1 to 99.")
+            return
+        }
+
+        remindersEnabled = notifyCheck.state == .on
+        autoSwitchEnabled = autoSwitchCheck.state == .on
+        protectFrontmostCodex = protectCheck.state == .on
+        reminderThreshold = notifyValue
+        autoSwitchThreshold = switchValue
+        if remindersEnabled || autoSwitchEnabled {
+            configureNotifications()
+        }
+        checkUsageReminder()
+        checkAutoSwitch()
+        rebuildMenu()
+    }
+
+    @objc private func showRefreshSettingsDialog() {
+        let activePopup = refreshIntervalPopup(width: 120, values: [5, 15, 30, 60], selected: activeRefreshInterval)
+        let idlePopup = refreshIntervalPopup(width: 120, values: [15, 30, 60], selected: idleRefreshInterval)
+        let stack = NSStackView(views: [
+            settingsRow(label: "Codex active", control: activePopup),
+            settingsRow(label: "Idle", control: idlePopup)
+        ])
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 260, height: 62)
+
+        let alert = NSAlert()
+        alert.messageText = "Refresh settings"
+        alert.accessoryView = stack
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let active = activePopup.selectedItem?.representedObject as? Int,
+           let idle = idlePopup.selectedItem?.representedObject as? Int {
+            activeRefreshInterval = active
+            idleRefreshInterval = idle
+            rebuildMenu()
+        }
     }
 
     @objc private func addAccountBrowser() {
@@ -1351,6 +2048,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    private func demoAccounts() -> [CodexAccount] {
+        [
+            CodexAccount(
+                selector: "01",
+                email: "alpha@example.com",
+                plan: "plus",
+                fiveHourUsage: "31% (16:40)",
+                weeklyUsage: "82% (Fri 09:00)",
+                fiveHourUsedPercent: 31,
+                weeklyUsedPercent: 82,
+                lastActivity: "Just now",
+                isActive: true
+            ),
+            CodexAccount(
+                selector: "02",
+                email: "beta@example.com",
+                plan: "plus",
+                fiveHourUsage: "92% (18:15)",
+                weeklyUsage: "64% (Fri 09:00)",
+                fiveHourUsedPercent: 92,
+                weeklyUsedPercent: 64,
+                lastActivity: "1h ago",
+                isActive: false
+            )
+        ]
+    }
+
     private static func parseUsage(_ tokens: [String], from startIndex: Int) -> (text: String, usedPercent: Int?, nextIndex: Int) {
         guard startIndex < tokens.count else {
             return ("-", nil, startIndex)
@@ -1521,6 +2245,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func limitedLabel(_ label: String) -> String {
         String(label.prefix(5))
+    }
+
+    private func compactEmail(_ email: String) -> String {
+        let maximumLength = 18
+        guard email.count > maximumLength else { return email }
+        return String(email.prefix(maximumLength - 3)) + "..."
     }
 
     private func displayPlan(_ plan: String) -> String {

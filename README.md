@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.0"><img alt="Download v1.0" src="https://img.shields.io/badge/Download-v1.0-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.1"><img alt="Download v1.1" src="https://img.shields.io/badge/Download-v1.1-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.0/Codex-Account-Switcher-v1.0.zip"><strong>Download v1.0</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.1/Codex-Account-Switcher-v1.1.zip"><strong>Download v1.1</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -34,10 +34,21 @@ If you use the Codex Desktop app heavily, swapping between personal and work Cha
 - one-click switching with Codex relaunch
 - optional automatic switching when the active account drops below your chosen 5-hour usage threshold
 - low-usage notification with a `Switch Now` action
+- a compact click-to-open account panel for quick switching and settings
 
 It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
 
 ## What It Looks Like
+
+<p align="center">
+  <img src="assets/screenshot-panel.png" alt="Codex Account Switcher account panel with placeholder accounts" width="720">
+</p>
+
+<p align="center">
+  <img src="assets/screenshot-settings.png" alt="Codex Account Switcher settings menu with placeholder accounts" width="720">
+</p>
+
+The screenshots use placeholder `example.com` accounts. Public screenshots and release assets should never include real account emails, account IDs, tokens, usage registries, or local Codex auth files.
 
 By default, the menu bar uses the larger percentage style:
 
@@ -55,6 +66,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 ## Features
 
 - Menu-bar usage display with large percentage and small compact styles.
+- Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, close, and launch-at-login controls.
 - Bright active account and dim inactive accounts.
 - Dropdown showing 5-hour usage for all saved accounts.
 - Email-based switching, avoiding brittle numeric selectors.
@@ -128,10 +140,13 @@ The app uses `codex-auth switch <email-query>` internally, so it does not depend
 
 This repository does not contain account credentials, tokens, account IDs, local auth files, usage registries, or personal account data.
 
+Screenshots are generated from demo account data and should stay that way for future releases.
+
 Usage refresh depends on `codex-auth`. In API mode, `codex-auth` fetches usage from ChatGPT backend endpoints using your saved account token. Review the `codex-auth` documentation and decide whether that tradeoff is right for you.
 
 ## Releases
 
+- Version 1.1: adds the account panel UI and dialog-based settings controls.
 - Version 1.00: first public release.
 
 ## Roadmap Ideas
