@@ -1,28 +1,67 @@
-# Codex Account Switcher
+<p align="center">
+  <img src="assets/hero.svg" alt="Codex Account Switcher preview" width="100%">
+</p>
 
-A small native macOS menu-bar app for switching between saved Codex / ChatGPT accounts with [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
+<h1 align="center">Codex Account Switcher</h1>
 
-The app shows compact weekly usage for saved accounts in the menu bar, shows 5-hour usage in the dropdown, and can prompt you to switch accounts when the active account gets low.
+<p align="center">
+  <strong>A tiny native macOS menu-bar app for switching Codex / ChatGPT accounts before your usage limit gets in the way.</strong>
+</p>
+
+<p align="center">
+  <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
+  <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
+  <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
+</p>
+
+## Why
+
+If you use Codex heavily, swapping between personal and work ChatGPT accounts can be clunky. Codex Account Switcher puts the useful bits in your menu bar:
+
+- weekly usage for each saved account at a glance
+- active account highlighted, inactive accounts dimmed
+- both accounts' 5-hour usage in the dropdown
+- one-click switching with Codex relaunch
+- low-usage notification with a `Switch Now` action
+
+It is deliberately small: a single Swift/AppKit menu-bar app that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
+
+## What It Looks Like
+
+The menu bar stays compact:
+
+```text
+A93 B84
+```
+
+By default, each account uses the first letter or number from its email address. For example:
+
+- `alice@example.com` becomes `A`
+- `builds@example.com` becomes `B`
+
+You can override account labels from the menu if you prefer custom initials.
 
 ## Features
 
-- Compact menu-bar usage such as `A93 B84`.
-- Active account shown bright, inactive accounts dimmed.
-- Dropdown with both accounts' 5-hour remaining usage.
-- One-click account switching with Codex relaunch.
-- Configurable usage notifications.
-- Optional "Switch Now" notification flow for low 5-hour usage.
-- Configurable refresh intervals.
+- Compact menu-bar usage display.
+- Bright active account and dim inactive accounts.
+- Dropdown showing 5-hour usage for all saved accounts.
+- Email-based switching, avoiding brittle numeric selectors.
+- Codex relaunch after switching so Desktop picks up the new account.
+- Configurable notification and auto-switch thresholds.
+- `Switch Now` notification action for low usage.
+- Refresh interval controls for active and idle states.
 - Launch-at-login toggle.
 - Account backup cleanup.
-- Generic account initials: by default, each account uses the first letter or number of its email address. You can override labels from the app menu.
+- No bundled credentials, tokens, account registry, or usage snapshots.
 
 ## Requirements
 
 - macOS 14 or later.
-- Swift compiler / Xcode command line tools.
-- Codex desktop app installed at `/Applications/Codex.app`.
-- `codex-auth` installed and configured with at least one account.
+- Xcode command line tools / Swift compiler.
+- Codex Desktop installed at `/Applications/Codex.app`.
+- [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth) installed and configured.
 
 Install `codex-auth`:
 
@@ -35,6 +74,8 @@ Add accounts:
 ```bash
 codex-auth login
 ```
+
+Repeat login for each account you want to switch between.
 
 ## Build
 
@@ -66,13 +107,24 @@ This installs to:
 ./run.sh
 ```
 
-## Notes
+## How Switching Works
 
-Codex Desktop needs to be relaunched after an account switch before the newly active account takes effect. This app performs that relaunch as part of switching.
+Codex Desktop needs to be relaunched after an account switch before the newly active account takes effect. This app handles that relaunch as part of switching.
 
-Usage refresh depends on `codex-auth`. When `codex-auth` is in API mode, it fetches usage from ChatGPT backend endpoints using the saved account token. Review the `codex-auth` documentation and decide whether that tradeoff is right for you.
+The app uses `codex-auth switch <email-query>` internally, so it does not depend on account numbers such as `01` or `02`.
 
-No account credentials, tokens, usage registry, or local auth files are included in this repository.
+## Privacy Notes
+
+This repository does not contain account credentials, tokens, account IDs, local auth files, usage registries, or personal account data.
+
+Usage refresh depends on `codex-auth`. In API mode, `codex-auth` fetches usage from ChatGPT backend endpoints using your saved account token. Review the `codex-auth` documentation and decide whether that tradeoff is right for you.
+
+## Roadmap Ideas
+
+- Signed release builds.
+- Homebrew cask.
+- Preferences window if the menu grows too large.
+- Optional sound or banner style settings for switch prompts.
 
 ## License
 
