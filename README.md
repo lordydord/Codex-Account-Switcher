@@ -119,6 +119,10 @@ This repository does not contain account credentials, tokens, account IDs, local
 
 Usage refresh depends on `codex-auth`. In API mode, `codex-auth` fetches usage from ChatGPT backend endpoints using your saved account token. Review the `codex-auth` documentation and decide whether that tradeoff is right for you.
 
+## Releases
+
+- Version 1.00: first public release.
+
 ## Roadmap Ideas
 
 - Signed release builds.
