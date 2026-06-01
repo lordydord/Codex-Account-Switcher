@@ -48,13 +48,6 @@ It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop t
   <img src="assets/screenshot-settings.png" alt="Codex Account Switcher settings menu with placeholder accounts" width="720">
 </p>
 
-The screenshots use placeholder `example.com` accounts. Public screenshots and release assets should never include real account emails, account IDs, tokens, usage registries, or local Codex auth files.
-
-By default, the menu bar uses the larger percentage style:
-
-```text
-A93% B84%
-```
 
 By default, each account uses the first letter or number from its email address. For example:
 
