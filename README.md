@@ -12,20 +12,30 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.0"><img alt="Download v1.0" src="https://img.shields.io/badge/Download-v1.0-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.0/Codex-Account-Switcher-v1.0.zip"><strong>Download v1.0</strong></a>
+  ·
+  <a href="#install"><strong>Install from source</strong></a>
+  ·
+  <a href="#how-switching-works"><strong>How switching works</strong></a>
 </p>
 
 ## Why
 
-If you use Codex heavily, swapping between personal and work ChatGPT accounts can be clunky. Codex Account Switcher puts the useful bits in your menu bar:
+If you use the Codex Desktop app heavily, swapping between personal and work ChatGPT accounts can be clunky. Codex Account Switcher puts the useful bits in your menu bar:
 
 - weekly usage for each saved account at a glance
 - active account highlighted, inactive accounts dimmed
 - both accounts' 5-hour usage in the dropdown
 - one-click switching with Codex relaunch
+- optional automatic switching when the active account drops below your chosen 5-hour usage threshold
 - low-usage notification with a `Switch Now` action
 
-It is deliberately small: a single Swift/AppKit menu-bar app that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
+It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
 
 ## What It Looks Like
 
@@ -50,6 +60,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - Email-based switching, avoiding brittle numeric selectors.
 - Codex relaunch after switching so Desktop picks up the new account.
 - Configurable notification and auto-switch thresholds.
+- Optional auto-switching from a low-usage active account to another saved account.
 - `Switch Now` notification action for low usage.
 - Refresh interval controls for active and idle states.
 - Launch-at-login toggle.
