@@ -41,11 +41,18 @@ It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop t
 ## What It Looks Like
 
 <p align="center">
-  <img src="assets/screenshot-panel.png" alt="Codex Account Switcher account panel with placeholder accounts" width="720">
+  <strong>Menu-bar status</strong><br>
+  <img src="assets/screenshot-menubar.png" alt="Codex Account Switcher menu-bar status with placeholder account labels" width="520">
 </p>
 
 <p align="center">
-  <img src="assets/screenshot-settings.png" alt="Codex Account Switcher settings menu with placeholder accounts" width="720">
+  <strong>Account panel</strong><br>
+  <img src="assets/screenshot-panel.png" alt="Codex Account Switcher account panel with placeholder accounts" width="360">
+</p>
+
+<p align="center">
+  <strong>Cog menu</strong><br>
+  <img src="assets/screenshot-settings.png" alt="Codex Account Switcher cog settings menu with placeholder accounts" width="380">
 </p>
 
 
