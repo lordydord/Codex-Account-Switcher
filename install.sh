@@ -11,6 +11,10 @@ mkdir -p "$DEST_DIR"
 rm -rf "$DEST_APP"
 cp -R "$APP_PATH" "$DEST_APP"
 
+if command -v xattr >/dev/null 2>&1; then
+  /usr/bin/xattr -cr "$DEST_APP"
+fi
+
 if command -v codesign >/dev/null 2>&1; then
   /usr/bin/codesign --force --deep --sign - "$DEST_APP" >/dev/null
 fi

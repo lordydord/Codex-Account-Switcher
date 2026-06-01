@@ -29,10 +29,10 @@ It is deliberately small: a single Swift/AppKit menu-bar app that talks to [`cod
 
 ## What It Looks Like
 
-The menu bar stays compact:
+By default, the menu bar uses the larger percentage style:
 
 ```text
-A93 B84
+A93% B84%
 ```
 
 By default, each account uses the first letter or number from its email address. For example:
@@ -40,11 +40,11 @@ By default, each account uses the first letter or number from its email address.
 - `alice@example.com` becomes `A`
 - `builds@example.com` becomes `B`
 
-You can override account labels from the menu if you prefer custom initials.
+You can switch the menu bar to a smaller `A93 B84` style, or override account labels from the menu if you prefer custom initials.
 
 ## Features
 
-- Compact menu-bar usage display.
+- Menu-bar usage display with large percentage and small compact styles.
 - Bright active account and dim inactive accounts.
 - Dropdown showing 5-hour usage for all saved accounts.
 - Email-based switching, avoiding brittle numeric selectors.

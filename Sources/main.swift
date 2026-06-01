@@ -19,6 +19,11 @@ enum UsageDisplayMode: String {
     case weekly
 }
 
+enum ToolbarDisplayStyle: String {
+    case detailed
+    case compact
+}
+
 struct CommandResult {
     let status: Int32
     let output: String
@@ -35,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let refreshIntervalDefaultsKey = "refreshIntervalSeconds"
     private let idleRefreshIntervalDefaultsKey = "idleRefreshIntervalSeconds"
     private let protectFrontmostCodexDefaultsKey = "protectFrontmostCodex"
+    private let toolbarDisplayStyleDefaultsKey = "toolbarDisplayStyle"
     private let autoSwitchNotificationCategory = "AUTO_SWITCH_CONFIRM"
     private let switchNowActionIdentifier = "SWITCH_NOW"
     private let launchAgentIdentifier = "com.mohamedfuad.codexaccountswitcher"
@@ -127,6 +133,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "usageDisplayMode")
+        }
+    }
+    private var toolbarDisplayStyle: ToolbarDisplayStyle {
+        get {
+            ToolbarDisplayStyle(rawValue: UserDefaults.standard.string(forKey: toolbarDisplayStyleDefaultsKey) ?? "") ?? .detailed
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: toolbarDisplayStyleDefaultsKey)
         }
     }
 
@@ -330,6 +344,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             labelsItem.submenu = labelsMenu
             menu.addItem(labelsItem)
 
+            let displayItem = NSMenuItem(title: "Menu Bar Display", action: nil, keyEquivalent: "")
+            let displayMenu = NSMenu()
+            displayMenu.addItem(toolbarDisplayStyleItem(title: "Large with Percentage", style: .detailed))
+            displayMenu.addItem(toolbarDisplayStyleItem(title: "Small Number Only", style: .compact))
+            displayItem.submenu = displayMenu
+            menu.addItem(displayItem)
+
             let removeItem = NSMenuItem(title: "Remove Account", action: nil, keyEquivalent: "")
             let removeMenu = NSMenu()
             for account in accounts {
@@ -438,16 +459,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 result.append(NSAttributedString(string: " ", attributes: toolbarTitleAttributes(isActive: true)))
             }
             result.append(NSAttributedString(
-                string: "\(toolbarLabel(for: account))\(remainingPercentNumberText(fromUsed: account.weeklyUsedPercent))",
+                string: toolbarStatusText(for: account),
                 attributes: toolbarTitleAttributes(isActive: account.isActive)
             ))
         }
         return result
     }
 
+    private func toolbarStatusText(for account: CodexAccount) -> String {
+        let label = toolbarLabel(for: account)
+        switch toolbarDisplayStyle {
+        case .detailed:
+            return "\(label)\(remainingPercentText(fromUsed: account.weeklyUsedPercent))"
+        case .compact:
+            return "\(label)\(remainingPercentNumberText(fromUsed: account.weeklyUsedPercent))"
+        }
+    }
+
     private func toolbarTitleAttributes(isActive: Bool) -> [NSAttributedString.Key: Any] {
-        [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium),
+        let size: CGFloat = toolbarDisplayStyle == .detailed ? 12.5 : 10.5
+        return [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .medium),
             .foregroundColor: isActive ? NSColor.labelColor : NSColor.secondaryLabelColor
         ]
     }
@@ -516,6 +548,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         item.representedObject = mode.rawValue
         item.state = usageMode == mode ? .on : .off
         item.attributedTitle = usageAttributedTitle(title: title, percent: percent, reset: reset)
+        return item
+    }
+
+    private func toolbarDisplayStyleItem(title: String, style: ToolbarDisplayStyle) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: #selector(setToolbarDisplayStyle(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = style.rawValue
+        item.state = toolbarDisplayStyle == style ? .on : .off
         return item
     }
 
@@ -666,6 +706,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         rebuildMenu()
     }
 
+    @objc private func setToolbarDisplayStyle(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let style = ToolbarDisplayStyle(rawValue: rawValue) else { return }
+        toolbarDisplayStyle = style
+        rebuildMenu()
+    }
+
     @objc private func addAccountBrowser() {
         runAccountMaintenance(title: "Adding account", args: ["login"], restartAfterSuccess: true)
     }
@@ -788,7 +835,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         let alert = NSAlert()
         alert.messageText = "Set display label"
-        alert.informativeText = "Choose the label shown in the menu bar for \(account.email). Use 01, 02, text, or an emoji."
+        alert.informativeText = "Choose the label shown in the menu bar for \(account.email). Use a short letter, number, word, or emoji."
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
 
