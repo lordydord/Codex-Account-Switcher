@@ -24,6 +24,13 @@ enum ToolbarDisplayStyle: String {
     case compact
 }
 
+private func usageStatusColor(for percent: Int?) -> NSColor {
+    guard let percent else { return .systemBlue }
+    if percent >= 50 { return .systemGreen }
+    if percent >= 20 { return .systemOrange }
+    return .systemRed
+}
+
 struct CommandResult {
     let status: Int32
     let output: String
@@ -72,10 +79,10 @@ final class AccountSwitcherPanelView: NSView {
         self.showSettings = showSettings
         self.close = close
         self.toggleLaunchAtLogin = toggleLaunchAtLogin
-        super.init(frame: NSRect(x: 0, y: 0, width: 390, height: 500))
+        super.init(frame: NSRect(x: 0, y: 0, width: 380, height: 430))
         wantsLayer = true
-        layer?.cornerRadius = 20
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        layer?.cornerRadius = 22
+        layer?.masksToBounds = true
         build()
     }
 
@@ -86,12 +93,9 @@ final class AccountSwitcherPanelView: NSView {
     override var isFlipped: Bool { true }
 
     private func build() {
-        let header = makeHeader()
-        addSubview(header)
-
-        let separator = NSBox(frame: NSRect(x: 20, y: 70, width: 350, height: 1))
-        separator.boxType = .separator
-        addSubview(separator)
+        let background = DashboardBackgroundView(frame: bounds)
+        background.autoresizingMask = [.width, .height]
+        addSubview(background)
 
         if accounts.isEmpty {
             addSubview(emptyStateCard())
@@ -105,37 +109,37 @@ final class AccountSwitcherPanelView: NSView {
                 return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
             }
             let columns = min(orderedAccounts.count, 2)
-            let cardWidth = columns == 1 ? 350 : 171
+            let cardWidth = columns == 1 ? 332 : 158
             for (index, account) in orderedAccounts.prefix(2).enumerated() {
-                let x = columns == 1 ? 20 : 20 + CGFloat(index) * 179
-                addSubview(accountCard(account, frame: NSRect(x: x, y: 90, width: CGFloat(cardWidth), height: 278)))
+                let x = columns == 1 ? 24 : 24 + CGFloat(index) * 178
+                addSubview(accountCard(account, frame: NSRect(x: x, y: 24, width: CGFloat(cardWidth), height: 328)))
             }
         }
 
-        addSubview(bottomBar(frame: NSRect(x: 20, y: 420, width: 350, height: 48)))
+        addSubview(bottomBar(frame: NSRect(x: 24, y: 374, width: 332, height: 42)))
     }
 
     private func makeHeader() -> NSView {
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 390, height: 70))
+        let view = FlippedContainerView(frame: NSRect(x: 0, y: 0, width: 520, height: 88))
 
-        let icon = CircleIconView(frame: NSRect(x: 22, y: 17, width: 36, height: 36), color: .systemBlue, symbol: "chevron.left.forwardslash.chevron.right")
+        let icon = CircleIconView(frame: NSRect(x: 38, y: 24, width: 42, height: 42), color: .systemIndigo, symbol: "chevron.left.forwardslash.chevron.right")
         view.addSubview(icon)
 
-        let title = label("Codex Control", frame: NSRect(x: 72, y: 15, width: 210, height: 25), size: 20, weight: .semibold, color: .labelColor)
+        let title = label("Codex Control", frame: NSRect(x: 98, y: 23, width: 250, height: 28), size: 22, weight: .semibold, color: .white.withAlphaComponent(0.94))
         view.addSubview(title)
 
         let subtitleText = activeAccount.map { "Active account \(labelForAccount($0))" } ?? (lastError ?? "No active account")
-        let subtitle = label(subtitleText, frame: NSRect(x: 73, y: 40, width: 220, height: 19), size: 13, weight: .medium, color: activeAccount == nil ? .systemOrange : .systemBlue)
+        let subtitle = label(subtitleText, frame: NSRect(x: 99, y: 52, width: 260, height: 19), size: 13, weight: .medium, color: activeAccount == nil ? .systemOrange : .white.withAlphaComponent(0.58))
         subtitle.lineBreakMode = .byTruncatingTail
         view.addSubview(subtitle)
 
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 290, y: 20, width: 30, height: 30), action: #selector(refreshPressed))
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 377, y: 29, width: 32, height: 32), action: #selector(refreshPressed))
         view.addSubview(refreshButton)
 
-        let settingsButton = iconButton(symbol: "gearshape.fill", frame: NSRect(x: 326, y: 18, width: 34, height: 34), action: #selector(settingsPressed(_:)))
+        let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: 421, y: 28, width: 34, height: 34), action: #selector(settingsPressed(_:)))
         view.addSubview(settingsButton)
 
-        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: 360, y: 20, width: 30, height: 30), action: #selector(closePressed))
+        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: 465, y: 29, width: 32, height: 32), action: #selector(closePressed))
         view.addSubview(closeButton)
 
         return view
@@ -144,40 +148,61 @@ final class AccountSwitcherPanelView: NSView {
     private func accountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
         let weeklyPercent = account.weeklyUsedPercent
         let fiveHourPercent = account.fiveHourUsedPercent
-        let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
-        let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
-        let card = RoundedPanelView(frame: frame, fillColor: NSColor.controlBackgroundColor)
+        let weeklyColor = account.isActive ? NSColor.systemGreen : inactiveAccentColor()
+        let fiveHourColor = account.isActive ? NSColor.systemGreen : inactiveAccentColor()
+        let card = RoundedPanelView(frame: frame, fillColor: cardFillColor(isActive: account.isActive), borderColor: cardBorderColor(isActive: account.isActive))
         let labelText = labelForAccount(account)
 
-        let metric = label("Weekly", frame: NSRect(x: 16, y: 16, width: 70, height: 17), size: 11, weight: .medium, color: .secondaryLabelColor)
-        card.addSubview(metric)
-        let weeklyValue = label(weeklyPercent.map { "\($0)%" } ?? "--", frame: NSRect(x: frame.width - 76, y: 16, width: 58, height: 17), size: 11, weight: .medium, color: .secondaryLabelColor, alignment: .right)
-        card.addSubview(weeklyValue)
-
-        let progress = ProgressLineView(frame: NSRect(x: 16, y: 39, width: frame.width - 32, height: 7), color: weeklyColor, percent: CGFloat(weeklyPercent ?? 0) / 100)
-        card.addSubview(progress)
-
-        let ringSize: CGFloat = columnsFitWide(frame.width) ? 110 : 98
-        let ringX = (frame.width - ringSize) / 2
-        card.addSubview(label("5H", frame: NSRect(x: ringX + 24, y: 60, width: ringSize - 48, height: 16), size: 11, weight: .semibold, color: .secondaryLabelColor, alignment: .center))
-        let ring = UsageRingView(frame: NSRect(x: ringX, y: 80, width: ringSize, height: ringSize), color: fiveHourColor, percent: CGFloat(fiveHourPercent ?? 0) / 100)
-        card.addSubview(ring)
-        card.addSubview(label(fiveHourPercent.map { "\($0)" } ?? "--", frame: NSRect(x: ringX + 24, y: 110, width: ringSize - 48, height: 31), size: 27, weight: .semibold, color: fiveHourColor, alignment: .center))
-        card.addSubview(label("%", frame: NSRect(x: ringX + 24, y: 144, width: ringSize - 48, height: 16), size: 12, weight: .semibold, color: .secondaryLabelColor.withAlphaComponent(0.75), alignment: .center))
-
-        card.addSubview(label(labelText, frame: NSRect(x: 16, y: 182, width: 40, height: 32), size: 28, weight: .semibold, color: fiveHourColor))
-        let status = account.isActive ? "Active" : "Ready"
-        card.addSubview(label(status, frame: NSRect(x: frame.width - 74, y: 190, width: 56, height: 18), size: 11, weight: .semibold, color: fiveHourColor, alignment: .right))
-
-        let buttonTitle = account.isActive ? "Active" : (isSwitching ? "Switching..." : "Switch")
-        let buttonColor = account.isActive ? usageColor(for: fiveHourPercent) : NSColor.systemGray.withAlphaComponent(0.42)
-        let switchButton = PillButton(frame: NSRect(x: 16, y: 230, width: frame.width - 32, height: 30), title: buttonTitle, color: buttonColor)
+        let statusTitle = account.isActive ? "Active" : (isSwitching ? "Switching..." : "Switch")
+        let buttonColor = account.isActive ? NSColor.systemGreen : NSColor.white.withAlphaComponent(0.15)
+        let switchButton = PillButton(frame: NSRect(x: 18, y: 20, width: frame.width - 36, height: 30), title: statusTitle, color: buttonColor, showsCheckmark: account.isActive)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
         switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
         switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
         card.addSubview(switchButton)
+
+        card.addSubview(label(labelText, frame: NSRect(x: 18, y: 68, width: frame.width - 36, height: 30), size: 26, weight: .semibold, color: fiveHourColor, alignment: .center))
+        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 18, y: 99, width: frame.width - 36, height: 14), size: 9.2, weight: .medium, color: .white.withAlphaComponent(0.42), alignment: .center))
+
+        let ringSize: CGFloat = columnsFitWide(frame.width) ? 150 : 116
+        let ringX = (frame.width - ringSize) / 2
+        let ring = UsageRingView(frame: NSRect(x: ringX, y: 116, width: ringSize, height: ringSize), color: fiveHourColor, percent: CGFloat(fiveHourPercent ?? 0) / 100, isActive: account.isActive)
+        card.addSubview(ring)
+        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: 148, width: ringSize - 16, height: 42), percent: fiveHourPercent, color: fiveHourColor))
+        card.addSubview(label("Remaining", frame: NSRect(x: ringX + 18, y: 184, width: ringSize - 36, height: 18), size: 10.5, weight: .medium, color: .white.withAlphaComponent(0.54), alignment: .center))
+
+        card.addSubview(label("5H Remaining", frame: NSRect(x: 18, y: 242, width: frame.width - 36, height: 18), size: 11, weight: .semibold, color: .white.withAlphaComponent(0.45), alignment: .center))
+
+        let divider = NSView(frame: NSRect(x: 18, y: 272, width: frame.width - 36, height: 1))
+        divider.wantsLayer = true
+        divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.09).cgColor
+        card.addSubview(divider)
+
+        let weeklyLabel = label("Weekly", frame: NSRect(x: 18, y: 288, width: 64, height: 16), size: 10.5, weight: .medium, color: .white.withAlphaComponent(0.50))
+        card.addSubview(weeklyLabel)
+        let weeklyValue = label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 60, y: 288, width: 42, height: 16), size: 10.5, weight: .semibold, color: .white.withAlphaComponent(0.72), alignment: .right)
+        card.addSubview(weeklyValue)
+
+        let progress = ProgressLineView(frame: NSRect(x: 18, y: 310, width: frame.width - 36, height: 7), color: weeklyColor, percent: CGFloat(weeklyPercent ?? 0) / 100)
+        card.addSubview(progress)
         return card
+    }
+
+    private func percentText(_ percent: Int?) -> String {
+        guard let percent else { return "--" }
+        return "\(max(0, min(100, percent)))%"
+    }
+
+    private func percentNumberText(_ percent: Int?) -> String {
+        guard let percent else { return "--" }
+        return "\(max(0, min(100, percent)))"
+    }
+
+    private func compactCardEmail(_ email: String) -> String {
+        let maximumLength = 16
+        guard email.count > maximumLength else { return email }
+        return String(email.prefix(maximumLength - 3)) + "..."
     }
 
     private func columnsFitWide(_ width: CGFloat) -> Bool {
@@ -196,18 +221,29 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func emptyStateCard() -> NSView {
-        let card = RoundedPanelView(frame: NSRect(x: 20, y: 90, width: 350, height: 278), fillColor: NSColor.controlBackgroundColor)
-        card.addSubview(label("No accounts available", frame: NSRect(x: 22, y: 30, width: 220, height: 26), size: 20, weight: .semibold, color: .labelColor))
-        card.addSubview(label(lastError ?? "Open settings to add an account.", frame: NSRect(x: 22, y: 66, width: 292, height: 44), size: 13, weight: .medium, color: .secondaryLabelColor))
+        let card = RoundedPanelView(frame: NSRect(x: 24, y: 24, width: 332, height: 328), fillColor: cardFillColor(isActive: false), borderColor: NSColor.white.withAlphaComponent(0.12))
+        card.addSubview(label("No accounts available", frame: NSRect(x: 22, y: 28, width: 240, height: 24), size: 18, weight: .semibold, color: .white.withAlphaComponent(0.92)))
+        card.addSubview(label(lastError ?? "Open settings to add an account.", frame: NSRect(x: 22, y: 62, width: 276, height: 40), size: 12, weight: .medium, color: .white.withAlphaComponent(0.56)))
         return card
     }
 
     private func bottomBar(frame: NSRect) -> NSView {
-        let bar = RoundedPanelView(frame: frame, fillColor: NSColor.controlBackgroundColor)
-        bar.addSubview(label("Updated \(lastUpdatedText)", frame: NSRect(x: 16, y: 13, width: 160, height: 22), size: 12, weight: .medium, color: .secondaryLabelColor))
-        bar.addSubview(label("Launch", frame: NSRect(x: 210, y: 13, width: 64, height: 22), size: 12, weight: .medium, color: .secondaryLabelColor, alignment: .right))
-        let startupSwitch = NSSwitch(frame: NSRect(x: 284, y: 10, width: 46, height: 28))
-        startupSwitch.state = launchAtLoginEnabled ? .on : .off
+        let bar = RoundedPanelView(frame: frame, fillColor: NSColor(red: 0.07, green: 0.10, blue: 0.14, alpha: 0.72), borderColor: NSColor.white.withAlphaComponent(0.10), cornerRadius: 14)
+        let clock = CircleIconView(frame: NSRect(x: 14, y: 11, width: 20, height: 20), color: .white.withAlphaComponent(0.58), symbol: "clock")
+        bar.addSubview(clock)
+        bar.addSubview(CenteredTextView(frame: NSRect(x: 42, y: 9, width: 58, height: 24), text: lastUpdatedText, size: 10.5, weight: .medium, color: .white.withAlphaComponent(0.82), alignment: .left))
+
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 124, y: 9, width: 24, height: 24), action: #selector(refreshPressed))
+        bar.addSubview(refreshButton)
+
+        let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: 154, y: 9, width: 24, height: 24), action: #selector(settingsPressed(_:)))
+        bar.addSubview(settingsButton)
+
+        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: 184, y: 9, width: 24, height: 24), action: #selector(closePressed))
+        bar.addSubview(closeButton)
+
+        bar.addSubview(CenteredTextView(frame: NSRect(x: 232, y: 9, width: 44, height: 24), text: "Launch", size: 10.5, weight: .medium, color: .white.withAlphaComponent(0.64), alignment: .right))
+        let startupSwitch = MiniSwitchButton(frame: NSRect(x: 288, y: 10, width: 34, height: 22), isOn: launchAtLoginEnabled)
         startupSwitch.target = self
         startupSwitch.action = #selector(launchAtLoginPressed)
         bar.addSubview(startupSwitch)
@@ -215,15 +251,27 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func usageColor(for percent: Int?) -> NSColor {
-        guard let percent else { return .systemBlue }
-        if percent >= 50 { return .systemGreen }
-        if percent >= 20 { return .systemOrange }
-        return .systemRed
+        usageStatusColor(for: percent)
     }
 
     private func accentColor(for percent: Int?, isActive: Bool) -> NSColor {
         guard isActive else { return NSColor.systemGray.withAlphaComponent(0.32) }
         return usageColor(for: percent)
+    }
+
+    private func inactiveAccentColor() -> NSColor {
+        NSColor.white.withAlphaComponent(0.42)
+    }
+
+    private func cardFillColor(isActive: Bool) -> NSColor {
+        if isActive {
+            return NSColor(red: 0.045, green: 0.105, blue: 0.085, alpha: 0.70)
+        }
+        return NSColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 0.76)
+    }
+
+    private func cardBorderColor(isActive: Bool) -> NSColor {
+        isActive ? NSColor.systemGreen.withAlphaComponent(0.68) : NSColor.white.withAlphaComponent(0.12)
     }
 
     private func label(_ string: String, frame: NSRect, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) -> NSTextField {
@@ -242,7 +290,7 @@ final class AccountSwitcherPanelView: NSView {
         button.isBordered = false
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         button.imagePosition = .imageOnly
-        button.contentTintColor = .secondaryLabelColor
+        button.contentTintColor = .white.withAlphaComponent(0.58)
         button.target = self
         button.action = action
         return button
@@ -270,26 +318,65 @@ final class AccountSwitcherPanelView: NSView {
     }
 }
 
-final class RoundedPanelView: NSView {
-    private let fillColor: NSColor
-
-    init(frame: NSRect, fillColor: NSColor) {
-        self.fillColor = fillColor
-        super.init(frame: frame)
+final class DashboardBackgroundView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
         wantsLayer = true
-        layer?.cornerRadius = 12
-        layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.22).cgColor
-        layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.05
-        layer?.shadowRadius = 10
-        layer?.shadowOffset = NSSize(width: 0, height: -4)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rect = bounds
+        let gradient = NSGradient(colors: [
+            NSColor(red: 0.12, green: 0.16, blue: 0.21, alpha: 1),
+            NSColor(red: 0.035, green: 0.055, blue: 0.075, alpha: 1),
+            NSColor(red: 0.018, green: 0.028, blue: 0.04, alpha: 1)
+        ])
+        gradient?.draw(in: rect, angle: -72)
+
+        NSColor(red: 0.16, green: 0.42, blue: 0.31, alpha: 0.10).setFill()
+        NSBezierPath(ovalIn: NSRect(x: rect.midX - 120, y: 132, width: 260, height: 300)).fill()
+
+        NSColor.white.withAlphaComponent(0.12).setStroke()
+        let border = rect.insetBy(dx: 1, dy: 1).roundedPath(radius: 24)
+        border.lineWidth = 1.2
+        border.stroke()
+    }
+}
+
+final class FlippedContainerView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+final class RoundedPanelView: NSView {
+    private let fillColor: NSColor
+    private let borderColor: NSColor
+    private let cornerRadius: CGFloat
+
+    init(frame: NSRect, fillColor: NSColor, borderColor: NSColor, cornerRadius: CGFloat = 18) {
+        self.fillColor = fillColor
+        self.borderColor = borderColor
+        self.cornerRadius = cornerRadius
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = cornerRadius
+        layer?.backgroundColor = fillColor.cgColor
+        layer?.borderWidth = 1.1
+        layer?.borderColor = borderColor.cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.24
+        layer?.shadowRadius = 18
+        layer?.shadowOffset = NSSize(width: 0, height: -8)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
 }
 
 final class CircleIconView: NSView {
@@ -308,12 +395,12 @@ final class CircleIconView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        color.withAlphaComponent(0.14).setFill()
+        color.withAlphaComponent(0.24).setFill()
         bounds.insetBy(dx: 1, dy: 1).roundedPath(radius: bounds.width / 2).fill()
         if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
             image.isTemplate = true
-            color.set()
-            image.draw(in: bounds.insetBy(dx: 10, dy: 10))
+            NSColor.white.withAlphaComponent(0.78).set()
+            image.draw(in: bounds.insetBy(dx: bounds.width * 0.28, dy: bounds.height * 0.28))
         }
     }
 }
@@ -335,21 +422,141 @@ final class ProgressLineView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let track = bounds.insetBy(dx: 0, dy: 2)
-        NSColor.separatorColor.withAlphaComponent(0.42).setFill()
+        NSColor.white.withAlphaComponent(0.11).setFill()
         track.roundedPath(radius: track.height / 2).fill()
         let fill = NSRect(x: track.minX, y: track.minY, width: track.width * percent, height: track.height)
-        color.setFill()
+        color.withAlphaComponent(0.92).setFill()
         fill.roundedPath(radius: track.height / 2).fill()
+    }
+}
+
+final class PercentCenterLabelView: NSView {
+    private let percent: Int?
+    private let color: NSColor
+
+    init(frame: NSRect, percent: Int?, color: NSColor) {
+        self.percent = percent
+        self.color = color
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
+        let numberAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 27, weight: .semibold),
+            .foregroundColor: color
+        ]
+        let percentAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 14, weight: .semibold),
+            .foregroundColor: color.withAlphaComponent(0.92),
+            .baselineOffset: -0.5
+        ]
+
+        let text = NSMutableAttributedString(string: value, attributes: numberAttributes)
+        text.append(NSAttributedString(string: "%", attributes: percentAttributes))
+        let size = text.size()
+        let point = NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 1)
+        text.draw(at: point)
+    }
+}
+
+final class CenteredTextView: NSView {
+    private let text: String
+    private let size: CGFloat
+    private let weight: NSFont.Weight
+    private let color: NSColor
+    private let alignment: NSTextAlignment
+
+    init(frame: NSRect, text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) {
+        self.text = text
+        self.size = size
+        self.weight = weight
+        self.color = color
+        self.alignment = alignment
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: size, weight: weight),
+            .foregroundColor: color
+        ]
+        let attributed = NSAttributedString(string: text, attributes: attributes)
+        let textSize = attributed.size()
+        let x: CGFloat
+        switch alignment {
+        case .right:
+            x = max(0, bounds.width - textSize.width)
+        case .center:
+            x = max(0, (bounds.width - textSize.width) / 2)
+        default:
+            x = 0
+        }
+        attributed.draw(at: NSPoint(x: x, y: (bounds.height - textSize.height) / 2))
+    }
+}
+
+final class MiniSwitchButton: NSButton {
+    init(frame: NSRect, isOn: Bool) {
+        super.init(frame: frame)
+        title = ""
+        isBordered = false
+        bezelStyle = .regularSquare
+        wantsLayer = true
+        state = isOn ? .on : .off
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let on = state == .on
+        let track = bounds.insetBy(dx: 1, dy: 3)
+        (on ? NSColor.systemBlue : NSColor.white.withAlphaComponent(0.18)).setFill()
+        track.roundedPath(radius: track.height / 2).fill()
+
+        let knobSize = track.height - 4
+        let knobX = on ? track.maxX - knobSize - 2 : track.minX + 2
+        NSColor.white.withAlphaComponent(0.94).setFill()
+        NSBezierPath(ovalIn: NSRect(x: knobX, y: track.minY + 2, width: knobSize, height: knobSize)).fill()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        state = state == .on ? .off : .on
+        needsDisplay = true
+        sendAction(action, to: target)
     }
 }
 
 final class UsageRingView: NSView {
     private let color: NSColor
     private let percent: CGFloat
+    private let isActive: Bool
+    private var isLowUsage: Bool {
+        percent > 0 && percent <= 0.10
+    }
 
-    init(frame: NSRect, color: NSColor, percent: CGFloat) {
+    init(frame: NSRect, color: NSColor, percent: CGFloat, isActive: Bool) {
         self.color = color
         self.percent = max(0, min(1, percent))
+        self.isActive = isActive
         super.init(frame: frame)
         wantsLayer = true
     }
@@ -359,40 +566,55 @@ final class UsageRingView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let rect = bounds.insetBy(dx: 6, dy: 6)
-        let lineWidth: CGFloat = 6
+        let rect = bounds.insetBy(dx: 10, dy: 10)
+        let lineWidth: CGFloat = 9
         let center = NSPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
         let track = NSBezierPath()
         track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
         track.lineWidth = lineWidth
-        NSColor.separatorColor.withAlphaComponent(0.18).setStroke()
+        NSColor.white.withAlphaComponent(isLowUsage ? 0.18 : 0.10).setStroke()
         track.stroke()
 
+        if isLowUsage {
+            let warningTrack = NSBezierPath()
+            warningTrack.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            warningTrack.lineWidth = lineWidth
+            color.withAlphaComponent(0.22).setStroke()
+            warningTrack.stroke()
+        }
+
+        guard percent > 0 else { return }
+
         let fill = NSBezierPath()
-        fill.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - (360 * percent), clockwise: true)
+        let visiblePercent = isLowUsage ? max(percent, 0.08) : percent
+        fill.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - (360 * visiblePercent), clockwise: true)
         fill.lineWidth = lineWidth
         fill.lineCapStyle = .round
-        color.setStroke()
+        color.withAlphaComponent(isActive ? 0.94 : 0.72).setStroke()
         fill.stroke()
     }
 }
 
 final class PillButton: NSButton {
     private let pillColor: NSColor
+    private let showsCheckmark: Bool
     private var trackingArea: NSTrackingArea?
 
-    init(frame: NSRect, title: String, color: NSColor) {
+    init(frame: NSRect, title: String, color: NSColor, showsCheckmark: Bool = false) {
         self.pillColor = color
+        self.showsCheckmark = showsCheckmark
         super.init(frame: frame)
         self.title = title
         bezelStyle = .rounded
         isBordered = false
-        font = .systemFont(ofSize: 13, weight: .semibold)
+        font = .systemFont(ofSize: 14, weight: .semibold)
         contentTintColor = .white
         wantsLayer = true
         layer?.cornerRadius = frame.height / 2
         layer?.backgroundColor = pillColor.cgColor
+        layer?.borderWidth = showsCheckmark ? 1 : 0
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
     }
 
     required init?(coder: NSCoder) {
@@ -422,6 +644,17 @@ final class PillButton: NSButton {
         layer?.backgroundColor = pillColor.cgColor
         layer?.shadowOpacity = 0
     }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard showsCheckmark,
+              let image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil) else {
+            return
+        }
+        image.isTemplate = true
+        NSColor.white.withAlphaComponent(0.92).set()
+        image.draw(in: NSRect(x: bounds.maxX - 35, y: (bounds.height - 14) / 2, width: 14, height: 14))
+    }
 }
 
 private extension NSRect {
@@ -437,7 +670,7 @@ final class AccountFloatingPanel: NSPanel {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let accountPanelSize = NSSize(width: 390, height: 500)
+    private let accountPanelSize = NSSize(width: 380, height: 430)
     private var accountPanel: NSPanel?
     private let timerTickInterval: TimeInterval = 5
     private let labelsDefaultsKey = "accountDisplayLabels"
@@ -464,12 +697,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var isSwitching = false
     private var switchAnimationTimer: Timer?
     private var switchAnimationFrame = 0
+    private var outsideClickMonitor: Any?
+    private var didResignActiveObserver: NSObjectProtocol?
     private var switchingTitle = "Switching"
     private let switchAnimationFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     private let statusPulseFrames = ["·", "•", "·", " "]
     private var notifiedLowUsageKeys = Set<String>()
     private var notifiedAutoSwitchPauseKeys = Set<String>()
     private var settingsMenu = NSMenu()
+    private weak var accountLabelDialogField: NSTextField?
+    private weak var accountLabelDialogPopup: NSPopUpButton?
     private var remindersEnabled: Bool {
         get {
             if UserDefaults.standard.object(forKey: remindersEnabledDefaultsKey) == nil {
@@ -588,6 +825,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         RunLoop.current.add(animationTimer, forMode: .common)
         statusAnimationTimer = animationTimer
+        installPanelDismissHandlers()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let outsideClickMonitor {
+            NSEvent.removeMonitor(outsideClickMonitor)
+        }
+        if let didResignActiveObserver {
+            NotificationCenter.default.removeObserver(didResignActiveObserver)
+        }
+    }
+
+    private func installPanelDismissHandlers() {
+        didResignActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: NSApp,
+            queue: .main
+        ) { [weak self] _ in
+            self?.closeAccountPanel()
+        }
+
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.closeAccountPanel()
+            }
+        }
     }
 
     private func configureNotifications() {
@@ -936,17 +1199,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func updateStatusTitle() {
         statusItem.button?.title = ""
         statusItem.button?.attributedTitle = statusAttributedTitle()
+        statusItem.length = NSStatusItem.variableLength
+        statusItem.button?.needsDisplay = true
     }
 
     private func statusAttributedTitle() -> NSAttributedString {
         let result = NSMutableAttributedString()
         for (index, account) in toolbarAccounts().enumerated() {
             if index > 0 {
-                result.append(NSAttributedString(string: " ", attributes: toolbarTitleAttributes(isActive: true)))
+                result.append(NSAttributedString(string: " ", attributes: toolbarTitleAttributes(for: nil)))
             }
             result.append(NSAttributedString(
                 string: toolbarStatusText(for: account),
-                attributes: toolbarTitleAttributes(isActive: account.isActive)
+                attributes: toolbarTitleAttributes(for: account)
             ))
         }
         return result
@@ -954,20 +1219,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func toolbarStatusText(for account: CodexAccount) -> String {
         let label = toolbarLabel(for: account)
+        let percent = toolbarUsagePercent(for: account)
         switch toolbarDisplayStyle {
         case .detailed:
-            return "\(label)\(remainingPercentText(fromUsed: account.weeklyUsedPercent))"
+            return "\(label)\(remainingPercentText(fromUsed: percent))"
         case .compact:
-            return "\(label)\(remainingPercentNumberText(fromUsed: account.weeklyUsedPercent))"
+            return "\(label)\(remainingPercentNumberText(fromUsed: percent))"
         }
     }
 
-    private func toolbarTitleAttributes(isActive: Bool) -> [NSAttributedString.Key: Any] {
+    private func toolbarTitleAttributes(for account: CodexAccount?) -> [NSAttributedString.Key: Any] {
         let size: CGFloat = toolbarDisplayStyle == .detailed ? 12.5 : 10.5
+        let color: NSColor
+        if let account, account.isActive {
+            color = usageStatusColor(for: toolbarUsagePercent(for: account))
+        } else {
+            color = NSColor.secondaryLabelColor
+        }
         return [
             .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .medium),
-            .foregroundColor: isActive ? NSColor.labelColor : NSColor.secondaryLabelColor
+            .foregroundColor: color
         ]
+    }
+
+    private func toolbarUsagePercent(for account: CodexAccount) -> Int? {
+        switch usageMode {
+        case .fiveHour:
+            return account.fiveHourUsedPercent
+        case .weekly:
+            return account.weeklyUsedPercent
+        }
     }
 
     private func toolbarAccounts() -> [CodexAccount] {
@@ -996,10 +1277,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if let custom = customLabel(forEmail: account.email), !custom.isEmpty {
             return String(custom.prefix(1)).uppercased()
         }
-        if let first = account.email.first(where: { $0.isLetter || $0.isNumber }) {
-            return String(first).uppercased()
-        }
-        return String(displayLabel(for: account).prefix(1)).uppercased()
+        return defaultLabel(forEmail: account.email)
     }
 
     private func codexIsFrontmost() -> Bool {
@@ -1250,14 +1528,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     @objc private func showAccountDisplayLabelsDialog() {
         guard !accounts.isEmpty else { return }
         let popup = accountPopup(width: 300)
+        accountLabelDialogPopup = popup
         let selectedEmail = selectedAccountEmail(from: popup)
         let selectedAccount = selectedEmail.flatMap { email in accounts.first(where: { $0.email == email }) }
+        popup.target = self
+        popup.action = #selector(accountLabelPopupChanged(_:))
 
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        accountLabelDialogField = field
         if let selectedAccount {
             field.stringValue = displayLabel(for: selectedAccount)
+            field.placeholderString = defaultLabel(forEmail: selectedAccount.email)
+        } else {
+            field.placeholderString = "A"
         }
-        field.placeholderString = "L"
 
         let stack = NSStackView(views: [popup, field])
         stack.orientation = .vertical
@@ -1286,25 +1570,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             clearCustomLabel(forEmail: email)
             rebuildMenu()
         }
+        accountLabelDialogField = nil
+        accountLabelDialogPopup = nil
+    }
+
+    @objc private func accountLabelPopupChanged(_ sender: NSPopUpButton) {
+        guard let field = accountLabelDialogField,
+              let email = selectedAccountEmail(from: sender),
+              let account = accounts.first(where: { $0.email == email }) else { return }
+        field.stringValue = displayLabel(for: account)
+        field.placeholderString = defaultLabel(forEmail: account.email)
     }
 
     @objc private func showMenuBarDisplayDialog() {
-        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26), pullsDown: false)
-        addPopupItem(to: popup, title: "Large with Percentage", representedObject: ToolbarDisplayStyle.detailed.rawValue)
-        addPopupItem(to: popup, title: "Small Number Only", representedObject: ToolbarDisplayStyle.compact.rawValue)
-        popup.selectItem(withTitle: toolbarDisplayStyle == .detailed ? "Large with Percentage" : "Small Number Only")
+        let usagePopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 26), pullsDown: false)
+        addPopupItem(to: usagePopup, title: "Weekly usage left", representedObject: UsageDisplayMode.weekly.rawValue)
+        addPopupItem(to: usagePopup, title: "5-hour usage left", representedObject: UsageDisplayMode.fiveHour.rawValue)
+        usagePopup.selectItem(withTitle: usageMode == .weekly ? "Weekly usage left" : "5-hour usage left")
+
+        let stylePopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 26), pullsDown: false)
+        addPopupItem(to: stylePopup, title: "Large with Percentage", representedObject: ToolbarDisplayStyle.detailed.rawValue)
+        addPopupItem(to: stylePopup, title: "Small Number Only", representedObject: ToolbarDisplayStyle.compact.rawValue)
+        stylePopup.selectItem(withTitle: toolbarDisplayStyle == .detailed ? "Large with Percentage" : "Small Number Only")
+
+        let stack = NSStackView(views: [usagePopup, stylePopup])
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 280, height: 58)
 
         let alert = NSAlert()
         alert.messageText = "Menu bar display"
-        alert.accessoryView = popup
+        alert.informativeText = "Choose which usage appears in the menu bar. The account panel keeps 5-hour as the main ring and weekly as the top bar."
+        alert.accessoryView = stack
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
 
         if alert.runModal() == .alertFirstButtonReturn,
-           let rawValue = popup.selectedItem?.representedObject as? String,
-           let style = ToolbarDisplayStyle(rawValue: rawValue) {
+           let usageRawValue = usagePopup.selectedItem?.representedObject as? String,
+           let selectedUsageMode = UsageDisplayMode(rawValue: usageRawValue),
+           let styleRawValue = stylePopup.selectedItem?.representedObject as? String,
+           let style = ToolbarDisplayStyle(rawValue: styleRawValue) {
+            usageMode = selectedUsageMode
             toolbarDisplayStyle = style
+            updateStatusTitle()
             rebuildMenu()
+            DispatchQueue.main.async { [weak self] in
+                self?.updateStatusTitle()
+            }
         }
     }
 
@@ -2240,15 +2552,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func displayLabel(for account: CodexAccount) -> String {
-        limitedLabel(customLabel(forEmail: account.email) ?? account.selector)
+        limitedLabel(customLabel(forEmail: account.email) ?? defaultLabel(forEmail: account.email))
+    }
+
+    private func defaultLabel(forEmail email: String) -> String {
+        if let first = email.first(where: { $0.isLetter || $0.isNumber }) {
+            return String(first).uppercased()
+        }
+        return "A"
     }
 
     private func limitedLabel(_ label: String) -> String {
         String(label.prefix(5))
     }
 
-    private func compactEmail(_ email: String) -> String {
-        let maximumLength = 18
+    private func compactEmail(_ email: String, maximumLength: Int = 18) -> String {
         guard email.count > maximumLength else { return email }
         return String(email.prefix(maximumLength - 3)) + "..."
     }
