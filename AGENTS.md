@@ -10,4 +10,4 @@ Rules for future work:
 - Keep switching based on account email queries, not padded numeric selectors such as `01` or `02`.
 - The app depends on `codex-auth`; do not vendor or copy private `~/.codex/accounts` data into the repository.
 - Build verification is `./build.sh`.
-- Install verification is `./install.sh`, then confirm the app runs from `~/Applications/Codex Account Switcher.app`.
+- Install verification is `./install.sh`, then confirm the app runs from `/Applications/Codex Account Switcher.app`.

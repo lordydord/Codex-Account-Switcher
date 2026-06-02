@@ -51,8 +51,8 @@ It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop t
 </p>
 
 <p align="center">
-  <strong>Cog menu</strong><br>
-  <img src="assets/screenshot-settings.png" alt="Codex Account Switcher cog settings menu with placeholder accounts" width="380">
+  <strong>Settings panel</strong><br>
+  <img src="assets/screenshot-settings.png" alt="Codex Account Switcher settings panel with placeholder accounts" width="380">
 </p>
 
 
@@ -66,7 +66,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 ## Features
 
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
-- Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, close, and launch-at-login controls.
+- Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
 - Bright active account and dim inactive accounts.
 - Dropdown showing 5-hour usage for all saved accounts.
 - Email-based switching, avoiding brittle numeric selectors.
@@ -75,7 +75,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - Optional auto-switching from a low-usage active account to another saved account.
 - `Switch Now` notification action for low usage.
 - Refresh interval controls for active and idle states.
-- Launch-at-login toggle.
+- In-panel settings for display mode, launch-at-login, usage reminders, auto-switching, account actions, and maintenance.
 - Account backup cleanup.
 - No bundled credentials, tokens, account registry, or usage snapshots.
 
@@ -121,7 +121,7 @@ build/Codex Account Switcher.app
 This installs to:
 
 ```text
-~/Applications/Codex Account Switcher.app
+/Applications/Codex Account Switcher.app
 ```
 
 ## Run Without Installing
@@ -146,7 +146,7 @@ Usage refresh depends on `codex-auth`. In API mode, `codex-auth` fetches usage f
 
 ## Releases
 
-- Version 1.2: adds the compact modern account panel redesign, visible account email labels, active account menu-bar usage colors, and a weekly/5-hour menu-bar usage selector.
+- Version 1.2: adds the compact modern account panel redesign, in-panel settings redesign, visible account email labels, active account menu-bar usage colors, and a weekly/5-hour menu-bar usage selector.
 - Version 1.1: adds the account panel UI and dialog-based settings controls.
 - Version 1.00: first public release.
 
