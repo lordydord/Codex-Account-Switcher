@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.2"><img alt="Download v1.2" src="https://img.shields.io/badge/Download-v1.2-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.2.1"><img alt="Download v1.2.1" src="https://img.shields.io/badge/Download-v1.2.1-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.2/Codex-Account-Switcher-v1.2.zip"><strong>Download v1.2</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.2.1/Codex-Account-Switcher-v1.2.1.zip"><strong>Download v1.2.1</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -67,7 +67,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
 - Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
-- Bright active account and dim inactive accounts.
+- Bright active account card and dim inactive accounts, with green, orange, and red status colors reflected in the active card background.
 - Dropdown showing 5-hour usage for all saved accounts.
 - Email-based switching, avoiding brittle numeric selectors.
 - Codex relaunch after switching so Desktop picks up the new account.
@@ -146,6 +146,7 @@ Usage refresh depends on `codex-auth`. In API mode, `codex-auth` fetches usage f
 
 ## Releases
 
+- Version 1.2.1: matches the in-app active account card, border, 5-hour ring, label, and active pill to the same green/orange/red usage status colors used in the menu bar, with light and dark mode background tints.
 - Version 1.2: adds the compact modern account panel redesign, in-panel settings redesign, visible account email labels, active account menu-bar usage colors, and a weekly/5-hour menu-bar usage selector.
 - Version 1.1: adds the account panel UI and dialog-based settings controls.
 - Version 1.00: first public release.

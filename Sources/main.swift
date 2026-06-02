@@ -442,12 +442,12 @@ final class AccountSwitcherPanelView: NSView {
     private func accountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
         let weeklyPercent = account.weeklyUsedPercent
         let fiveHourPercent = account.fiveHourUsedPercent
-        let weeklyColor = account.isActive ? NSColor.systemGreen : inactiveAccentColor()
-        let fiveHourColor = account.isActive ? NSColor.systemGreen : inactiveAccentColor()
+        let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
+        let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
         let card = RoundedPanelView(
             frame: frame,
-            fillColor: cardFillColor(isActive: account.isActive),
-            borderColor: cardBorderColor(isActive: account.isActive),
+            fillColor: cardFillColor(for: account),
+            borderColor: cardBorderColor(for: account),
             hoverFillColor: account.isActive || isSwitching ? nil : theme.inactiveCardHoverFill,
             clickAction: account.isActive || isSwitching ? nil : { [weak self] in
                 self?.switchAccount(account.email)
@@ -456,7 +456,7 @@ final class AccountSwitcherPanelView: NSView {
         let labelText = labelForAccount(account)
 
         let statusTitle = account.isActive ? "Active" : (isSwitching ? "Switching..." : "Switch")
-        let buttonColor = account.isActive ? NSColor.systemGreen : theme.usageInactiveButtonFill
+        let buttonColor = account.isActive ? fiveHourColor : theme.usageInactiveButtonFill
         let switchButton = PillButton(frame: NSRect(x: 18, y: 20, width: frame.width - 36, height: 30), title: statusTitle, color: buttonColor, showsCheckmark: account.isActive, allowsHover: false)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
@@ -596,6 +596,33 @@ final class AccountSwitcherPanelView: NSView {
 
     private func cardBorderColor(isActive: Bool) -> NSColor {
         isActive ? NSColor.systemGreen.withAlphaComponent(theme.isDark ? 0.68 : 0.52) : theme.inactiveCardBorder
+    }
+
+    private func cardFillColor(for account: CodexAccount) -> NSColor {
+        guard account.isActive else { return theme.inactiveCardFill }
+        return activeCardFillColor(for: account.fiveHourUsedPercent)
+    }
+
+    private func cardBorderColor(for account: CodexAccount) -> NSColor {
+        guard account.isActive else { return theme.inactiveCardBorder }
+        return usageColor(for: account.fiveHourUsedPercent).withAlphaComponent(theme.isDark ? 0.68 : 0.52)
+    }
+
+    private func activeCardFillColor(for percent: Int?) -> NSColor {
+        guard let percent else {
+            return theme.activeCardFill
+        }
+        if percent >= 50 {
+            return theme.activeCardFill
+        }
+        if percent >= 20 {
+            return theme.isDark
+                ? NSColor(red: 0.145, green: 0.092, blue: 0.025, alpha: 0.78)
+                : NSColor(red: 1.00, green: 0.945, blue: 0.835, alpha: 0.96)
+        }
+        return theme.isDark
+            ? NSColor(red: 0.135, green: 0.045, blue: 0.048, alpha: 0.78)
+            : NSColor(red: 1.00, green: 0.91, blue: 0.91, alpha: 0.96)
     }
 
     private func label(_ string: String, frame: NSRect, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) -> NSTextField {
