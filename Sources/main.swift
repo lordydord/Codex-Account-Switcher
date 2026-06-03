@@ -51,7 +51,7 @@ enum SettingsPanelAction: String {
 }
 
 private func usageStatusColor(for percent: Int?) -> NSColor {
-    guard let percent else { return .systemBlue }
+    guard let percent else { return .secondaryLabelColor }
     if percent >= 50 { return .systemGreen }
     if percent >= 20 { return .systemOrange }
     return .systemRed
@@ -75,11 +75,11 @@ private struct PanelTheme {
     }
 
     var secondaryText: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.58) : NSColor.black.withAlphaComponent(0.54)
+        isDark ? NSColor.white.withAlphaComponent(0.52) : NSColor.black.withAlphaComponent(0.50)
     }
 
     var tertiaryText: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.45) : NSColor.black.withAlphaComponent(0.42)
+        isDark ? NSColor.white.withAlphaComponent(0.38) : NSColor.black.withAlphaComponent(0.38)
     }
 
     var valueText: NSColor {
@@ -87,7 +87,7 @@ private struct PanelTheme {
     }
 
     var inactiveAccent: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.42) : NSColor.black.withAlphaComponent(0.36)
+        isDark ? NSColor.white.withAlphaComponent(0.34) : NSColor.black.withAlphaComponent(0.32)
     }
 
     var activeCardFill: NSColor {
@@ -103,7 +103,7 @@ private struct PanelTheme {
     }
 
     var inactiveCardBorder: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.black.withAlphaComponent(0.10)
+        isDark ? NSColor.white.withAlphaComponent(0.08) : NSColor.black.withAlphaComponent(0.08)
     }
 
     var bottomBarFill: NSColor {
@@ -119,11 +119,11 @@ private struct PanelTheme {
     }
 
     var ringTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.10)
+        isDark ? NSColor.white.withAlphaComponent(0.08) : NSColor.black.withAlphaComponent(0.08)
     }
 
     var progressTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.11) : NSColor.black.withAlphaComponent(0.10)
+        isDark ? NSColor.white.withAlphaComponent(0.085) : NSColor.black.withAlphaComponent(0.085)
     }
 
     var inactiveButtonFill: NSColor {
@@ -131,7 +131,7 @@ private struct PanelTheme {
     }
 
     var usageInactiveButtonFill: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.18) : NSColor(red: 0.36, green: 0.39, blue: 0.43, alpha: 1)
+        isDark ? NSColor.white.withAlphaComponent(0.15) : NSColor(red: 0.36, green: 0.39, blue: 0.43, alpha: 0.92)
     }
 
     var switchOffFill: NSColor {
@@ -166,13 +166,14 @@ final class AccountSwitcherPanelView: NSView {
     private let switchAccount: (String) -> Void
     private let refresh: () -> Void
     private let showSettings: () -> Void
+    private let editAccountLabel: (String) -> Void
     private let performSettingsAction: (SettingsPanelAction) -> Void
     private let close: () -> Void
     private let toggleLaunchAtLogin: () -> Void
     private var theme: PanelTheme { PanelTheme.current(for: effectiveAppearance) }
-    private let outerInset: CGFloat = 14
+    private let outerInset: CGFloat = 18
     private let cardGap: CGFloat = 14
-    private let bottomBarHeight: CGFloat = 42
+    private let bottomBarHeight: CGFloat = 54
     private var accountCardHeight: CGFloat {
         bounds.height - (outerInset * 2) - cardGap - bottomBarHeight
     }
@@ -199,6 +200,7 @@ final class AccountSwitcherPanelView: NSView {
         switchAccount: @escaping (String) -> Void,
         refresh: @escaping () -> Void,
         showSettings: @escaping () -> Void,
+        editAccountLabel: @escaping (String) -> Void,
         performSettingsAction: @escaping (SettingsPanelAction) -> Void,
         close: @escaping () -> Void,
         toggleLaunchAtLogin: @escaping () -> Void
@@ -224,10 +226,11 @@ final class AccountSwitcherPanelView: NSView {
         self.switchAccount = switchAccount
         self.refresh = refresh
         self.showSettings = showSettings
+        self.editAccountLabel = editAccountLabel
         self.performSettingsAction = performSettingsAction
         self.close = close
         self.toggleLaunchAtLogin = toggleLaunchAtLogin
-        super.init(frame: NSRect(x: 0, y: 0, width: 380, height: 430))
+        super.init(frame: NSRect(x: 0, y: 0, width: 430, height: 530))
         wantsLayer = true
         layer?.cornerRadius = 22
         layer?.masksToBounds = true
@@ -304,9 +307,10 @@ final class AccountSwitcherPanelView: NSView {
         addSubview(displaySection)
 
         let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 254, width: contentWidth, height: 96), title: "Automation")
+        let autoSwitchWidth: CGFloat = 176
         automationSection.addSubview(settingToggleRow(title: "Launch at login", detail: "Open this helper automatically", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 14, y: 28, width: contentWidth - 28, height: 28)))
         automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 14, y: 58, width: 154, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: "\(autoSwitchThreshold)% 5H", isOn: autoSwitchEnabled, action: .toggleAutoSwitch, frame: NSRect(x: 186, y: 58, width: 152, height: 28)))
+        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: "\(autoSwitchThreshold)% 5H", isOn: autoSwitchEnabled, action: .toggleAutoSwitch, frame: NSRect(x: contentWidth - 14 - autoSwitchWidth, y: 58, width: autoSwitchWidth, height: 28)))
         addSubview(automationSection)
 
         addSubview(settingsFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
@@ -405,11 +409,11 @@ final class AccountSwitcherPanelView: NSView {
             x += action.2 + 8
         }
 
-        let more = SettingsActionButton(frame: NSRect(x: frame.width - 74, y: buttonY, width: 62, height: 26), title: "Clean", color: theme.bottomBarFill, textColor: theme.primaryText)
-        more.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.cleanBackups.rawValue)
-        more.target = self
-        more.action = #selector(settingsActionPressed(_:))
-        footer.addSubview(more)
+        let quit = SettingsActionButton(frame: NSRect(x: frame.width - 66, y: buttonY, width: 54, height: 26), title: "Quit", color: theme.bottomBarFill, textColor: NSColor.systemRed)
+        quit.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.quit.rawValue)
+        quit.target = self
+        quit.action = #selector(settingsActionPressed(_:))
+        footer.addSubview(quit)
         return footer
     }
 
@@ -455,38 +459,48 @@ final class AccountSwitcherPanelView: NSView {
         )
         let labelText = labelForAccount(account)
 
-        let statusTitle = account.isActive ? "Active" : (isSwitching ? "Switching..." : "Switch")
+        let statusTitle = account.isActive ? "  ACTIVE" : (isSwitching ? "SWITCHING..." : "SWITCH")
         let buttonColor = account.isActive ? fiveHourColor : theme.usageInactiveButtonFill
-        let switchButton = PillButton(frame: NSRect(x: 18, y: 20, width: frame.width - 36, height: 30), title: statusTitle, color: buttonColor, showsCheckmark: account.isActive, allowsHover: false)
+        let switchButton = PillButton(frame: NSRect(x: 20, y: 20, width: account.isActive ? 92 : 82, height: 30), title: statusTitle, color: buttonColor, showsDot: account.isActive, allowsHover: false)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
         switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
         switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
         card.addSubview(switchButton)
 
-        card.addSubview(label(labelText, frame: NSRect(x: 18, y: 68, width: frame.width - 36, height: 30), size: 26, weight: .semibold, color: fiveHourColor, alignment: .center))
-        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 18, y: 99, width: frame.width - 36, height: 14), size: 9.2, weight: .medium, color: theme.tertiaryText, alignment: .center))
+        let accountSettingsButton = AccountMoreButton(frame: NSRect(x: frame.width - 52, y: 20, width: 34, height: 34), tintColor: account.isActive ? fiveHourColor : theme.iconTint)
+        accountSettingsButton.identifier = NSUserInterfaceItemIdentifier("label|\(account.email)")
+        accountSettingsButton.target = self
+        accountSettingsButton.action = #selector(accountSettingsActionPressed(_:))
+        card.addSubview(accountSettingsButton)
 
-        let ringSize: CGFloat = columnsFitWide(frame.width) ? 150 : 116
+        card.addSubview(label(labelText.uppercased(), frame: NSRect(x: 18, y: 78, width: frame.width - 36, height: 32), size: 27, weight: .medium, color: fiveHourColor, alignment: .center))
+        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 18, y: 114, width: frame.width - 36, height: 18), size: 12, weight: .medium, color: theme.tertiaryText, alignment: .center))
+
+        let ringSize: CGFloat = columnsFitWide(frame.width) ? 152 : 132
         let ringX = (frame.width - ringSize) / 2
-        let ring = UsageRingView(frame: NSRect(x: ringX, y: 116, width: ringSize, height: ringSize), color: fiveHourColor, trackColor: theme.ringTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100, isActive: account.isActive)
+        let ring = UsageRingView(frame: NSRect(x: ringX, y: 138, width: ringSize, height: ringSize), color: fiveHourColor, trackColor: theme.ringTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100, isActive: account.isActive)
         card.addSubview(ring)
-        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: 148, width: ringSize - 16, height: 42), percent: fiveHourPercent, color: fiveHourColor))
-        card.addSubview(label("Remaining", frame: NSRect(x: ringX + 18, y: 184, width: ringSize - 36, height: 18), size: 10.5, weight: .medium, color: theme.secondaryText, alignment: .center))
+        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: 169, width: ringSize - 16, height: 46), percent: fiveHourPercent, color: fiveHourColor))
+        card.addSubview(label("5H REMAINING", frame: NSRect(x: ringX + 12, y: 211, width: ringSize - 24, height: 16), size: 9.5, weight: .medium, color: theme.secondaryText, alignment: .center))
 
-        card.addSubview(label("5H Remaining", frame: NSRect(x: 18, y: 242, width: frame.width - 36, height: 18), size: 11, weight: .semibold, color: theme.tertiaryText, alignment: .center))
+        let resetTime = fiveHourResetTimeText(from: account.fiveHourUsage)
+        let resetBadgeWidth: CGFloat = 74
+        let resetBadgeX = (frame.width - resetBadgeWidth) / 2
+        card.addSubview(label("RESETS", frame: NSRect(x: 18, y: 288, width: frame.width - 36, height: 16), size: 11, weight: .medium, color: theme.tertiaryText, alignment: .center))
+        card.addSubview(ResetTimeBadgeView(frame: NSRect(x: resetBadgeX, y: 310, width: resetBadgeWidth, height: 26), text: resetTime, color: fiveHourColor, isActive: account.isActive))
 
-        let divider = NSView(frame: NSRect(x: 18, y: 272, width: frame.width - 36, height: 1))
+        let divider = NSView(frame: NSRect(x: 22, y: 358, width: frame.width - 44, height: 1))
         divider.wantsLayer = true
         divider.layer?.backgroundColor = theme.divider.cgColor
         card.addSubview(divider)
 
-        let weeklyLabel = label("Weekly", frame: NSRect(x: 18, y: 288, width: 64, height: 16), size: 10.5, weight: .medium, color: theme.secondaryText)
+        let weeklyLabel = label("WEEKLY", frame: NSRect(x: 22, y: 374, width: 74, height: 16), size: 10.8, weight: .medium, color: theme.secondaryText)
         card.addSubview(weeklyLabel)
-        let weeklyValue = label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 60, y: 288, width: 42, height: 16), size: 10.5, weight: .semibold, color: theme.valueText, alignment: .right)
+        let weeklyValue = label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 70, y: 374, width: 48, height: 16), size: 12, weight: .medium, color: theme.primaryText, alignment: .right)
         card.addSubview(weeklyValue)
 
-        let progress = ProgressLineView(frame: NSRect(x: 18, y: 310, width: frame.width - 36, height: 7), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100)
+        let progress = ProgressLineView(frame: NSRect(x: 22, y: 400, width: frame.width - 44, height: 8), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100)
         card.addSubview(progress)
         return card
     }
@@ -499,6 +513,23 @@ final class AccountSwitcherPanelView: NSView {
     private func percentNumberText(_ percent: Int?) -> String {
         guard let percent else { return "--" }
         return "\(max(0, min(100, percent)))"
+    }
+
+    private func fiveHourResetTimeText(from usage: String) -> String {
+        guard let inner = parenthesizedValue(from: usage) else { return "--.--" }
+        let parts = inner.split(separator: ":")
+        guard parts.count >= 2, let hour = Int(parts[0]) else {
+            return inner
+        }
+        let minute = String(parts[1].prefix(2))
+        return String(format: "%02d.%@", hour, minute)
+    }
+
+    private func parenthesizedValue(from usage: String) -> String? {
+        guard let open = usage.firstIndex(of: "("), let close = usage.firstIndex(of: ")"), open < close else {
+            return nil
+        }
+        return String(usage[usage.index(after: open)..<close])
     }
 
     private func compactCardEmail(_ email: String) -> String {
@@ -514,7 +545,7 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func columnsFitWide(_ width: CGFloat) -> Bool {
-        width > 260
+        width > 200
     }
 
     private func orderedSettingsAccounts() -> [CodexAccount] {
@@ -547,9 +578,9 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func bottomBar(frame: NSRect) -> NSView {
-        let bar = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 14)
-        let toolbarInset: CGFloat = 14
-        let toolbarGap: CGFloat = 14
+        let bar = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 20)
+        let toolbarInset: CGFloat = 18
+        let toolbarGap: CGFloat = 20
         let iconSize: CGFloat = 28
         let clockSize: CGFloat = 24
         let iconY = (frame.height - iconSize) / 2
@@ -558,18 +589,28 @@ final class AccountSwitcherPanelView: NSView {
         let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: toolbarInset, y: iconY, width: iconSize, height: iconSize), action: #selector(settingsPressed(_:)))
         bar.addSubview(settingsButton)
 
-        let clockX = toolbarInset + iconSize + toolbarGap
-        let clock = CircleIconView(frame: NSRect(x: clockX, y: clockY, width: clockSize, height: clockSize), color: theme.iconTint, symbol: "clock", symbolColor: theme.iconTint)
+        let leftDivider = NSView(frame: NSRect(x: toolbarInset + iconSize + 16, y: 13, width: 1, height: frame.height - 26))
+        leftDivider.wantsLayer = true
+        leftDivider.layer?.backgroundColor = theme.divider.cgColor
+        bar.addSubview(leftDivider)
+
+        let clockX = toolbarInset + iconSize + toolbarGap + 14
+        let clock = SymbolIconView(frame: NSRect(x: clockX, y: clockY, width: clockSize, height: clockSize), symbol: "clock", color: theme.iconTint)
         bar.addSubview(clock)
-        let timeX = clockX + clockSize + toolbarGap
-        bar.addSubview(CenteredTextView(frame: NSRect(x: timeX, y: 9, width: 72, height: 24), text: lastUpdatedText, size: 10.5, weight: .medium, color: theme.primaryText, alignment: .left))
+        bar.addSubview(CenteredTextView(frame: NSRect(x: (frame.width - 96) / 2, y: 15, width: 96, height: 28), text: lastUpdatedText, size: 15, weight: .medium, color: theme.primaryText, alignment: .center))
 
         let closeX = frame.width - toolbarInset - iconSize
-        let refreshX = closeX - toolbarGap - iconSize
+        let refreshX = closeX - toolbarGap - iconSize - 14
         let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed))
         bar.addSubview(refreshButton)
 
+        let rightDivider = NSView(frame: NSRect(x: refreshX + iconSize + 14, y: 13, width: 1, height: frame.height - 26))
+        rightDivider.wantsLayer = true
+        rightDivider.layer?.backgroundColor = theme.divider.cgColor
+        bar.addSubview(rightDivider)
+
         let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: closeX, y: iconY, width: iconSize, height: iconSize), action: #selector(closePressed))
+        closeButton.toolTip = "Quit Account Switcher"
         bar.addSubview(closeButton)
         return bar
     }
@@ -579,7 +620,7 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func accentColor(for percent: Int?, isActive: Bool) -> NSColor {
-        guard isActive else { return NSColor.systemGray.withAlphaComponent(0.32) }
+        guard isActive else { return NSColor.systemGray.withAlphaComponent(0.24) }
         return usageColor(for: percent)
     }
 
@@ -605,12 +646,14 @@ final class AccountSwitcherPanelView: NSView {
 
     private func cardBorderColor(for account: CodexAccount) -> NSColor {
         guard account.isActive else { return theme.inactiveCardBorder }
-        return usageColor(for: account.fiveHourUsedPercent).withAlphaComponent(theme.isDark ? 0.68 : 0.52)
+        return usageColor(for: account.fiveHourUsedPercent).withAlphaComponent(theme.isDark ? 0.48 : 0.40)
     }
 
     private func activeCardFillColor(for percent: Int?) -> NSColor {
         guard let percent else {
-            return theme.activeCardFill
+            return theme.isDark
+                ? NSColor(red: 0.065, green: 0.075, blue: 0.085, alpha: 0.76)
+                : NSColor(red: 0.955, green: 0.965, blue: 0.975, alpha: 0.96)
         }
         if percent >= 50 {
             return theme.activeCardFill
@@ -683,6 +726,8 @@ final class AccountSwitcherPanelView: NSView {
         switch parts[0] {
         case "switch":
             switchAccount(parts[1])
+        case "label":
+            editAccountLabel(parts[1])
         case "remove":
             performSettingsAction(.removeAccount)
         default:
@@ -750,12 +795,12 @@ final class RoundedPanelView: NSView {
         wantsLayer = true
         layer?.cornerRadius = cornerRadius
         layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 1.1
+        layer?.borderWidth = 0.9
         layer?.borderColor = borderColor.cgColor
         layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.24
-        layer?.shadowRadius = 18
-        layer?.shadowOffset = NSSize(width: 0, height: -8)
+        layer?.shadowOpacity = 0.18
+        layer?.shadowRadius = 14
+        layer?.shadowOffset = NSSize(width: 0, height: -6)
     }
 
     required init?(coder: NSCoder) {
@@ -828,6 +873,24 @@ final class CircleIconView: NSView {
     }
 }
 
+final class SymbolIconView: NSView {
+    init(frame: NSRect, symbol: String, color: NSColor) {
+        super.init(frame: frame)
+        wantsLayer = true
+        let imageView = NSImageView(frame: bounds)
+        imageView.autoresizingMask = [.width, .height]
+        imageView.imageScaling = .scaleProportionallyDown
+        imageView.contentTintColor = color
+        imageView.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        imageView.image?.isTemplate = true
+        addSubview(imageView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 final class ProgressLineView: NSView {
     private let color: NSColor
     private let trackColor: NSColor
@@ -855,6 +918,44 @@ final class ProgressLineView: NSView {
     }
 }
 
+final class ResetTimeBadgeView: NSView {
+    private let text: String
+    private let color: NSColor
+    private let isActive: Bool
+
+    init(frame: NSRect, text: String, color: NSColor, isActive: Bool) {
+        self.text = text
+        self.color = color
+        self.isActive = isActive
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rect = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let path = rect.roundedPath(radius: rect.height / 2)
+        color.withAlphaComponent(isActive ? 0.12 : 0.06).setFill()
+        path.fill()
+        color.withAlphaComponent(isActive ? 0.78 : 0.28).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: color.withAlphaComponent(isActive ? 0.95 : 0.58)
+        ]
+        let attributed = NSAttributedString(string: text, attributes: attributes)
+        let size = attributed.size()
+        attributed.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 0.5))
+    }
+}
+
 final class PercentCenterLabelView: NSView {
     private let percent: Int?
     private let color: NSColor
@@ -875,11 +976,11 @@ final class PercentCenterLabelView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
         let numberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 27, weight: .semibold),
+            .font: NSFont.systemFont(ofSize: 29, weight: .semibold),
             .foregroundColor: color
         ]
         let percentAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 14, weight: .semibold),
+            .font: NSFont.systemFont(ofSize: 15, weight: .semibold),
             .foregroundColor: color.withAlphaComponent(0.92),
             .baselineOffset: -0.5
         ]
@@ -997,7 +1098,7 @@ final class UsageRingView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let rect = bounds.insetBy(dx: 10, dy: 10)
-        let lineWidth: CGFloat = 9
+        let lineWidth: CGFloat = 4
         let center = NSPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
         let track = NSBezierPath()
@@ -1028,24 +1129,24 @@ final class UsageRingView: NSView {
 
 final class PillButton: NSButton {
     private let pillColor: NSColor
-    private let showsCheckmark: Bool
+    private let showsDot: Bool
     private let allowsHover: Bool
     private var trackingArea: NSTrackingArea?
 
-    init(frame: NSRect, title: String, color: NSColor, showsCheckmark: Bool = false, allowsHover: Bool = true) {
+    init(frame: NSRect, title: String, color: NSColor, showsDot: Bool = false, allowsHover: Bool = true) {
         self.pillColor = color
-        self.showsCheckmark = showsCheckmark
+        self.showsDot = showsDot
         self.allowsHover = allowsHover
         super.init(frame: frame)
         self.title = title
         bezelStyle = .rounded
         isBordered = false
-        font = .systemFont(ofSize: 14, weight: .semibold)
+        font = .systemFont(ofSize: 13, weight: .semibold)
         contentTintColor = .white
         wantsLayer = true
         layer?.cornerRadius = frame.height / 2
         layer?.backgroundColor = pillColor.cgColor
-        layer?.borderWidth = showsCheckmark ? 1 : 0
+        layer?.borderWidth = showsDot ? 1 : 0
         layer?.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
     }
 
@@ -1080,14 +1181,66 @@ final class PillButton: NSButton {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard showsCheckmark,
-              let image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil) else {
-            return
+        if showsDot {
+            NSColor.white.withAlphaComponent(0.72).setFill()
+            NSBezierPath(ovalIn: NSRect(x: 15, y: (bounds.height - 6) / 2, width: 6, height: 6)).fill()
         }
-        image.isTemplate = true
-        NSColor.white.withAlphaComponent(0.92).set()
-        image.draw(in: NSRect(x: bounds.maxX - 35, y: (bounds.height - 14) / 2, width: 14, height: 14))
+        super.draw(dirtyRect)
+    }
+}
+
+final class AccountMoreButton: NSButton {
+    private let tintColor: NSColor
+    private var trackingArea: NSTrackingArea?
+
+    init(frame: NSRect, tintColor: NSColor) {
+        self.tintColor = tintColor
+        super.init(frame: frame)
+        title = ""
+        bezelStyle = .regularSquare
+        isBordered = false
+        wantsLayer = true
+        layer?.cornerRadius = frame.height / 2
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.055).cgColor
+        layer?.borderWidth = 1.2
+        layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
+        toolTip = "Account settings"
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        layer?.backgroundColor = tintColor.withAlphaComponent(0.13).cgColor
+        layer?.borderColor = tintColor.withAlphaComponent(0.52).cgColor
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.055).cgColor
+        layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        tintColor.withAlphaComponent(0.92).setFill()
+        let dotSize: CGFloat = 3.2
+        let gap: CGFloat = 4.6
+        let startX = (bounds.width - (dotSize * 3 + gap * 2)) / 2
+        let y = (bounds.height - dotSize) / 2
+        for index in 0..<3 {
+            NSBezierPath(ovalIn: NSRect(x: startX + CGFloat(index) * (dotSize + gap), y: y, width: dotSize, height: dotSize)).fill()
+        }
     }
 }
 
@@ -1149,7 +1302,7 @@ final class AccountFloatingPanel: NSPanel {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let accountPanelSize = NSSize(width: 380, height: 430)
+    private let accountPanelSize = NSSize(width: 430, height: 530)
     private var accountPanel: NSPanel?
     private var accountPanelMode: AccountPanelMode = .usage
     private let timerTickInterval: TimeInterval = 5
@@ -1415,10 +1568,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         lastRefreshStartedAt = Date()
         DispatchQueue.global(qos: .utility).async {
             var result = self.runCodexAuth(["list"])
+            var usedSkipAPI = false
             if result.status != 0 {
                 result = self.runCodexAuth(["list", "--skip-api"])
+                usedSkipAPI = result.status == 0
             }
-            let parsed = result.status == 0 ? self.parseAccounts(result.output) : []
+            let parsed = result.status == 0 ? self.parseAccounts(result.output, usageIsLive: !usedSkipAPI) : []
             DispatchQueue.main.async {
                 self.isRefreshing = false
                 let newAccounts: [CodexAccount]
@@ -1459,7 +1614,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             menu.addItem(headerItem("Active: \(compactEmail(active.email)) (\(displayPlan(active.plan)))"))
         } else {
             if !isSwitching {
-                statusItem.button?.title = ""
+                clearStatusTitle()
             }
             menu.addItem(headerItem(lastError ?? "No active account"))
         }
@@ -1631,11 +1786,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             showSettings: { [weak self] in
                 self?.showSettingsPanel()
             },
+            editAccountLabel: { [weak self] email in
+                self?.showAccountDisplayLabelsDialogForAccount(email)
+            },
             performSettingsAction: { [weak self] action in
                 self?.handleSettingsPanelAction(action)
             },
-            close: { [weak self] in
-                self?.closeAccountPanel()
+            close: {
+                NSApp.terminate(nil)
             },
             toggleLaunchAtLogin: { [weak self] in
                 self?.toggleLaunchAtLogin()
@@ -1753,6 +1911,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func updateStatusTitle() {
         statusItem.button?.title = ""
         statusItem.button?.attributedTitle = statusAttributedTitle()
+        statusItem.length = NSStatusItem.variableLength
+        statusItem.button?.needsDisplay = true
+    }
+
+    private func clearStatusTitle() {
+        statusItem.button?.title = ""
+        statusItem.button?.attributedTitle = NSAttributedString(string: "")
         statusItem.length = NSStatusItem.variableLength
         statusItem.button?.needsDisplay = true
     }
@@ -2080,8 +2245,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     @objc private func showAccountDisplayLabelsDialog() {
+        showAccountDisplayLabelsDialogForAccount(nil)
+    }
+
+    private func showAccountDisplayLabelsDialogForAccount(_ preferredEmail: String?) {
         guard !accounts.isEmpty else { return }
         let popup = accountPopup(width: 300)
+        if let preferredEmail,
+           let preferredAccount = accounts.first(where: { $0.email.caseInsensitiveCompare(preferredEmail) == .orderedSame }) {
+            popup.selectItem(withTitle: "\(toolbarLabel(for: preferredAccount))  \(compactEmail(preferredAccount.email))")
+        }
         accountLabelDialogPopup = popup
         let selectedEmail = selectedAccountEmail(from: popup)
         let selectedAccount = selectedEmail.flatMap { email in accounts.first(where: { $0.email == email }) }
@@ -2524,6 +2697,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func updateSwitchAnimationTitle() {
         let frame = switchAnimationFrames[switchAnimationFrame % switchAnimationFrames.count]
+        statusItem.button?.attributedTitle = NSAttributedString(string: "")
         statusItem.button?.title = "\(switchingTitle) \(frame)"
     }
 
@@ -2812,6 +2986,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func runAccountMaintenance(title: String, args: [String], restartAfterSuccess: Bool = false) {
         guard !isSwitching else { return }
         isSwitching = true
+        statusItem.button?.attributedTitle = NSAttributedString(string: "")
         statusItem.button?.title = title
         rebuildMenu()
 
@@ -2850,6 +3025,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return CommandResult(status: 1, output: "Codex processes survived force quit: \(remaining.joined(separator: ", "))")
         }
 
+        if let configMessage = ensureComputerUsePluginConfigured() {
+            transcript.append(configMessage)
+        }
+
         transcript.append("Opening Codex App through codex-auth...")
         let appResult = runCodexAuth(["app", "--platform", "mac"])
         if appResult.status != 0 {
@@ -2870,6 +3049,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return CommandResult(status: 0, output: transcript.joined(separator: "\n"))
     }
 
+    private func ensureComputerUsePluginConfigured() -> String? {
+        let home = NSHomeDirectory()
+        let configURL = URL(fileURLWithPath: "\(home)/.codex/config.toml")
+        let stateURL = URL(fileURLWithPath: "\(home)/.codex/.codex-global-state.json")
+        var changed = false
+
+        do {
+            var config = try String(contentsOf: configURL, encoding: .utf8)
+            if !config.contains("[plugins.\"computer-use@openai-bundled\"]") {
+                let chromeBlock = "[plugins.\"chrome@openai-bundled\"]\nenabled = true"
+                let computerUseBlock = "\(chromeBlock)\n\n[plugins.\"computer-use@openai-bundled\"]\nenabled = true"
+                if config.contains(chromeBlock) {
+                    config = config.replacingOccurrences(of: chromeBlock, with: computerUseBlock)
+                } else {
+                    config += "\n\n[plugins.\"computer-use@openai-bundled\"]\nenabled = true\n"
+                }
+                changed = true
+            }
+
+            if !config.contains("SKY_CUA_SERVICE_PATH") {
+                let codePathLine = "CODEX_CLI_PATH = \"/Applications/Codex.app/Contents/Resources/codex\""
+                let servicePathLine = "SKY_CUA_SERVICE_PATH = \"\(home)/.codex/plugins/cache/openai-bundled/computer-use/1.0.799/Codex Computer Use.app\""
+                if config.contains(codePathLine) {
+                    config = config.replacingOccurrences(of: codePathLine, with: "\(servicePathLine)\n\(codePathLine)")
+                }
+                changed = true
+            }
+
+            if changed {
+                try config.write(to: configURL, atomically: true, encoding: .utf8)
+            }
+        } catch {
+            return "Computer Use config check failed: \(error.localizedDescription)"
+        }
+
+        do {
+            var state = try String(contentsOf: stateURL, encoding: .utf8)
+            if state.contains("\"electron-chrome-extension-sync-managed-plugin-ids\":[\"chrome@openai-bundled\"]") {
+                state = state.replacingOccurrences(
+                    of: "\"electron-chrome-extension-sync-managed-plugin-ids\":[\"chrome@openai-bundled\"]",
+                    with: "\"electron-chrome-extension-sync-managed-plugin-ids\":[\"chrome@openai-bundled\",\"computer-use@openai-bundled\"]"
+                )
+                try state.write(to: stateURL, atomically: true, encoding: .utf8)
+                changed = true
+            }
+        } catch {
+            return "Computer Use state check failed: \(error.localizedDescription)"
+        }
+
+        return changed ? "Repaired Computer Use plugin config before Codex launch." : nil
+    }
+
     private func codexAppPIDs() -> [String] {
         let result = run("/usr/bin/pgrep", ["-f", "/Applications/Codex\\.app/Contents/"])
         guard result.status == 0 else { return [] }
@@ -2879,7 +3110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             .filter { !$0.isEmpty }
     }
 
-    private func parseAccounts(_ output: String) -> [CodexAccount] {
+    private func parseAccounts(_ output: String, usageIsLive: Bool = true) -> [CodexAccount] {
         output.split(whereSeparator: \.isNewline).compactMap { rawLine in
             let line = String(rawLine)
             let tokens = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
@@ -2894,9 +3125,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let email = tokens[offset + 1]
             let plan = tokens[offset + 2]
             var cursor = offset + 3
-            let fiveHour = Self.parseUsage(tokens, from: cursor)
+            let fiveHour = Self.parseUsage(tokens, from: cursor, usageIsLive: usageIsLive)
             cursor = fiveHour.nextIndex
-            let weekly = Self.parseUsage(tokens, from: cursor)
+            let weekly = Self.parseUsage(tokens, from: cursor, usageIsLive: usageIsLive)
             cursor = weekly.nextIndex
             let lastActivity = tokens.dropFirst(cursor).joined(separator: " ")
 
@@ -2941,7 +3172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ]
     }
 
-    private static func parseUsage(_ tokens: [String], from startIndex: Int) -> (text: String, usedPercent: Int?, nextIndex: Int) {
+    private static func parseUsage(_ tokens: [String], from startIndex: Int, usageIsLive: Bool = true) -> (text: String, usedPercent: Int?, nextIndex: Int) {
         guard startIndex < tokens.count else {
             return ("-", nil, startIndex)
         }
@@ -2964,7 +3195,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
 
-        return (parts.joined(separator: " "), firstPercent(in: first), cursor)
+        let text = usageIsLive ? parts.joined(separator: " ") : "-"
+        return (text, usageIsLive ? firstPercent(in: first) : nil, cursor)
     }
 
     private static func firstPercent(in token: String) -> Int? {
