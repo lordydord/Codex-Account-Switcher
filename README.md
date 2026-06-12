@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.3"><img alt="Download v1.3" src="https://img.shields.io/badge/Download-v1.3-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.31"><img alt="Download v1.31" src="https://img.shields.io/badge/Download-v1.31-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.3/Codex-Account-Switcher-v1.3.zip"><strong>Download v1.3</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.31/Codex-Account-Switcher-v1.31.zip"><strong>Download v1.31</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -30,7 +30,7 @@ If you use the Codex Desktop app heavily, swapping between personal and work Cha
 
 - weekly usage for each saved account at a glance
 - active account highlighted, inactive accounts dimmed
-- both accounts' 5-hour usage in the dropdown
+- saved accounts' 5-hour usage in the dropdown
 - one-click switching with Codex relaunch
 - optional automatic switching when the active account drops below your chosen 5-hour usage threshold
 - low-usage notification with a `Switch Now` action
@@ -67,6 +67,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
 - Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
+- Compact 2x2 account panel layout for three or four saved accounts.
 - Bright active account card and dim inactive accounts, with green, orange, and red status colors reflected in the active card background.
 - Dropdown showing 5-hour usage for all saved accounts.
 - Email-based switching, avoiding brittle numeric selectors.
@@ -143,10 +144,11 @@ This repository does not contain account credentials, tokens, account IDs, local
 
 Screenshots are generated from demo account data and should stay that way for future releases.
 
-Usage refresh depends on `codex-auth`. In API mode, `codex-auth` fetches usage from ChatGPT backend endpoints using your saved account token. Review the `codex-auth` documentation and decide whether that tradeoff is right for you.
+Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions. API token mode is disabled in the current local build.
 
 ## Releases
 
+- Version 1.31: smooths the menu-bar percentage display on newer macOS releases, tightens the percentage padding, restores click-again-to-close behavior for the menu-bar panel, and keeps the recent three/four-account compact grid, expired-login detection, safer Codex relaunch handling, and ChatGPT-account-only switching updates.
 - Version 1.3: adds panel-card switch confirmation, account-label edit badges, a shorter account panel, cleaner compact Settings layout, compact Settings health checks, clearer refresh/stale status text, and tooltips on icon-only controls.
 - Version 1.2.2: fixes menu-bar percentage display issues and makes usage readings more stable when live Codex usage data is unavailable. Includes recent compact panel design refinements, clearer account controls, reset-time display polish, and lighter active/inactive visual styling.
 - Version 1.2.1: matches the in-app active account card, border, 5-hour ring, label, and active pill to the same green/orange/red usage status colors used in the menu bar, with light and dark mode background tints.
