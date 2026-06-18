@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.33"><img alt="Download v1.33" src="https://img.shields.io/badge/Download-v1.33-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.34"><img alt="Download v1.34" src="https://img.shields.io/badge/Download-v1.34-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.33/Codex-Account-Switcher-v1.33.zip"><strong>Download v1.33</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.34/Codex-Account-Switcher-v1.34.zip"><strong>Download v1.34</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -30,7 +30,7 @@ If you use the Codex Desktop app heavily, swapping between personal and work Cha
 
 - active account usage in the menu bar
 - 5-hour and weekly usage in a compact account panel
-- freshness badges so live values and snapshots are easier to tell apart
+- clearer active and inactive account styling without extra panel badges
 - safer switch previews before relaunching Codex
 - health checks for `codex-auth`, Codex, notifications, refresh freshness, and updates
 - optional automatic switching and resume prompts when quota gets tight
@@ -64,7 +64,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 ## Features
 
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
-- Click-to-open account panel with 5-hour rings, weekly progress, freshness badges, refresh, settings, and close controls.
+- Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
 - Compact 2x2 account panel layout for three or four saved accounts.
 - Bright active account card and dim inactive accounts, with green, orange, and red status colours retained across cards.
 - Dropdown showing 5-hour usage for all saved accounts.
@@ -146,7 +146,8 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
-- Version 1.33: adds per-account freshness badges, switch previews, expanded health checks, GitHub update checking, clearer refresh wording, better empty/error actions, and refreshed public screenshots/README presentation.
+- Version 1.34: removes per-account live/snapshot badges from the panel, keeps clearer active/inactive account styling, and refreshes public screenshots without badge overlays.
+- Version 1.33: adds switch previews, expanded health checks, GitHub update checking, clearer refresh wording, better empty/error actions, and refreshed public screenshots/README presentation.
 - Version 1.32: improves usage refresh freshness when values do not numerically change, clarifies inactive local snapshots, and refines the account panel so inactive accounts keep their green/orange/red usage colours while active accounts stand out with stronger weight and saturation.
 - Version 1.31: smooths the menu-bar percentage display on newer macOS releases, tightens the percentage padding, restores click-again-to-close behavior for the menu-bar panel, and keeps the recent three/four-account compact grid, expired-login detection, safer Codex relaunch handling, and ChatGPT-account-only switching updates.
 - Version 1.3: adds panel-card switch confirmation, account-label edit badges, a shorter account panel, cleaner compact Settings layout, compact Settings health checks, clearer refresh/stale status text, and tooltips on icon-only controls.

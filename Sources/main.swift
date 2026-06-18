@@ -740,7 +740,6 @@ final class AccountSwitcherPanelView: NSView {
         card.addSubview(accountSettingsButton)
 
         card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 12, y: 46, width: frame.width - 24, height: 16), size: 11.2, weight: .semibold, color: theme.tertiaryText, alignment: .center))
-        card.addSubview(freshnessBadge(for: account, frame: NSRect(x: frame.width - 76, y: 50, width: 58, height: 18)))
 
         let contentX: CGFloat = 14
         let contentWidth = frame.width - 28
@@ -814,7 +813,6 @@ final class AccountSwitcherPanelView: NSView {
         card.addSubview(accountSettingsButton)
 
         card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 8, y: 64, width: frame.width - 16, height: 18), size: 12, weight: .medium, color: theme.tertiaryText, alignment: .center))
-        card.addSubview(freshnessBadge(for: account, frame: NSRect(x: frame.width - 86, y: 86, width: 64, height: 18)))
 
         let ringSize: CGFloat = columnsFitWide(frame.width) ? 142 : 126
         let ringX = (frame.width - ringSize) / 2
@@ -864,32 +862,6 @@ final class AccountSwitcherPanelView: NSView {
     private func percentNumberText(_ percent: Int?) -> String {
         guard let percent else { return "--" }
         return "\(max(0, min(100, percent)))"
-    }
-
-    private func freshnessBadge(for account: CodexAccount, frame: NSRect) -> NSView {
-        let color = freshnessColor(for: account)
-        let badge = RoundedPanelView(
-            frame: frame,
-            fillColor: color.withAlphaComponent(theme.isDark ? 0.12 : 0.10),
-            borderColor: color.withAlphaComponent(theme.isDark ? 0.28 : 0.22),
-            cornerRadius: 9
-        )
-        badge.addSubview(label(freshnessTitle(for: account), frame: NSRect(x: 4, y: 2, width: frame.width - 8, height: 13), size: 8.2, weight: .semibold, color: color, alignment: .center))
-        return badge
-    }
-
-    private func freshnessTitle(for account: CodexAccount) -> String {
-        if account.fiveHourUsage == "Login expired" || account.weeklyUsage == "Login expired" {
-            return "Login"
-        }
-        return account.isActive ? "Live" : "Snapshot"
-    }
-
-    private func freshnessColor(for account: CodexAccount) -> NSColor {
-        if account.fiveHourUsage == "Login expired" || account.weeklyUsage == "Login expired" {
-            return .systemRed
-        }
-        return account.isActive ? .systemGreen : theme.secondaryText
     }
 
     private func switchPreviewText(for account: CodexAccount) -> String {
@@ -2497,7 +2469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         let refresh = NSMenuItem(title: "Force Usage Refresh", action: #selector(refreshNow), keyEquivalent: "")
         refresh.target = self
-        refresh.toolTip = "Refreshes the active account live; inactive accounts are local snapshots until switched."
+        refresh.toolTip = "Refreshes the active account now; inactive account usage updates after switching."
         refresh.isEnabled = !isSwitching
         menu.addItem(refresh)
 
@@ -3130,13 +3102,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func accountUsageTooltip(for account: CodexAccount) -> String {
         var parts = ["Plan \(account.plan)", "5h \(account.fiveHourUsage)", "weekly \(account.weeklyUsage)"]
-        if localUsageSnapshot(account) {
-            parts.append("inactive local snapshot; switch to refresh live")
+        if inactiveLocalUsage(account) {
+            parts.append("inactive usage updates after switching")
         }
         return parts.joined(separator: ", ")
     }
 
-    private func localUsageSnapshot(_ account: CodexAccount) -> Bool {
+    private func inactiveLocalUsage(_ account: CodexAccount) -> Bool {
         lastUsageRefreshWasLocalOnly && !account.isActive
     }
 
