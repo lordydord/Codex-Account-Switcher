@@ -96,6 +96,7 @@ enum SettingsPanelAction: String {
     case toggleProtectCodex
     case editRefresh
     case forceRefresh
+    case checkUpdates
     case cleanBackups
     case quit
 }
@@ -230,6 +231,7 @@ final class AccountSwitcherPanelView: NSView {
     private let switchAccount: (String) -> Void
     private let refresh: () -> Void
     private let showSettings: () -> Void
+    private let checkUpdates: () -> Void
     private let editAccountLabel: (String) -> Void
     private let performSettingsAction: (SettingsPanelAction) -> Void
     private let close: () -> Void
@@ -276,6 +278,7 @@ final class AccountSwitcherPanelView: NSView {
         switchAccount: @escaping (String) -> Void,
         refresh: @escaping () -> Void,
         showSettings: @escaping () -> Void,
+        checkUpdates: @escaping () -> Void,
         editAccountLabel: @escaping (String) -> Void,
         performSettingsAction: @escaping (SettingsPanelAction) -> Void,
         close: @escaping () -> Void,
@@ -311,6 +314,7 @@ final class AccountSwitcherPanelView: NSView {
         self.switchAccount = switchAccount
         self.refresh = refresh
         self.showSettings = showSettings
+        self.checkUpdates = checkUpdates
         self.editAccountLabel = editAccountLabel
         self.performSettingsAction = performSettingsAction
         self.close = close
@@ -332,6 +336,9 @@ final class AccountSwitcherPanelView: NSView {
     static func preferredSize(mode: AccountPanelMode, accountCount: Int) -> NSSize {
         if mode == .usage && accountCount >= 3 {
             return NSSize(width: 430, height: 520)
+        }
+        if mode == .settings {
+            return NSSize(width: 370, height: 500)
         }
         return NSSize(width: 370, height: 450)
     }
@@ -428,7 +435,7 @@ final class AccountSwitcherPanelView: NSView {
         automationSection.addSubview(settingToggleRow(title: "Card confirmation", detail: "Arm card first, then switch", isOn: confirmBeforeSwitching, action: .toggleConfirmSwitch, frame: NSRect(x: 14, y: 130, width: contentWidth - 28, height: 28)))
         addSubview(automationSection)
 
-        addSubview(healthSection(frame: NSRect(x: outerInset, y: 318, width: contentWidth, height: 74)))
+        addSubview(healthSection(frame: NSRect(x: outerInset, y: 318, width: contentWidth, height: 106)))
         addSubview(settingsFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
     }
 
@@ -570,13 +577,13 @@ final class AccountSwitcherPanelView: NSView {
 
     private func healthSection(frame: NSRect) -> NSView {
         let section = settingsSection(frame: frame, title: "Health")
-        let rows = Array(healthStatuses.prefix(4))
+        let rows = Array(healthStatuses.prefix(6))
         let badgeWidth = (frame.width - 40) / 2
         for (index, status) in rows.enumerated() {
             let column = index % 2
             let row = index / 2
             let x = 14 + CGFloat(column) * (badgeWidth + 12)
-            let y = 28 + CGFloat(row) * 16
+            let y = 28 + CGFloat(row) * 22
             section.addSubview(healthBadge(status, frame: NSRect(x: x, y: y, width: badgeWidth, height: 14)))
         }
         return section
@@ -654,7 +661,8 @@ final class AccountSwitcherPanelView: NSView {
             ("Add", .addAccount, 40),
             ("Device", .addDeviceAccount, 54),
             ("Reminder", .editUsageReminder, 68),
-            ("Refresh", .editRefresh, 58)
+            ("Refresh", .editRefresh, 58),
+            ("Update", .checkUpdates, 54)
         ]
         var x: CGFloat = 12
         for action in actions {
@@ -665,12 +673,6 @@ final class AccountSwitcherPanelView: NSView {
             footer.addSubview(button)
             x += action.2 + 8
         }
-
-        let quit = SettingsActionButton(frame: NSRect(x: frame.width - 66, y: buttonY, width: 54, height: 26), title: "Quit", color: theme.bottomBarFill, textColor: NSColor.systemRed)
-        quit.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.quit.rawValue)
-        quit.target = self
-        quit.action = #selector(settingsActionPressed(_:))
-        footer.addSubview(quit)
         return footer
     }
 
@@ -688,7 +690,7 @@ final class AccountSwitcherPanelView: NSView {
         subtitle.lineBreakMode = .byTruncatingTail
         view.addSubview(subtitle)
 
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 377, y: 29, width: 32, height: 32), action: #selector(refreshPressed), toolTip: "Refresh usage")
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 377, y: 29, width: 32, height: 32), action: #selector(refreshPressed), toolTip: "Refresh active usage; inactive accounts update when switched")
         view.addSubview(refreshButton)
 
         let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: 421, y: 28, width: 34, height: 34), action: #selector(settingsPressed(_:)), toolTip: "Open settings")
@@ -724,7 +726,7 @@ final class AccountSwitcherPanelView: NSView {
         let buttonColor = account.isActive ? fiveHourColor : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
         let switchButtonWidth: CGFloat = isArmed ? 76 : 64
         let switchButton = PillButton(frame: NSRect(x: 12, y: 12, width: switchButtonWidth, height: 24), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
-        switchButton.toolTip = isArmed ? "Click to confirm switching to this account" : "Switch to this account"
+        switchButton.toolTip = isArmed ? "Confirm \(switchPreviewText(for: account))" : switchPreviewText(for: account)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
         switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
@@ -738,6 +740,7 @@ final class AccountSwitcherPanelView: NSView {
         card.addSubview(accountSettingsButton)
 
         card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 12, y: 46, width: frame.width - 24, height: 16), size: 11.2, weight: .semibold, color: theme.tertiaryText, alignment: .center))
+        card.addSubview(freshnessBadge(for: account, frame: NSRect(x: frame.width - 76, y: 50, width: 58, height: 18)))
 
         let contentX: CGFloat = 14
         let contentWidth = frame.width - 28
@@ -797,7 +800,7 @@ final class AccountSwitcherPanelView: NSView {
         let buttonColor = account.isActive ? fiveHourColor : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
         let switchButtonWidth: CGFloat = account.isActive ? 74 : (isArmed ? 80 : 66)
         let switchButton = PillButton(frame: NSRect(x: 18, y: 18, width: switchButtonWidth, height: 26), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
-        switchButton.toolTip = isArmed ? "Click to confirm switching to this account" : "Switch to this account"
+        switchButton.toolTip = isArmed ? "Confirm \(switchPreviewText(for: account))" : switchPreviewText(for: account)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
         switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
@@ -811,6 +814,7 @@ final class AccountSwitcherPanelView: NSView {
         card.addSubview(accountSettingsButton)
 
         card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 8, y: 64, width: frame.width - 16, height: 18), size: 12, weight: .medium, color: theme.tertiaryText, alignment: .center))
+        card.addSubview(freshnessBadge(for: account, frame: NSRect(x: frame.width - 86, y: 86, width: 64, height: 18)))
 
         let ringSize: CGFloat = columnsFitWide(frame.width) ? 142 : 126
         let ringX = (frame.width - ringSize) / 2
@@ -860,6 +864,36 @@ final class AccountSwitcherPanelView: NSView {
     private func percentNumberText(_ percent: Int?) -> String {
         guard let percent else { return "--" }
         return "\(max(0, min(100, percent)))"
+    }
+
+    private func freshnessBadge(for account: CodexAccount, frame: NSRect) -> NSView {
+        let color = freshnessColor(for: account)
+        let badge = RoundedPanelView(
+            frame: frame,
+            fillColor: color.withAlphaComponent(theme.isDark ? 0.12 : 0.10),
+            borderColor: color.withAlphaComponent(theme.isDark ? 0.28 : 0.22),
+            cornerRadius: 9
+        )
+        badge.addSubview(label(freshnessTitle(for: account), frame: NSRect(x: 4, y: 2, width: frame.width - 8, height: 13), size: 8.2, weight: .semibold, color: color, alignment: .center))
+        return badge
+    }
+
+    private func freshnessTitle(for account: CodexAccount) -> String {
+        if account.fiveHourUsage == "Login expired" || account.weeklyUsage == "Login expired" {
+            return "Login"
+        }
+        return account.isActive ? "Live" : "Snapshot"
+    }
+
+    private func freshnessColor(for account: CodexAccount) -> NSColor {
+        if account.fiveHourUsage == "Login expired" || account.weeklyUsage == "Login expired" {
+            return .systemRed
+        }
+        return account.isActive ? .systemGreen : theme.secondaryText
+    }
+
+    private func switchPreviewText(for account: CodexAccount) -> String {
+        "Switch to \(labelForAccount(account)) · 5H \(percentText(account.fiveHourUsedPercent)) · Weekly \(percentText(account.weeklyUsedPercent))"
     }
 
     private func fiveHourResetTimeText(from usage: String) -> String {
@@ -1057,7 +1091,24 @@ final class AccountSwitcherPanelView: NSView {
         let card = RoundedPanelView(frame: NSRect(x: outerInset, y: outerInset, width: bounds.width - (outerInset * 2), height: accountCardHeight), fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false))
         card.addSubview(label("No accounts available", frame: NSRect(x: 22, y: 28, width: 240, height: 24), size: 18, weight: .semibold, color: theme.primaryText))
         card.addSubview(label(lastError ?? "Open settings to add an account.", frame: NSRect(x: 22, y: 62, width: 276, height: 40), size: 12, weight: .medium, color: theme.secondaryText))
+        let settingsButton = SettingsActionButton(frame: NSRect(x: 22, y: 118, width: 92, height: 28), title: "Settings", color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        settingsButton.target = self
+        settingsButton.action = #selector(settingsPressedFromEmptyState)
+        card.addSubview(settingsButton)
+
+        let refreshButton = SettingsActionButton(frame: NSRect(x: 126, y: 118, width: 86, height: 28), title: "Refresh", color: theme.bottomBarFill, textColor: theme.primaryText)
+        refreshButton.target = self
+        refreshButton.action = #selector(refreshPressedFromEmptyState)
+        card.addSubview(refreshButton)
         return card
+    }
+
+    @objc private func settingsPressedFromEmptyState() {
+        showSettings()
+    }
+
+    @objc private func refreshPressedFromEmptyState() {
+        refresh()
     }
 
     private func bottomBar(frame: NSRect) -> NSView {
@@ -1084,7 +1135,7 @@ final class AccountSwitcherPanelView: NSView {
 
         let closeX = frame.width - toolbarInset - iconSize
         let refreshX = closeX - toolbarGap - iconSize - 10
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed), toolTip: "Refresh usage")
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed), toolTip: "Refresh active usage; inactive accounts update when switched")
         bar.addSubview(refreshButton)
 
         let rightDivider = NSView(frame: NSRect(x: refreshX + iconSize + 10, y: 10, width: 1, height: frame.height - 20))
@@ -1920,6 +1971,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private weak var accountLabelDialogPopup: NSPopUpButton?
     private var notificationHealthTitle = "Checking"
     private var notificationHealthColor = NSColor.systemOrange
+    private var updateHealthTitle = "Check"
+    private var updateHealthColor = NSColor.systemOrange
+    private var latestReleaseURL: URL?
     private var remindersEnabled: Bool {
         get {
             if UserDefaults.standard.object(forKey: remindersEnabledDefaultsKey) == nil {
@@ -2443,8 +2497,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         let refresh = NSMenuItem(title: "Force Usage Refresh", action: #selector(refreshNow), keyEquivalent: "")
         refresh.target = self
+        refresh.toolTip = "Refreshes the active account live; inactive accounts are local snapshots until switched."
         refresh.isEnabled = !isSwitching
         menu.addItem(refresh)
+
+        let updates = NSMenuItem(title: "Check for Updates", action: #selector(checkForUpdatesMenu), keyEquivalent: "")
+        updates.target = self
+        menu.addItem(updates)
 
         let cleanBackups = NSMenuItem(title: "Clean Account Backups", action: #selector(cleanAccountBackups), keyEquivalent: "")
         cleanBackups.target = self
@@ -2580,6 +2639,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             showSettings: { [weak self] in
                 self?.showSettingsPanel()
             },
+            checkUpdates: { [weak self] in
+                self?.checkForUpdates(showResult: true)
+            },
             editAccountLabel: { [weak self] email in
                 self?.showAccountDisplayLabelsDialogForAccount(email)
             },
@@ -2643,8 +2705,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return [
             HealthStatus(title: "Auth", value: codexAuthOK ? "OK" : "Missing", color: codexAuthOK ? .systemGreen : .systemRed),
             HealthStatus(title: "Codex", value: codexAppOK ? "Found" : "Missing", color: codexAppOK ? .systemGreen : .systemRed),
-            HealthStatus(title: "Mode", value: "Accounts", color: .systemGreen),
-            HealthStatus(title: "Notify", value: notificationHealthTitle, color: notificationHealthColor)
+            HealthStatus(title: "Mode", value: "ChatGPT", color: .systemGreen),
+            HealthStatus(title: "Refresh", value: lastUpdatedText(), color: refreshHealthColor()),
+            HealthStatus(title: "Notify", value: notificationHealthTitle, color: notificationHealthColor),
+            HealthStatus(title: "Update", value: updateHealthTitle, color: updateHealthColor)
         ]
     }
 
@@ -2750,6 +2814,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             showRefreshSettingsDialog()
         case .forceRefresh:
             refreshNow()
+        case .checkUpdates:
+            checkForUpdates(showResult: true)
         case .cleanBackups:
             cleanAccountBackups()
         case .quit:
@@ -3173,12 +3239,111 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return "stale \(minutes / 60)h"
     }
 
+    private func refreshHealthColor() -> NSColor {
+        if isRefreshing { return .systemOrange }
+        guard let lastUpdatedAt else { return .systemRed }
+        let elapsed = Date().timeIntervalSince(lastUpdatedAt)
+        if elapsed < 60 { return .systemGreen }
+        if elapsed < 600 { return .systemOrange }
+        return .systemRed
+    }
+
     private func normalizedRefreshInterval(_ seconds: Int) -> Int {
         [5, 15, 30, 60].contains(seconds) ? seconds : 5
     }
 
     @objc private func refreshNow() {
         refreshAccounts(force: true)
+    }
+
+    @objc private func checkForUpdatesMenu() {
+        checkForUpdates(showResult: true)
+    }
+
+    private func checkForUpdates(showResult: Bool) {
+        guard let url = URL(string: "https://api.github.com/repos/lordydord/Codex-Account-Switcher/releases/latest") else { return }
+        updateHealthTitle = "Checking"
+        updateHealthColor = .systemOrange
+        refreshAccountPanelContentIfVisible()
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    self.updateHealthTitle = "Error"
+                    self.updateHealthColor = .systemRed
+                    if showResult {
+                        self.showAlert(title: "Update check failed", message: error.localizedDescription)
+                    }
+                    self.refreshAccountPanelContentIfVisible()
+                    return
+                }
+
+                guard
+                    let data,
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    let tag = object["tag_name"] as? String
+                else {
+                    self.updateHealthTitle = "Unknown"
+                    self.updateHealthColor = .systemOrange
+                    if showResult {
+                        self.showAlert(title: "Update check failed", message: "GitHub did not return a readable latest release.")
+                    }
+                    self.refreshAccountPanelContentIfVisible()
+                    return
+                }
+
+                let releaseURL = (object["html_url"] as? String).flatMap(URL.init(string:))
+                self.latestReleaseURL = releaseURL
+                let latestVersion = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+                let currentVersion = self.currentAppVersion()
+                if self.version(latestVersion, isNewerThan: currentVersion) {
+                    self.updateHealthTitle = tag
+                    self.updateHealthColor = .systemOrange
+                    if showResult {
+                        self.showUpdateAvailableAlert(tag: tag, currentVersion: currentVersion, url: releaseURL)
+                    }
+                } else {
+                    self.updateHealthTitle = "Current"
+                    self.updateHealthColor = .systemGreen
+                    if showResult {
+                        self.showAlert(title: "Codex Account Switcher is up to date", message: "Installed version \(currentVersion) matches the latest GitHub release.")
+                    }
+                }
+                self.refreshAccountPanelContentIfVisible()
+            }
+        }.resume()
+    }
+
+    private func showUpdateAvailableAlert(tag: String, currentVersion: String, url: URL?) {
+        let alert = NSAlert()
+        alert.messageText = "Update available"
+        alert.informativeText = "Installed version \(currentVersion) can be updated to \(tag)."
+        alert.addButton(withTitle: "Open Release")
+        alert.addButton(withTitle: "Later")
+        if alert.runModal() == .alertFirstButtonReturn, let url {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func currentAppVersion() -> String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    }
+
+    private func version(_ left: String, isNewerThan right: String) -> Bool {
+        let leftParts = left.split(separator: ".").map { Int($0) ?? 0 }
+        let rightParts = right.split(separator: ".").map { Int($0) ?? 0 }
+        let count = max(leftParts.count, rightParts.count)
+        for index in 0..<count {
+            let leftValue = index < leftParts.count ? leftParts[index] : 0
+            let rightValue = index < rightParts.count ? rightParts[index] : 0
+            if leftValue != rightValue {
+                return leftValue > rightValue
+            }
+        }
+        return false
     }
 
     @objc private func setActiveRefreshInterval(_ sender: NSMenuItem) {
@@ -3794,6 +3959,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         switchTo(query: query)
     }
 
+    private func confirmSwitchPreview(for account: CodexAccount) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Switch to \(displayLabel(for: account))?"
+        alert.informativeText = "5H \(remainingPercentText(fromUsed: account.fiveHourUsedPercent)) left · Weekly \(remainingPercentText(fromUsed: account.weeklyUsedPercent)) left\n\nCodex will relaunch after switching."
+        alert.addButton(withTitle: "Switch")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     private func switchTo(query: String, allowAutoResume: Bool = false) {
         guard !isSwitching else { return }
         clearArmedSwitch()
@@ -3804,6 +3978,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 message: "Account \(displayLabel(for: target)) has an expired Codex session. Re-login it with Add Account with Device Code, then refresh."
             )
             refreshAccounts(force: true)
+            return
+        }
+        if let target, !target.isActive, !allowAutoResume, !confirmBeforeSwitching, !confirmSwitchPreview(for: target) {
             return
         }
         isSwitching = true

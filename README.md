@@ -1,23 +1,23 @@
 <p align="center">
-  <img src="assets/hero.svg" alt="Codex Account Switcher preview" width="100%">
+  <img src="assets/social-preview.png" alt="Codex Account Switcher modern preview" width="100%">
 </p>
 
 <h1 align="center">Codex Account Switcher</h1>
 
 <p align="center">
-  <strong>A tiny native macOS menu-bar app for switching Codex / ChatGPT accounts before your usage limit gets in the way.</strong>
+  <strong>A tiny native macOS menu-bar app for switching Codex / ChatGPT accounts, watching usage, and keeping the active account obvious.</strong>
 </p>
 
 <p align="center">
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.32"><img alt="Download v1.32" src="https://img.shields.io/badge/Download-v1.32-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.33"><img alt="Download v1.33" src="https://img.shields.io/badge/Download-v1.33-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.32/Codex-Account-Switcher-v1.32.zip"><strong>Download v1.32</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.33/Codex-Account-Switcher-v1.33.zip"><strong>Download v1.33</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -28,33 +28,31 @@
 
 If you use the Codex Desktop app heavily, swapping between personal and work ChatGPT accounts can be clunky. Codex Account Switcher puts the useful bits in your menu bar:
 
-- weekly usage for each saved account at a glance
-- active account highlighted, inactive accounts dimmed
-- saved accounts' 5-hour usage in the dropdown
-- one-click switching with Codex relaunch
-- optional automatic switching when the active account drops below your chosen 5-hour usage threshold
-- low-usage notification with a `Switch Now` action
-- a compact click-to-open account panel for quick switching and settings
+- active account usage in the menu bar
+- 5-hour and weekly usage in a compact account panel
+- freshness badges so live values and snapshots are easier to tell apart
+- safer switch previews before relaunching Codex
+- health checks for `codex-auth`, Codex, notifications, refresh freshness, and updates
+- optional automatic switching and resume prompts when quota gets tight
 
 It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
 
 ## What It Looks Like
 
 <p align="center">
-  <strong>Menu-bar status</strong><br>
-  <img src="assets/screenshot-menubar.png" alt="Codex Account Switcher menu-bar status with placeholder account labels" width="520">
+  <img src="assets/screenshot-menubar.png" alt="Codex Account Switcher menu-bar status with placeholder account labels" width="720">
 </p>
 
-<p align="center">
-  <strong>Account panel</strong><br>
-  <img src="assets/screenshot-panel.png" alt="Codex Account Switcher account panel with placeholder accounts" width="360">
-</p>
-
-<p align="center">
-  <strong>Settings panel</strong><br>
-  <img src="assets/screenshot-settings.png" alt="Codex Account Switcher settings panel with placeholder accounts" width="380">
-</p>
-
+<table>
+  <tr>
+    <td width="50%">
+      <img src="assets/screenshot-panel.png" alt="Codex Account Switcher account panel with placeholder accounts">
+    </td>
+    <td width="50%">
+      <img src="assets/screenshot-settings.png" alt="Codex Account Switcher settings panel with placeholder accounts">
+    </td>
+  </tr>
+</table>
 
 By default, each account uses the first letter or number from its email address. For example:
 
@@ -66,18 +64,18 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 ## Features
 
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
-- Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
+- Click-to-open account panel with 5-hour rings, weekly progress, freshness badges, refresh, settings, and close controls.
 - Compact 2x2 account panel layout for three or four saved accounts.
-- Bright active account card and dim inactive accounts, with green, orange, and red status colors reflected in the active card background.
+- Bright active account card and dim inactive accounts, with green, orange, and red status colours retained across cards.
 - Dropdown showing 5-hour usage for all saved accounts.
 - Email-based switching, avoiding brittle numeric selectors.
-- Optional panel-card confirmation: first click arms the inactive card, second click on the highlighted switch pill confirms the account change.
+- Optional panel-card confirmation plus switch previews showing target 5-hour and weekly usage.
 - Codex relaunch after switching so Desktop picks up the new account.
 - Configurable notification and auto-switch thresholds.
 - Optional auto-switching from a low-usage active account to another saved account.
 - `Switch Now` notification action for low usage.
 - Refresh interval controls for active and idle states.
-- In-panel settings for display mode, launch-at-login, usage reminders, card confirmation, auto-switching, account actions, health checks, and maintenance.
+- In-panel settings for display mode, launch-at-login, usage reminders, card confirmation, auto-switching, auto-resume, account actions, health checks, update checks, and maintenance.
 - Account backup cleanup.
 - No bundled credentials, tokens, account registry, or usage snapshots.
 
@@ -148,6 +146,7 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
+- Version 1.33: adds per-account freshness badges, switch previews, expanded health checks, GitHub update checking, clearer refresh wording, better empty/error actions, and refreshed public screenshots/README presentation.
 - Version 1.32: improves usage refresh freshness when values do not numerically change, clarifies inactive local snapshots, and refines the account panel so inactive accounts keep their green/orange/red usage colours while active accounts stand out with stronger weight and saturation.
 - Version 1.31: smooths the menu-bar percentage display on newer macOS releases, tightens the percentage padding, restores click-again-to-close behavior for the menu-bar panel, and keeps the recent three/four-account compact grid, expired-login detection, safer Codex relaunch handling, and ChatGPT-account-only switching updates.
 - Version 1.3: adds panel-card switch confirmation, account-label edit badges, a shorter account panel, cleaner compact Settings layout, compact Settings health checks, clearer refresh/stale status text, and tooltips on icon-only controls.
