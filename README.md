@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.31"><img alt="Download v1.31" src="https://img.shields.io/badge/Download-v1.31-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.32"><img alt="Download v1.32" src="https://img.shields.io/badge/Download-v1.32-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.31/Codex-Account-Switcher-v1.31.zip"><strong>Download v1.31</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.32/Codex-Account-Switcher-v1.32.zip"><strong>Download v1.32</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -148,6 +148,7 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
+- Version 1.32: improves usage refresh freshness when values do not numerically change, clarifies inactive local snapshots, and refines the account panel so inactive accounts keep their green/orange/red usage colours while active accounts stand out with stronger weight and saturation.
 - Version 1.31: smooths the menu-bar percentage display on newer macOS releases, tightens the percentage padding, restores click-again-to-close behavior for the menu-bar panel, and keeps the recent three/four-account compact grid, expired-login detection, safer Codex relaunch handling, and ChatGPT-account-only switching updates.
 - Version 1.3: adds panel-card switch confirmation, account-label edit badges, a shorter account panel, cleaner compact Settings layout, compact Settings health checks, clearer refresh/stale status text, and tooltips on icon-only controls.
 - Version 1.2.2: fixes menu-bar percentage display issues and makes usage readings more stable when live Codex usage data is unavailable. Includes recent compact panel design refinements, clearer account controls, reset-time display polish, and lighter active/inactive visual styling.

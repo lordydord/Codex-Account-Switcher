@@ -32,7 +32,7 @@ Work from the root of this repository.
 
 ## Behavior Summary
 
-- Current local update is v1.31 / build 131.
+- Current local update is v1.32 / build 132.
 - Menu bar defaults to large weekly usage with percent signs, with a compact number-only option.
 - Active account is bright; inactive accounts are dimmed.
 - Dropdown shows 5-hour usage for all accounts.

@@ -11,7 +11,7 @@ Rules for future work:
 - The app depends on `codex-auth`; do not vendor or copy private `~/.codex/accounts` data into the repository.
 - Build verification is `./build.sh`.
 - Install verification is `./install.sh`, then confirm the app runs from `/Applications/Codex Account Switcher.app`.
-- Current local app update is v1.31 / build 131 plus local API-mode rollback: macOS 27 menu-bar stability, tighter percentage padding, click-again-to-close panel behavior, three/four-account compact grid, ChatGPT-account-only switching, expired-login detection for 400/401 usage responses, safer Codex relaunch when helper processes remain, and compact-card reset-row spacing.
+- Current local app update is v1.32 / build 132 plus local API-mode rollback: usage refresh freshness when values do not numerically change, inactive local snapshot clarity, macOS 27 menu-bar stability, tighter percentage padding, click-again-to-close panel behavior, three/four-account compact grid, ChatGPT-account-only switching, expired-login detection for 400/401 usage responses, safer Codex relaunch when helper processes remain, and refined inactive-account usage colours in the panel.
 
 Potential v2.5 idea:
 
