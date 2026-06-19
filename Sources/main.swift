@@ -39,6 +39,30 @@ struct ApiUsageSnapshot: Equatable {
     }
 }
 
+struct ResetCredit: Equatable {
+    let id: String
+    let title: String
+    let resetType: String
+    let status: String
+    let grantedAt: Date?
+    let expiresAt: Date?
+}
+
+struct ResetCreditsSnapshot: Equatable {
+    let availableCount: Int?
+    let credits: [ResetCredit]
+    let lastUpdatedText: String
+    let lastError: String?
+
+    var availableCredits: [ResetCredit] {
+        credits.filter { $0.status.lowercased() == "available" }
+    }
+
+    var displayCount: Int? {
+        availableCount ?? (credits.isEmpty ? nil : availableCredits.count)
+    }
+}
+
 enum UsageDisplayMode: String {
     case fiveHour
     case weekly
@@ -200,6 +224,27 @@ enum ApiUsageFetchResult {
     case failure(String)
 }
 
+enum ResetCreditsFetchResult {
+    case success(ResetCreditsSnapshot)
+    case failure(String)
+}
+
+enum ResetCreditRedemptionResult {
+    case success(String)
+    case failure(String)
+}
+
+struct SavedAccountAuth {
+    let email: String
+    let accessToken: String
+    let accountID: String
+}
+
+enum SavedAccountAuthResult {
+    case success(SavedAccountAuth)
+    case failure(String)
+}
+
 final class AccountSwitcherPanelView: NSView {
     private let accounts: [CodexAccount]
     private let activeAccount: CodexAccount?
@@ -221,6 +266,7 @@ final class AccountSwitcherPanelView: NSView {
     private let apiKeyConfigured: Bool
     private let usageKeyConfigured: Bool
     private let apiUsage: ApiUsageSnapshot
+    private let resetCreditsByEmail: [String: ResetCreditsSnapshot]
     private let healthStatuses: [HealthStatus]
     private let usageMode: UsageDisplayMode
     private let toolbarDisplayStyle: ToolbarDisplayStyle
@@ -233,18 +279,20 @@ final class AccountSwitcherPanelView: NSView {
     private let showSettings: () -> Void
     private let checkUpdates: () -> Void
     private let editAccountLabel: (String) -> Void
+    private let showResetCredits: (NSView) -> Void
     private let performSettingsAction: (SettingsPanelAction) -> Void
     private let close: () -> Void
     private let toggleLaunchAtLogin: () -> Void
     private var theme: PanelTheme { PanelTheme.current(for: effectiveAppearance) }
     private let outerInset: CGFloat = 18
     private let cardGap: CGFloat = 14
+    private let bottomBarTopGap: CGFloat = 12
     private let bottomBarHeight: CGFloat = 42
     private var usesCompactGrid: Bool {
         mode == .usage && accounts.count >= 3
     }
     private var accountCardHeight: CGFloat {
-        bounds.height - (outerInset * 2) - cardGap - bottomBarHeight
+        bounds.height - (outerInset * 2) - cardGap - bottomBarTopGap - bottomBarHeight
     }
 
     init(
@@ -268,6 +316,7 @@ final class AccountSwitcherPanelView: NSView {
         apiKeyConfigured: Bool,
         usageKeyConfigured: Bool,
         apiUsage: ApiUsageSnapshot,
+        resetCreditsByEmail: [String: ResetCreditsSnapshot],
         healthStatuses: [HealthStatus],
         usageMode: UsageDisplayMode,
         toolbarDisplayStyle: ToolbarDisplayStyle,
@@ -280,6 +329,7 @@ final class AccountSwitcherPanelView: NSView {
         showSettings: @escaping () -> Void,
         checkUpdates: @escaping () -> Void,
         editAccountLabel: @escaping (String) -> Void,
+        showResetCredits: @escaping (NSView) -> Void,
         performSettingsAction: @escaping (SettingsPanelAction) -> Void,
         close: @escaping () -> Void,
         toggleLaunchAtLogin: @escaping () -> Void
@@ -304,6 +354,7 @@ final class AccountSwitcherPanelView: NSView {
         self.apiKeyConfigured = apiKeyConfigured
         self.usageKeyConfigured = usageKeyConfigured
         self.apiUsage = apiUsage
+        self.resetCreditsByEmail = resetCreditsByEmail
         self.healthStatuses = healthStatuses
         self.usageMode = usageMode
         self.toolbarDisplayStyle = toolbarDisplayStyle
@@ -316,6 +367,7 @@ final class AccountSwitcherPanelView: NSView {
         self.showSettings = showSettings
         self.checkUpdates = checkUpdates
         self.editAccountLabel = editAccountLabel
+        self.showResetCredits = showResetCredits
         self.performSettingsAction = performSettingsAction
         self.close = close
         self.toggleLaunchAtLogin = toggleLaunchAtLogin
@@ -396,7 +448,7 @@ final class AccountSwitcherPanelView: NSView {
 
         let contentWidth = bounds.width - (outerInset * 2)
         let cardWidth = (contentWidth - cardGap) / 2
-        let cardHeight = (bounds.height - (outerInset * 2) - cardGap - bottomBarHeight) / 2
+        let cardHeight = (bounds.height - (outerInset * 2) - cardGap - bottomBarTopGap - bottomBarHeight) / 2
 
         for index in 0..<4 {
             let column = index % 2
@@ -448,7 +500,7 @@ final class AccountSwitcherPanelView: NSView {
         case .threshold:
             return "Switch at \(autoSwitchThreshold)%"
         case .zero:
-            return "Switch at 0%"
+            return "Ask at 0%"
         }
     }
 
@@ -1100,13 +1152,23 @@ final class AccountSwitcherPanelView: NSView {
         leftDivider.layer?.backgroundColor = theme.divider.cgColor
         bar.addSubview(leftDivider)
 
-        let clockX = toolbarInset + iconSize + toolbarGap + 18
-        let clock = SymbolIconView(frame: NSRect(x: clockX, y: clockY, width: clockSize, height: clockSize), symbol: "clock", color: theme.iconTint)
-        bar.addSubview(clock)
-        bar.addSubview(CenteredTextView(frame: NSRect(x: (frame.width - 92) / 2, y: (frame.height - 22) / 2, width: 92, height: 22), text: lastUpdatedText, size: 13, weight: .medium, color: theme.primaryText, alignment: .center))
-
         let closeX = frame.width - toolbarInset - iconSize
         let refreshX = closeX - toolbarGap - iconSize - 10
+        let resetWidth: CGFloat = frame.width >= 370 ? 82 : 74
+        let resetX = refreshX - resetWidth - 12
+        let clockX = toolbarInset + iconSize + toolbarGap + 12
+        let clock = SymbolIconView(frame: NSRect(x: clockX, y: clockY, width: clockSize, height: clockSize), symbol: "clock", color: theme.iconTint)
+        bar.addSubview(clock)
+        let updatedX = clockX + clockSize + 6
+        let updatedWidth = max(46, resetX - updatedX - 8)
+        bar.addSubview(CenteredTextView(frame: NSRect(x: updatedX, y: (frame.height - 22) / 2, width: updatedWidth, height: 22), text: lastUpdatedText, size: 12.2, weight: .medium, color: theme.primaryText, alignment: .left))
+
+        let resetButton = SettingsActionButton(frame: NSRect(x: resetX, y: 8, width: resetWidth, height: 26), title: resetCreditsButtonTitle(), color: resetCreditsButtonColor(), textColor: resetCreditsButtonTextColor())
+        resetButton.target = self
+        resetButton.action = #selector(resetCreditsPressed(_:))
+        resetButton.toolTip = resetCreditsTooltip()
+        bar.addSubview(resetButton)
+
         let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed), toolTip: "Refresh active usage; inactive accounts update when switched")
         bar.addSubview(refreshButton)
 
@@ -1119,6 +1181,62 @@ final class AccountSwitcherPanelView: NSView {
         closeButton.toolTip = "Quit Account Switcher"
         bar.addSubview(closeButton)
         return bar
+    }
+
+    private func resetCreditsButtonTitle() -> String {
+        let state = resetCreditsSummaryState()
+        if state.hasError, state.knownTotal == 0 {
+            return "RESETS ?"
+        }
+        guard state.knownAccounts > 0 else {
+            return "RESETS ..."
+        }
+        if state.knownTotal == 0 {
+            return "NO RESETS"
+        }
+        let suffix = state.hasError ? "+" : ""
+        return state.knownTotal == 1 ? "1\(suffix) RESET" : "\(state.knownTotal)\(suffix) RESETS"
+    }
+
+    private func resetCreditsButtonColor() -> NSColor {
+        let state = resetCreditsSummaryState()
+        if state.hasError, state.knownTotal == 0 {
+            return NSColor.systemOrange.withAlphaComponent(theme.isDark ? 0.34 : 0.20)
+        }
+        if state.knownTotal > 0 {
+            return NSColor.systemBlue.withAlphaComponent(theme.isDark ? 0.42 : 0.22)
+        }
+        return theme.inactiveButtonFill
+    }
+
+    private func resetCreditsButtonTextColor() -> NSColor {
+        let state = resetCreditsSummaryState()
+        if state.hasError, state.knownTotal == 0 {
+            return NSColor.systemOrange
+        }
+        if state.knownTotal > 0 {
+            return NSColor.systemBlue
+        }
+        return theme.primaryText
+    }
+
+    private func resetCreditsTooltip() -> String {
+        let state = resetCreditsSummaryState()
+        if state.hasError, state.knownTotal == 0 {
+            return "One or more reset-credit checks failed"
+        }
+        guard state.knownAccounts > 0 else {
+            return "Checking reset credits"
+        }
+        return state.knownTotal == 0 ? "No Codex reset credits available" : "Show Codex reset credits by account"
+    }
+
+    private func resetCreditsSummaryState() -> (knownTotal: Int, knownAccounts: Int, hasError: Bool) {
+        let snapshots = accounts.compactMap { resetCreditsByEmail[$0.email] }
+        let knownCounts = snapshots.compactMap { $0.displayCount }
+        let total = knownCounts.reduce(0, +)
+        let hasError = snapshots.contains { $0.lastError != nil }
+        return (total, knownCounts.count, hasError)
     }
 
     private func usageColor(for percent: Int?) -> NSColor {
@@ -1223,6 +1341,10 @@ final class AccountSwitcherPanelView: NSView {
 
     @objc private func refreshPressed() {
         refresh()
+    }
+
+    @objc private func resetCreditsPressed(_ sender: NSButton) {
+        showResetCredits(sender)
     }
 
     @objc private func settingsPressed(_ sender: NSButton) {
@@ -1856,6 +1978,20 @@ private extension NSRect {
 }
 
 private extension DateFormatter {
+    static let resetCreditISO: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static let resetCreditDisplay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE d MMM, HH:mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        return formatter
+    }()
+
     static let apiDayKey: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -1946,6 +2082,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var updateHealthTitle = "Check"
     private var updateHealthColor = NSColor.systemOrange
     private var latestReleaseURL: URL?
+    private var resetCreditsByEmail: [String: ResetCreditsSnapshot] = [:]
     private var remindersEnabled: Bool {
         get {
             if UserDefaults.standard.object(forKey: remindersEnabledDefaultsKey) == nil {
@@ -2314,6 +2451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard !isSwitching else { return }
         if demoMode {
             accounts = demoAccounts()
+            resetCreditsByEmail = demoResetCreditsByEmail(for: accounts)
             lastError = nil
             lastUpdatedAt = Date()
             rebuildMenu()
@@ -2345,6 +2483,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 usedSkipAPI = result.status == 0
             }
             let parsed = result.status == 0 ? self.parseAccounts(result.output, usageIsLive: !usedSkipAPI) : []
+            let resetResults = result.status == 0
+                ? self.fetchResetCredits(for: parsed)
+                : [:]
             DispatchQueue.main.async {
                 self.isRefreshing = false
                 let newAccounts: [CodexAccount]
@@ -2357,7 +2498,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     newError = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
 
-                let stateChanged = newAccounts != self.accounts || newError != self.lastError
+                let previousResetCredits = self.resetCreditsByEmail
+                if result.status == 0 {
+                    if usedSkipAPI {
+                        self.resetCreditsByEmail = Dictionary(uniqueKeysWithValues: parsed.map { account in
+                            (
+                                account.email,
+                                ResetCreditsSnapshot(
+                                    availableCount: nil,
+                                    credits: [],
+                                    lastUpdatedText: self.lastUpdatedText(),
+                                    lastError: "usage refresh was local only"
+                                )
+                            )
+                        })
+                    } else {
+                        self.resetCreditsByEmail = resetResults
+                    }
+                }
+
+                let stateChanged = newAccounts != self.accounts || newError != self.lastError || self.resetCreditsByEmail != previousResetCredits
                 if result.status == 0 {
                     self.lastUpdatedAt = Date()
                     self.lastUsageRefreshWasLocalOnly = !usedSkipAPI && (result.output.contains("mode=local-only") || !self.apiModeActive)
@@ -2591,6 +2751,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             apiKeyConfigured: apiKeyConfigured(),
             usageKeyConfigured: usageKeyConfigured(),
             apiUsage: apiUsageSnapshot(),
+            resetCreditsByEmail: resetCreditsByEmail,
             healthStatuses: healthStatusRows(),
             usageMode: usageMode,
             toolbarDisplayStyle: toolbarDisplayStyle,
@@ -2616,6 +2777,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             },
             editAccountLabel: { [weak self] email in
                 self?.showAccountDisplayLabelsDialogForAccount(email)
+            },
+            showResetCredits: { [weak self] sender in
+                self?.showResetCreditsMenu(from: sender)
             },
             performSettingsAction: { [weak self] action in
                 self?.handleSettingsPanelAction(action)
@@ -2806,6 +2970,181 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard demoMode, let panel = accountPanel else { return }
         let point = NSPoint(x: panel.frame.maxX - 190, y: panel.frame.maxY - 96)
         settingsMenu.popUp(positioning: nil, at: point, in: nil)
+    }
+
+    private func showResetCreditsMenu(from sender: NSView) {
+        let menu = NSMenu()
+        let header = NSMenuItem(title: resetCreditsMenuHeader(), action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        menu.addItem(.separator())
+
+        for (accountIndex, account) in toolbarAccounts().enumerated() {
+            if accountIndex > 0 {
+                menu.addItem(.separator())
+            }
+
+            let snapshot = resetCreditsByEmail[account.email]
+            let count = snapshot?.displayCount
+            let accountHeader = NSMenuItem(title: resetAccountHeaderTitle(account, count: count), action: nil, keyEquivalent: "")
+            accountHeader.isEnabled = false
+            menu.addItem(accountHeader)
+
+            if let error = snapshot?.lastError {
+                let item = NSMenuItem(title: "Unavailable: \(error)", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
+                continue
+            }
+
+            guard let snapshot else {
+                let item = NSMenuItem(title: "Checking reset credits...", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
+                continue
+            }
+
+            let credits = snapshot.availableCredits.sorted { left, right in
+                switch (left.expiresAt, right.expiresAt) {
+                case let (left?, right?):
+                    return left < right
+                case (.some, nil):
+                    return true
+                case (nil, .some):
+                    return false
+                case (nil, nil):
+                    return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+                }
+            }
+
+            if credits.isEmpty {
+                let item = NSMenuItem(title: "No available reset credits", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
+            } else {
+                for (index, credit) in credits.enumerated() {
+                    let title = resetCreditMenuTitle(credit, index: index + 1)
+                    let item = NSMenuItem(title: title, action: #selector(redeemResetCreditMenuItem(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = resetCreditActionPayload(email: account.email, creditID: credit.id)
+                    item.toolTip = "Redeem this reset credit after confirmation"
+                    menu.addItem(item)
+                }
+            }
+        }
+
+        menu.addItem(.separator())
+        let updated = NSMenuItem(title: resetCreditsUpdatedText(), action: nil, keyEquivalent: "")
+        updated.isEnabled = false
+        menu.addItem(updated)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    private func resetCreditsMenuHeader() -> String {
+        let counts = toolbarAccounts().compactMap { resetCreditsByEmail[$0.email]?.displayCount }
+        guard !counts.isEmpty else {
+            return "Codex reset credits"
+        }
+        let total = counts.reduce(0, +)
+        return total == 1 ? "1 Codex reset available" : "\(total) Codex resets available"
+    }
+
+    private func resetAccountHeaderTitle(_ account: CodexAccount, count: Int?) -> String {
+        let label = toolbarLabel(for: account)
+        let countText: String
+        if let count {
+            countText = count == 1 ? "1 reset" : "\(count) resets"
+        } else {
+            countText = "checking"
+        }
+        return "\(label)  \(compactEmail(account.email))  -  \(countText)"
+    }
+
+    private func resetCreditMenuTitle(_ credit: ResetCredit, index: Int) -> String {
+        let granted = credit.grantedAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown grant"
+        let expires = credit.expiresAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown expiry"
+        return "#\(index)  Redeem reset  -  granted \(granted), expires \(expires)"
+    }
+
+    private func resetCreditsUpdatedText() -> String {
+        let updates = toolbarAccounts().compactMap { resetCreditsByEmail[$0.email]?.lastUpdatedText }
+        let unique = Array(Set(updates))
+        if unique.count == 1, let first = unique.first {
+            return "Updated \(first)"
+        }
+        if updates.isEmpty {
+            return "Updated never"
+        }
+        return "Updated per account"
+    }
+
+    private func resetCreditActionPayload(email: String, creditID: String) -> String {
+        "\(email)\u{1F}\(creditID)"
+    }
+
+    private func resetCreditActionParts(from payload: String) -> (email: String, creditID: String)? {
+        let parts = payload.split(separator: "\u{1F}", maxSplits: 1).map(String.init)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        return (parts[0], parts[1])
+    }
+
+    @objc private func redeemResetCreditMenuItem(_ sender: NSMenuItem) {
+        guard
+            let payload = sender.representedObject as? String,
+            let action = resetCreditActionParts(from: payload),
+            let account = accounts.first(where: { $0.email == action.email }),
+            let credit = resetCreditsByEmail[action.email]?.credits.first(where: { $0.id == action.creditID })
+        else {
+            showAlert(title: "Reset unavailable", message: "The selected reset credit could not be found. Refresh the switcher and try again.")
+            return
+        }
+
+        confirmAndRedeemResetCredit(account: account, credit: credit)
+    }
+
+    private func confirmAndRedeemResetCredit(account: CodexAccount, credit: ResetCredit) {
+        let expires = credit.expiresAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown expiry"
+        let alert = NSAlert()
+        alert.messageText = "Redeem reset for \(toolbarLabel(for: account))?"
+        alert.informativeText = "This will spend one Codex reset credit for \(compactEmail(account.email)) and refresh the account's rate-limit window.\n\nExpires: \(expires)"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Redeem Reset")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        redeemResetCredit(account: account, credit: credit)
+    }
+
+    private func redeemResetCredit(account: CodexAccount, credit: ResetCredit) {
+        closeAccountPanel()
+        let label = toolbarLabel(for: account)
+        statusItem.button?.title = "\(label) · reset"
+        let accountsToRefresh = accounts
+
+        DispatchQueue.global(qos: .utility).async {
+            let result = self.consumeResetCredit(email: account.email, creditID: credit.id)
+            let resetResults = self.fetchResetCredits(for: accountsToRefresh)
+            let usageResult = self.runCodexAuth(["list", "--debug"])
+            let parsed = usageResult.status == 0 ? self.parseAccounts(usageResult.output, usageIsLive: true) : accountsToRefresh
+
+            DispatchQueue.main.async {
+                self.resetCreditsByEmail = resetResults
+                if usageResult.status == 0 {
+                    self.accounts = parsed
+                    self.lastUpdatedAt = Date()
+                    self.lastError = parsed.isEmpty ? "No codex-auth accounts found." : nil
+                }
+
+                switch result {
+                case .success(let message):
+                    self.rebuildMenu()
+                    self.showAlert(title: "Reset redeemed", message: message)
+                case .failure(let message):
+                    self.rebuildMenu()
+                    self.showAlert(title: "Reset failed", message: message)
+                }
+            }
+        }
     }
 
     private func advanceStatusAnimation() {
@@ -3517,7 +3856,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         addPopupItem(to: modePopup, title: "Off", representedObject: AutoSwitchMode.off.rawValue)
         addPopupItem(to: modePopup, title: "Ask at threshold", representedObject: AutoSwitchMode.ask.rawValue)
         addPopupItem(to: modePopup, title: "Switch at threshold", representedObject: AutoSwitchMode.threshold.rawValue)
-        addPopupItem(to: modePopup, title: "Switch only at 0%", representedObject: AutoSwitchMode.zero.rawValue)
+        addPopupItem(to: modePopup, title: "Ask at 0%", representedObject: AutoSwitchMode.zero.rawValue)
         selectPopupItem(modePopup, representedObject: autoSwitchMode.rawValue)
 
         let thresholdField = NSTextField(frame: NSRect(x: 0, y: 0, width: 70, height: 24))
@@ -3538,7 +3877,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         let alert = NSAlert()
         alert.messageText = "Auto switch"
-        alert.informativeText = "Choose whether the switcher asks first or changes accounts automatically when 5-hour usage is low."
+        alert.informativeText = "Choose whether the switcher asks first or changes accounts automatically when 5-hour usage is low. At 0%, it asks so Codex can finish any running task."
         alert.accessoryView = stack
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
@@ -4066,7 +4405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let key = "\(active.email)|\(target.email)|\(autoSwitchThreshold)|\(mode.rawValue)"
         guard !notifiedAutoSwitchPauseKeys.contains(key) else { return }
         notifiedAutoSwitchPauseKeys.insert(key)
-        if mode == .ask {
+        if mode == .ask || mode == .zero {
             sendAutoSwitchPrompt(active: active, target: target, activeFiveHour: activeFiveHour)
         } else {
             switchTo(query: target.email, allowAutoResume: true)
@@ -4709,6 +5048,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ]
     }
 
+    private func demoResetCreditsByEmail(for accounts: [CodexAccount]) -> [String: ResetCreditsSnapshot] {
+        let now = Date()
+        var snapshots: [String: ResetCreditsSnapshot] = [:]
+        for (index, account) in accounts.enumerated() {
+            let count: Int
+            if index == 0 {
+                count = 2
+            } else if index == 1 {
+                count = 0
+            } else {
+                count = 1
+            }
+
+            var credits: [ResetCredit] = []
+            for creditIndex in 0..<count {
+                let grantOffset = TimeInterval(-(creditIndex + 1) * 86_400)
+                let expiryOffset = TimeInterval((12 + creditIndex * 7) * 86_400)
+                credits.append(
+                    ResetCredit(
+                        id: "demo-\(account.selector)-\(creditIndex)",
+                        title: "One free rate limit reset",
+                        resetType: "codex_rate_limits",
+                        status: "available",
+                        grantedAt: now.addingTimeInterval(grantOffset),
+                        expiresAt: now.addingTimeInterval(expiryOffset)
+                    )
+                )
+            }
+
+            snapshots[account.email] = ResetCreditsSnapshot(
+                availableCount: count,
+                credits: credits,
+                lastUpdatedText: "just now",
+                lastError: nil
+            )
+        }
+        return snapshots
+    }
+
     private static func parseUsage(_ tokens: [String], from startIndex: Int, usageIsLive: Bool = true) -> (text: String, usedPercent: Int?, nextIndex: Int) {
         guard startIndex < tokens.count else {
             return ("-", nil, startIndex)
@@ -4760,6 +5138,195 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func fetchApiUsage() -> ApiUsageFetchResult {
         .failure("API mode disabled")
+    }
+
+    private func fetchResetCredits(for accounts: [CodexAccount]) -> [String: ResetCreditsSnapshot] {
+        Dictionary(uniqueKeysWithValues: accounts.map { account in
+            let snapshot: ResetCreditsSnapshot
+            switch savedAuth(forEmail: account.email) {
+            case .success(let auth):
+                switch fetchResetCredits(using: auth) {
+                case .success(let fetched):
+                    snapshot = fetched
+                case .failure(let message):
+                    snapshot = ResetCreditsSnapshot(availableCount: nil, credits: [], lastUpdatedText: "just now", lastError: message)
+                }
+            case .failure(let message):
+                snapshot = ResetCreditsSnapshot(availableCount: nil, credits: [], lastUpdatedText: "never", lastError: message)
+            }
+            return (account.email, snapshot)
+        })
+    }
+
+    private func fetchResetCredits(using auth: SavedAccountAuth) -> ResetCreditsFetchResult {
+        guard let url = URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits") else {
+            return .failure("reset endpoint URL is invalid")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 12
+        request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(auth.accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
+        request.setValue("codex-1", forHTTPHeaderField: "OpenAI-Beta")
+        request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var responseData: Data?
+        var statusCode: Int?
+        var responseError: Error?
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            responseData = data
+            responseError = error
+            statusCode = (response as? HTTPURLResponse)?.statusCode
+            semaphore.signal()
+        }.resume()
+
+        guard semaphore.wait(timeout: .now() + 14) == .success else {
+            return .failure("reset endpoint timed out")
+        }
+
+        if let responseError {
+            return .failure(responseError.localizedDescription)
+        }
+        guard statusCode == 200, let responseData else {
+            let statusText = statusCode.map(String.init) ?? "unknown"
+            return .failure("reset endpoint returned \(statusText)")
+        }
+        guard let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
+            return .failure("reset endpoint returned unreadable JSON")
+        }
+
+        let credits = (object["credits"] as? [[String: Any]] ?? []).map { raw in
+            ResetCredit(
+                id: raw["id"] as? String ?? "",
+                title: raw["title"] as? String ?? "Reset credit",
+                resetType: raw["reset_type"] as? String ?? "codex_rate_limits",
+                status: raw["status"] as? String ?? "unknown",
+                grantedAt: (raw["granted_at"] as? String).flatMap { DateFormatter.resetCreditISO.date(from: $0) },
+                expiresAt: (raw["expires_at"] as? String).flatMap { DateFormatter.resetCreditISO.date(from: $0) }
+            )
+        }
+
+        return .success(ResetCreditsSnapshot(
+            availableCount: object["available_count"] as? Int,
+            credits: credits,
+            lastUpdatedText: "just now",
+            lastError: nil
+        ))
+    }
+
+    private func consumeResetCredit(email: String, creditID: String) -> ResetCreditRedemptionResult {
+        guard !creditID.isEmpty else {
+            return .failure("The selected reset credit is missing its backend id.")
+        }
+        guard case .success(let auth) = savedAuth(forEmail: email) else {
+            return .failure("Could not read the saved Codex auth for this account.")
+        }
+        guard let url = URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume") else {
+            return .failure("Reset consume endpoint URL is invalid.")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(auth.accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
+        request.setValue("codex-1", forHTTPHeaderField: "OpenAI-Beta")
+        request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "credit_id": creditID,
+            "redeem_request_id": UUID().uuidString
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
+            return .failure("Could not prepare the reset request.")
+        }
+        request.httpBody = bodyData
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var responseData: Data?
+        var statusCode: Int?
+        var responseError: Error?
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            responseData = data
+            responseError = error
+            statusCode = (response as? HTTPURLResponse)?.statusCode
+            semaphore.signal()
+        }.resume()
+
+        guard semaphore.wait(timeout: .now() + 24) == .success else {
+            return .failure("Reset request timed out.")
+        }
+        if let responseError {
+            return .failure(responseError.localizedDescription)
+        }
+        guard statusCode == 200, let responseData else {
+            let statusText = statusCode.map(String.init) ?? "unknown"
+            let detail = responseData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            return .failure("Reset endpoint returned \(statusText). \(detail)")
+        }
+
+        guard let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
+            return .success("The reset request completed, then the app refreshed the account state.")
+        }
+        let code = object["code"] as? String ?? "reset"
+        let windows = object["windows_reset"] as? Int ?? 0
+        return .success("Reset redeemed for \(compactEmail(email)). Code: \(code). Windows reset: \(windows).")
+    }
+
+    private func savedAuth(forEmail email: String) -> SavedAccountAuthResult {
+        let root = URL(fileURLWithPath: "\(NSHomeDirectory())/.codex/accounts")
+        let registryURL = root.appendingPathComponent("registry.json")
+        guard
+            let registryData = try? Data(contentsOf: registryURL),
+            let registry = try? JSONSerialization.jsonObject(with: registryData) as? [String: Any],
+            let registryAccounts = registry["accounts"] as? [[String: Any]],
+            let registryAccount = registryAccounts.first(where: { ($0["email"] as? String) == email }),
+            let expectedAccountID = registryAccount["chatgpt_account_id"] as? String,
+            !expectedAccountID.isEmpty
+        else {
+            return .failure("saved account registry was not readable")
+        }
+
+        guard let authURL = authFileURL(forAccountID: expectedAccountID, root: root) else {
+            return .failure("saved account auth file was not found")
+        }
+        guard
+            let authData = try? Data(contentsOf: authURL),
+            let auth = try? JSONSerialization.jsonObject(with: authData) as? [String: Any],
+            let tokens = auth["tokens"] as? [String: Any],
+            let accessToken = tokens["access_token"] as? String,
+            let accountID = tokens["account_id"] as? String,
+            !accessToken.isEmpty,
+            !accountID.isEmpty
+        else {
+            return .failure("saved account auth token was not readable")
+        }
+
+        return .success(SavedAccountAuth(email: email, accessToken: accessToken, accountID: accountID))
+    }
+
+    private func authFileURL(forAccountID accountID: String, root: URL) -> URL? {
+        guard let urls = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else {
+            return nil
+        }
+        for url in urls where url.lastPathComponent.hasSuffix(".auth.json") {
+            guard
+                let data = try? Data(contentsOf: url),
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let tokens = object["tokens"] as? [String: Any],
+                let candidate = tokens["account_id"] as? String,
+                candidate == accountID
+            else {
+                continue
+            }
+            return url
+        }
+        return nil
     }
 
     private func apiKeyConfigured() -> Bool {

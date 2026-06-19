@@ -146,6 +146,7 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
+- Version 1.4: major reset-credit update. The switcher now checks reset credits across every saved Codex account, shows the total resets available in the compact panel bar, and opens a per-account breakdown with each reset credit's grant time and expiry date. Reset rows can be redeemed from the menu after an explicit confirmation, then the app refreshes usage and reset-credit state so you can see the new limits immediately.
 - Version 1.34: removes per-account live/snapshot badges from the panel, keeps clearer active/inactive account styling, and refreshes public screenshots without badge overlays.
 - Version 1.33: adds switch previews, expanded health checks, GitHub update checking, clearer refresh wording, better empty/error actions, and refreshed public screenshots/README presentation.
 - Version 1.32: improves usage refresh freshness when values do not numerically change, clarifies inactive local snapshots, and refines the account panel so inactive accounts keep their green/orange/red usage colours while active accounts stand out with stronger weight and saturation.
