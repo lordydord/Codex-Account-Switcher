@@ -108,6 +108,7 @@ enum SettingsPanelAction: String {
     case removeAccount
     case usageWeekly
     case usageFiveHour
+    case toggleAmPmTime
     case styleDetailed
     case styleCompact
     case toggleLaunchAtLogin
@@ -269,6 +270,9 @@ final class AccountSwitcherPanelView: NSView {
     private let resetCreditsByEmail: [String: ResetCreditsSnapshot]
     private let healthStatuses: [HealthStatus]
     private let usageMode: UsageDisplayMode
+    private let menuBarShowsWeekly: Bool
+    private let menuBarShowsFiveHour: Bool
+    private let useAmPmTime: Bool
     private let toolbarDisplayStyle: ToolbarDisplayStyle
     private let activeRefreshInterval: Int
     private let idleRefreshInterval: Int
@@ -319,6 +323,9 @@ final class AccountSwitcherPanelView: NSView {
         resetCreditsByEmail: [String: ResetCreditsSnapshot],
         healthStatuses: [HealthStatus],
         usageMode: UsageDisplayMode,
+        menuBarShowsWeekly: Bool,
+        menuBarShowsFiveHour: Bool,
+        useAmPmTime: Bool,
         toolbarDisplayStyle: ToolbarDisplayStyle,
         activeRefreshInterval: Int,
         idleRefreshInterval: Int,
@@ -357,6 +364,9 @@ final class AccountSwitcherPanelView: NSView {
         self.resetCreditsByEmail = resetCreditsByEmail
         self.healthStatuses = healthStatuses
         self.usageMode = usageMode
+        self.menuBarShowsWeekly = menuBarShowsWeekly
+        self.menuBarShowsFiveHour = menuBarShowsFiveHour
+        self.useAmPmTime = useAmPmTime
         self.toolbarDisplayStyle = toolbarDisplayStyle
         self.activeRefreshInterval = activeRefreshInterval
         self.idleRefreshInterval = idleRefreshInterval
@@ -390,9 +400,9 @@ final class AccountSwitcherPanelView: NSView {
             return NSSize(width: 430, height: 520)
         }
         if mode == .settings {
-            return NSSize(width: 370, height: 500)
+            return NSSize(width: 370, height: 572)
         }
-        return NSSize(width: 370, height: 450)
+        return NSSize(width: 370, height: 520)
     }
 
     private func build() {
@@ -468,26 +478,27 @@ final class AccountSwitcherPanelView: NSView {
         let contentWidth = bounds.width - (outerInset * 2)
         addSubview(settingsHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 38)))
 
-        let displaySection = settingsSection(frame: NSRect(x: outerInset, y: 64, width: contentWidth, height: 80), title: "Display")
-        displaySection.addSubview(segmentedRow(label: "Menu bar", frame: NSRect(x: 14, y: 29, width: contentWidth - 28, height: 24), options: [
-            ("Weekly", usageMode == .weekly, SettingsPanelAction.usageWeekly),
-            ("5H", usageMode == .fiveHour, SettingsPanelAction.usageFiveHour)
+        let displaySection = settingsSection(frame: NSRect(x: outerInset, y: 66, width: contentWidth, height: 116), title: "Display")
+        displaySection.addSubview(segmentedRow(label: "Menu bar", frame: NSRect(x: 14, y: 31, width: contentWidth - 28, height: 24), options: [
+            ("Weekly", menuBarShowsWeekly, SettingsPanelAction.usageWeekly),
+            ("5H", menuBarShowsFiveHour, SettingsPanelAction.usageFiveHour)
         ]))
-        displaySection.addSubview(segmentedRow(label: "Style", frame: NSRect(x: 14, y: 54, width: contentWidth - 28, height: 24), options: [
+        displaySection.addSubview(segmentedRow(label: "Style", frame: NSRect(x: 14, y: 59, width: contentWidth - 28, height: 24), options: [
             ("Large", toolbarDisplayStyle == .detailed, SettingsPanelAction.styleDetailed),
             ("Small", toolbarDisplayStyle == .compact, SettingsPanelAction.styleCompact)
         ]))
+        displaySection.addSubview(settingToggleRow(title: "AM/PM time", detail: "Show reset times as 8:33 PM", isOn: useAmPmTime, action: .toggleAmPmTime, frame: NSRect(x: 14, y: 86, width: contentWidth - 28, height: 30)))
         addSubview(displaySection)
 
-        let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 152, width: contentWidth, height: 158), title: "Automation")
-        automationSection.addSubview(settingToggleRow(title: "Launch at login", detail: "Open this helper automatically", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 14, y: 26, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 14, y: 52, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: autoSwitchDetailText(), isOn: autoSwitchEnabled, action: .editAutoSwitch, frame: NSRect(x: 14, y: 78, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Auto resume", detail: autoResumeDetailText(), isOn: autoResumeMode != .off, action: .editAutoResume, frame: NSRect(x: 14, y: 104, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Card confirmation", detail: "Arm card first, then switch", isOn: confirmBeforeSwitching, action: .toggleConfirmSwitch, frame: NSRect(x: 14, y: 130, width: contentWidth - 28, height: 28)))
+        let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 194, width: contentWidth, height: 184), title: "Automation")
+        automationSection.addSubview(settingToggleRow(title: "Launch at login", detail: "Open this helper automatically", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 14, y: 30, width: contentWidth - 28, height: 30)))
+        automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 14, y: 60, width: contentWidth - 28, height: 30)))
+        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: autoSwitchDetailText(), isOn: autoSwitchEnabled, action: .editAutoSwitch, frame: NSRect(x: 14, y: 90, width: contentWidth - 28, height: 30)))
+        automationSection.addSubview(settingToggleRow(title: "Auto resume", detail: autoResumeDetailText(), isOn: autoResumeMode != .off, action: .editAutoResume, frame: NSRect(x: 14, y: 120, width: contentWidth - 28, height: 30)))
+        automationSection.addSubview(settingToggleRow(title: "Card confirmation", detail: "Arm card first, then switch", isOn: confirmBeforeSwitching, action: .toggleConfirmSwitch, frame: NSRect(x: 14, y: 150, width: contentWidth - 28, height: 30)))
         addSubview(automationSection)
 
-        addSubview(healthSection(frame: NSRect(x: outerInset, y: 318, width: contentWidth, height: 106)))
+        addSubview(healthSection(frame: NSRect(x: outerInset, y: 390, width: contentWidth, height: 112)))
         addSubview(settingsFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
     }
 
@@ -696,9 +707,9 @@ final class AccountSwitcherPanelView: NSView {
 
     private func settingToggleRow(title: String, detail: String, isOn: Bool, action: SettingsPanelAction, frame: NSRect) -> NSView {
         let row = FlippedContainerView(frame: frame)
-        row.addSubview(label(title, frame: NSRect(x: 0, y: 1, width: frame.width - 44, height: 15), size: 11.2, weight: .semibold, color: theme.primaryText))
-        row.addSubview(label(detail, frame: NSRect(x: 0, y: 15, width: frame.width - 44, height: 13), size: 9.5, weight: .medium, color: theme.secondaryText))
-        let toggle = MiniSwitchButton(frame: NSRect(x: frame.width - 36, y: 3, width: 34, height: 22), isOn: isOn, offColor: theme.switchOffFill)
+        row.addSubview(label(title, frame: NSRect(x: 0, y: 0, width: frame.width - 44, height: 16), size: 11.2, weight: .semibold, color: theme.primaryText))
+        row.addSubview(label(detail, frame: NSRect(x: 0, y: 17, width: frame.width - 44, height: 13), size: 9.5, weight: .medium, color: theme.secondaryText))
+        let toggle = MiniSwitchButton(frame: NSRect(x: frame.width - 36, y: 4, width: 34, height: 22), isOn: isOn, offColor: theme.switchOffFill)
         toggle.identifier = NSUserInterfaceItemIdentifier(action.rawValue)
         toggle.target = self
         toggle.action = #selector(settingsActionPressed(_:))
@@ -759,7 +770,7 @@ final class AccountSwitcherPanelView: NSView {
         let fiveHourPercent = account.fiveHourUsedPercent
         let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
         let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
-        let usageWeight: NSFont.Weight = account.isActive ? .semibold : .medium
+        let usageWeight: NSFont.Weight = .semibold
         let compactProgressHeight = progressLineHeight(isActive: account.isActive)
         let card = RoundedPanelView(
             frame: frame,
@@ -847,10 +858,10 @@ final class AccountSwitcherPanelView: NSView {
         let labelText = labelForAccount(account)
 
         let isArmed = confirmBeforeSwitching && armedSwitchEmail == account.email && !account.isActive
-        let statusTitle = account.isActive ? "  ACTIVE" : (isSwitching ? "SWITCHING..." : (isArmed ? "CONFIRM" : "SWITCH"))
+        let statusTitle = account.isActive ? "ACTIVE" : (isSwitching ? "SYNC" : (isArmed ? "CONFIRM" : "SWITCH"))
         let buttonColor = account.isActive ? fiveHourColor : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
-        let switchButtonWidth: CGFloat = account.isActive ? 74 : (isArmed ? 80 : 66)
-        let switchButton = PillButton(frame: NSRect(x: 18, y: 18, width: switchButtonWidth, height: 26), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
+        let switchButtonWidth: CGFloat = account.isActive ? 74 : 78
+        let switchButton = PillButton(frame: NSRect(x: 14, y: 20, width: switchButtonWidth, height: 28), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
         switchButton.toolTip = isArmed ? "Confirm \(switchPreviewText(for: account))" : switchPreviewText(for: account)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
@@ -858,51 +869,55 @@ final class AccountSwitcherPanelView: NSView {
         switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
         card.addSubview(switchButton)
 
-        let accountSettingsButton = AccountMoreButton(frame: NSRect(x: frame.width - 62, y: 14, width: 46, height: 38), tintColor: account.isActive ? fiveHourColor : theme.iconTint, label: labelText)
+        let accountSettingsButton = AccountMoreButton(frame: NSRect(x: frame.width - 60, y: 16, width: 46, height: 38), tintColor: account.isActive ? fiveHourColor : theme.iconTint, label: labelText)
         accountSettingsButton.identifier = NSUserInterfaceItemIdentifier("label|\(account.email)")
         accountSettingsButton.target = self
         accountSettingsButton.action = #selector(accountSettingsActionPressed(_:))
         card.addSubview(accountSettingsButton)
 
-        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 8, y: 64, width: frame.width - 16, height: 18), size: 12, weight: .medium, color: theme.tertiaryText, alignment: .center))
+        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 20, y: 68, width: frame.width - 40, height: 18), size: 11.8, weight: .semibold, color: theme.tertiaryText, alignment: .center))
 
-        let ringSize: CGFloat = columnsFitWide(frame.width) ? 142 : 126
+        let ringSize: CGFloat = columnsFitWide(frame.width) ? 134 : 124
         let ringX = (frame.width - ringSize) / 2
-        let ringY: CGFloat = 90
+        let ringY: CGFloat = 94
         let ring = UsageRingView(frame: NSRect(x: ringX, y: ringY, width: ringSize, height: ringSize), color: fiveHourColor, trackColor: theme.ringTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100, isActive: account.isActive)
         card.addSubview(ring)
-        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: ringY + 31, width: ringSize - 16, height: 46), percent: fiveHourPercent, color: fiveHourColor))
-        card.addSubview(label("5H REMAINING", frame: NSRect(x: ringX + 12, y: ringY + 73, width: ringSize - 24, height: 16), size: 9.5, weight: .medium, color: theme.secondaryText, alignment: .center))
+        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: ringY + 29, width: ringSize - 16, height: 46), percent: fiveHourPercent, color: fiveHourColor))
+        card.addSubview(label("5H REMAINING", frame: NSRect(x: ringX + 12, y: ringY + 70, width: ringSize - 24, height: 16), size: 9.2, weight: .semibold, color: theme.secondaryText, alignment: .center))
 
-        let resetBlockY = ringY + ringSize + 8
+        let resetBlockY = ringY + ringSize + 10
         card.addSubview(resetRow(
             title: "5H",
             value: fiveHourResetTimeText(from: account.fiveHourUsage),
             color: fiveHourColor,
             isActive: account.isActive,
-            frame: NSRect(x: 22, y: resetBlockY, width: frame.width - 44, height: 22)
+            frame: NSRect(x: 24, y: resetBlockY, width: frame.width - 48, height: 22)
         ))
         let dividerY = resetBlockY + 32
-        let divider = NSView(frame: NSRect(x: 22, y: dividerY, width: frame.width - 44, height: 1))
+        let divider = NSView(frame: NSRect(x: 24, y: dividerY, width: frame.width - 48, height: 1))
         divider.wantsLayer = true
         divider.layer?.backgroundColor = theme.divider.cgColor
         card.addSubview(divider)
 
         let weeklyY = dividerY + 15
-        let weeklyLabel = label("WEEKLY", frame: NSRect(x: 22, y: weeklyY, width: 74, height: 16), size: 10.8, weight: .medium, color: theme.secondaryText)
+        let weeklyLabel = label("WEEKLY", frame: NSRect(x: 24, y: weeklyY, width: 74, height: 16), size: 10.6, weight: .semibold, color: theme.secondaryText)
         card.addSubview(weeklyLabel)
-        let weeklyValue = label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 70, y: weeklyY, width: 48, height: 16), size: 12, weight: usageWeight, color: weeklyColor, alignment: .right)
+        let weeklyValue = label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 72, y: weeklyY, width: 48, height: 16), size: 12, weight: usageWeight, color: weeklyColor, alignment: .right)
         card.addSubview(weeklyValue)
 
-        let progress = ProgressLineView(frame: NSRect(x: 22, y: weeklyY + 27, width: frame.width - 44, height: fullProgressHeight), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100)
+        let progress = ProgressLineView(frame: NSRect(x: 24, y: weeklyY + 27, width: frame.width - 48, height: fullProgressHeight), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100)
         card.addSubview(progress)
         card.addSubview(resetRow(
             title: "RESET",
             value: weeklyResetText(from: account.weeklyUsage),
             color: weeklyColor,
             isActive: account.isActive,
-            frame: NSRect(x: 22, y: weeklyY + 44, width: frame.width - 44, height: 22)
+            frame: NSRect(x: 24, y: weeklyY + 44, width: frame.width - 48, height: 22)
         ))
+        let pace = weeklyPaceDisplay(for: account)
+        card.addSubview(resetRow(title: "USED", value: pace.used, color: pace.color, isActive: account.isActive, frame: NSRect(x: 24, y: weeklyY + 66, width: frame.width - 48, height: 22), toolTip: pace.toolTip))
+        card.addSubview(resetRow(title: "TDY", value: pace.today, color: pace.color, isActive: account.isActive, frame: NSRect(x: 24, y: weeklyY + 88, width: frame.width - 48, height: 22), toolTip: pace.toolTip))
+        card.addSubview(resetRow(title: "TMR", value: pace.tomorrow, color: pace.color, isActive: account.isActive, frame: NSRect(x: 24, y: weeklyY + 110, width: frame.width - 48, height: 22), toolTip: pace.toolTip))
         return card
     }
 
@@ -922,17 +937,13 @@ final class AccountSwitcherPanelView: NSView {
 
     private func fiveHourResetTimeText(from usage: String) -> String {
         guard let inner = parenthesizedValue(from: usage) else { return "--.--" }
-        let parts = inner.split(separator: ":")
-        guard parts.count >= 2, let hour = Int(parts[0]) else {
-            return inner
-        }
-        let minute = String(parts[1].prefix(2))
-        return String(format: "%02d.%@", hour, minute)
+        guard let time = firstClockText(in: inner) else { return inner }
+        return formattedResetTime(time, compactTwentyFourHour: true)
     }
 
     private func weeklyResetText(from usage: String) -> String {
         guard let inner = parenthesizedValue(from: usage) else { return "--" }
-        let time = firstClockText(in: inner)
+        let time = firstClockText(in: inner).map { formattedResetTime($0, compactTwentyFourHour: false) }
         let day = firstWeekdayText(in: inner) ?? inferredWeekdayText(from: inner)
 
         switch (time, day) {
@@ -945,6 +956,46 @@ final class AccountSwitcherPanelView: NSView {
         }
     }
 
+    private func weeklyPaceDisplay(for account: CodexAccount) -> (used: String, today: String, tomorrow: String, color: NSColor, toolTip: String) {
+        guard let remaining = account.weeklyUsedPercent,
+              let resetDate = weeklyResetDate(from: account.weeklyUsage) else {
+            return ("--", "--", "--", theme.tertiaryText, "Weekly reset date unavailable")
+        }
+
+        let daily = 100.0 / 7.0
+        let daySeconds: TimeInterval = 24 * 60 * 60
+        let daysLeft = Int(ceil(min(7 * daySeconds, max(0, resetDate.timeIntervalSince(Date()))) / daySeconds))
+        let dayOfCycle = max(1, min(7, 8 - daysLeft))
+        let expectedUsed = min(100, Double(dayOfCycle) * daily)
+        let expectedTomorrow = min(100, Double(dayOfCycle + 1) * daily)
+        let actualUsed = 100 - Double(max(0, min(100, remaining)))
+        let todayLeft = max(0, expectedUsed - actualUsed)
+        let tomorrowLeft = max(0, expectedTomorrow - max(actualUsed, expectedUsed))
+        let overPace = actualUsed - expectedUsed
+        let color: NSColor = overPace >= daily ? .systemRed : (overPace > 0 ? .systemOrange : .systemGreen)
+        let toolTip = String(format: "Day %d target %.1f%%, used %.1f%%", dayOfCycle, expectedUsed, actualUsed)
+
+        return (
+            "\(pacePercentText(actualUsed))/\(pacePercentText(expectedUsed))",
+            pacePercentText(todayLeft),
+            pacePercentText(tomorrowLeft),
+            color,
+            toolTip
+        )
+    }
+
+    private func pacePercentText(_ value: Double) -> String {
+        let rounded = (max(0, min(100, value)) * 10).rounded() / 10
+        return rounded.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f%%", rounded)
+            : String(format: "%.1f%%", rounded)
+    }
+
+    private func weeklyResetDate(from usage: String) -> Date? {
+        guard let inner = parenthesizedValue(from: usage) else { return nil }
+        return resetDate(from: inner)
+    }
+
     private func firstClockText(in text: String) -> String? {
         let pattern = #"(?<!\d)(\d{1,2}):(\d{2})(?!\d)"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -953,6 +1004,30 @@ final class AccountSwitcherPanelView: NSView {
             return nil
         }
         return String(text[range])
+    }
+
+    private func formattedResetTime(_ text: String, compactTwentyFourHour: Bool) -> String {
+        guard let (hour, minute) = parsedClockTime(text) else { return text }
+        if useAmPmTime {
+            let displayHour = hour % 12 == 0 ? 12 : hour % 12
+            let suffix = hour < 12 ? "AM" : "PM"
+            return String(format: "%d:%02d %@", displayHour, minute, suffix)
+        }
+        return compactTwentyFourHour
+            ? String(format: "%02d.%02d", hour, minute)
+            : String(format: "%02d:%02d", hour, minute)
+    }
+
+    private func parsedClockTime(_ text: String) -> (hour: Int, minute: Int)? {
+        let parts = text.split(separator: ":")
+        guard parts.count >= 2,
+              let hour = Int(parts[0]),
+              let minute = Int(String(parts[1].prefix(2))),
+              (0...23).contains(hour),
+              (0...59).contains(minute) else {
+            return nil
+        }
+        return (hour, minute)
     }
 
     private func firstWeekdayText(in text: String) -> String? {
@@ -992,6 +1067,12 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func inferredWeekdayText(from text: String) -> String? {
+        guard let date = resetDate(from: text) else { return nil }
+        let weekday = Calendar.current.component(.weekday, from: date)
+        return weekdayText(from: weekday)
+    }
+
+    private func resetDate(from text: String) -> Date? {
         let cleaned = text
             .replacingOccurrences(of: ",", with: " ")
             .replacingOccurrences(of: " on ", with: " ")
@@ -1030,12 +1111,23 @@ final class AccountSwitcherPanelView: NSView {
             for format in formats {
                 formatter.dateFormat = format
                 if let date = formatter.date(from: candidate) {
-                    let weekday = Calendar.current.component(.weekday, from: date)
-                    return weekdayText(from: weekday)
+                    return upcomingWeeklyResetDate(from: date)
                 }
             }
         }
         return nil
+    }
+
+    private func upcomingWeeklyResetDate(from date: Date) -> Date {
+        var candidate = date
+        let cutoff = Date().addingTimeInterval(-3600)
+        while candidate < cutoff {
+            guard let next = Calendar.current.date(byAdding: .day, value: 7, to: candidate) else {
+                return candidate
+            }
+            candidate = next
+        }
+        return candidate
     }
 
     private func weekdayText(from weekday: Int) -> String? {
@@ -1059,10 +1151,11 @@ final class AccountSwitcherPanelView: NSView {
         }
     }
 
-    private func resetRow(title: String, value: String, color: NSColor, isActive: Bool, frame: NSRect) -> NSView {
+    private func resetRow(title: String, value: String, color: NSColor, isActive: Bool, frame: NSRect, toolTip: String? = nil) -> NSView {
         let row = FlippedContainerView(frame: frame)
-        row.addSubview(label(title, frame: NSRect(x: 0, y: 3, width: 50, height: 16), size: 10.2, weight: .semibold, color: theme.tertiaryText))
-        row.addSubview(ResetTimeBadgeView(frame: NSRect(x: 56, y: 0, width: frame.width - 56, height: 22), text: value, color: color, isActive: isActive))
+        row.toolTip = toolTip
+        row.addSubview(label(title, frame: NSRect(x: 0, y: 3, width: 44, height: 16), size: 10.2, weight: .semibold, color: theme.tertiaryText))
+        row.addSubview(ResetTimeBadgeView(frame: NSRect(x: 46, y: 0, width: frame.width - 46, height: 22), text: value, color: color, isActive: isActive))
         return row
     }
 
@@ -1154,14 +1247,15 @@ final class AccountSwitcherPanelView: NSView {
 
         let closeX = frame.width - toolbarInset - iconSize
         let refreshX = closeX - toolbarGap - iconSize - 10
-        let resetWidth: CGFloat = frame.width >= 370 ? 82 : 74
+        let resetWidth: CGFloat = 58
         let resetX = refreshX - resetWidth - 12
         let clockX = toolbarInset + iconSize + toolbarGap + 12
         let clock = SymbolIconView(frame: NSRect(x: clockX, y: clockY, width: clockSize, height: clockSize), symbol: "clock", color: theme.iconTint)
         bar.addSubview(clock)
         let updatedX = clockX + clockSize + 6
         let updatedWidth = max(46, resetX - updatedX - 8)
-        bar.addSubview(CenteredTextView(frame: NSRect(x: updatedX, y: (frame.height - 22) / 2, width: updatedWidth, height: 22), text: lastUpdatedText, size: 12.2, weight: .medium, color: theme.primaryText, alignment: .left))
+        let footerUpdatedText = lastUpdatedText == "refreshing..." ? "Syncing" : (lastUpdatedText == "just now" ? "Synced" : lastUpdatedText)
+        bar.addSubview(CenteredTextView(frame: NSRect(x: updatedX, y: (frame.height - 22) / 2, width: updatedWidth, height: 22), text: footerUpdatedText, size: 11.4, weight: .medium, color: theme.primaryText, alignment: .left))
 
         let resetButton = SettingsActionButton(frame: NSRect(x: resetX, y: 8, width: resetWidth, height: 26), title: resetCreditsButtonTitle(), color: resetCreditsButtonColor(), textColor: resetCreditsButtonTextColor())
         resetButton.target = self
@@ -1186,16 +1280,16 @@ final class AccountSwitcherPanelView: NSView {
     private func resetCreditsButtonTitle() -> String {
         let state = resetCreditsSummaryState()
         if state.hasError, state.knownTotal == 0 {
-            return "RESETS ?"
+            return "R?"
         }
         guard state.knownAccounts > 0 else {
-            return "RESETS ..."
+            return "R..."
         }
         if state.knownTotal == 0 {
-            return "NO RESETS"
+            return "0R"
         }
         let suffix = state.hasError ? "+" : ""
-        return state.knownTotal == 1 ? "1\(suffix) RESET" : "\(state.knownTotal)\(suffix) RESETS"
+        return "\(state.knownTotal)\(suffix)R"
     }
 
     private func resetCreditsButtonColor() -> NSColor {
@@ -1263,7 +1357,7 @@ final class AccountSwitcherPanelView: NSView {
 
     private func accentColor(for percent: Int?, isActive: Bool) -> NSColor {
         let color = usageColor(for: percent)
-        return isActive ? color : color.withAlphaComponent(theme.isDark ? 0.48 : 0.44)
+        return isActive ? color : color.withAlphaComponent(theme.isDark ? 0.58 : 0.56)
     }
 
     private func progressLineHeight(isActive: Bool) -> CGFloat {
@@ -1425,10 +1519,6 @@ final class DashboardBackgroundView: NSView {
         NSColor(red: 0.16, green: 0.42, blue: 0.31, alpha: isDark ? 0.10 : 0.08).setFill()
         NSBezierPath(ovalIn: NSRect(x: rect.midX - 120, y: 132, width: 260, height: 300)).fill()
 
-        (isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.black.withAlphaComponent(0.10)).setStroke()
-        let border = rect.insetBy(dx: 1, dy: 1).roundedPath(radius: 24)
-        border.lineWidth = 1.2
-        border.stroke()
     }
 }
 
@@ -1616,13 +1706,21 @@ final class ResetTimeBadgeView: NSView {
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: color.withAlphaComponent(isActive ? 0.95 : 0.58)
-        ]
-        let attributed = NSAttributedString(string: text, attributes: attributes)
+        var fontSize: CGFloat = 11
+        var attributed = ResetTimeBadgeView.attributedText(text, fontSize: fontSize, color: color, isActive: isActive)
+        while attributed.size().width > bounds.width, fontSize > 8 {
+            fontSize -= 0.5
+            attributed = ResetTimeBadgeView.attributedText(text, fontSize: fontSize, color: color, isActive: isActive)
+        }
         let size = attributed.size()
         attributed.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 0.5))
+    }
+
+    private static func attributedText(_ text: String, fontSize: CGFloat, color: NSColor, isActive: Bool) -> NSAttributedString {
+        NSAttributedString(string: text, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: color.withAlphaComponent(isActive ? 0.95 : 0.72)
+        ])
     }
 }
 
@@ -2032,6 +2130,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let idleRefreshIntervalDefaultsKey = "idleRefreshIntervalSeconds"
     private let protectFrontmostCodexDefaultsKey = "protectFrontmostCodex"
     private let toolbarDisplayStyleDefaultsKey = "toolbarDisplayStyle"
+    private let menuBarShowWeeklyDefaultsKey = "menuBarShowWeekly"
+    private let menuBarShowFiveHourDefaultsKey = "menuBarShowFiveHour"
+    private let useAmPmTimeDefaultsKey = "useAmPmTime"
     private let apiDailyLimitDefaultsKey = "apiDailyLimitTokens"
     private let apiWarningPercentDefaultsKey = "apiWarningPercent"
     private let apiUsageNotificationDefaultsKey = "apiUsageNotificationEnabled"
@@ -2062,13 +2163,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var armedSwitchEmail: String?
     private var armedSwitchClearWorkItem: DispatchWorkItem?
     private var switchAnimationTimer: Timer?
-    private var switchAnimationFrame = 0
     private var outsideClickMonitor: Any?
     private var localClickMonitor: Any?
     private var didResignActiveObserver: NSObjectProtocol?
     private var suppressStatusToggleOpenUntil: Date?
     private var switchingTitle = "Switching"
-    private let switchAnimationFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     private let statusPulseFrames = ["·", "•", "·", " "]
     private var notifiedLowUsageKeys = Set<String>()
     private var notifiedAutoSwitchPauseKeys = Set<String>()
@@ -2200,6 +2299,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "usageDisplayMode")
+        }
+    }
+    private var menuBarShowsWeekly: Bool {
+        get {
+            UserDefaults.standard.object(forKey: menuBarShowWeeklyDefaultsKey) == nil
+                ? true
+                : UserDefaults.standard.bool(forKey: menuBarShowWeeklyDefaultsKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: menuBarShowWeeklyDefaultsKey)
+        }
+    }
+    private var menuBarShowsFiveHour: Bool {
+        get {
+            UserDefaults.standard.object(forKey: menuBarShowFiveHourDefaultsKey) == nil
+                ? true
+                : UserDefaults.standard.bool(forKey: menuBarShowFiveHourDefaultsKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: menuBarShowFiveHourDefaultsKey)
+        }
+    }
+    private var useAmPmTime: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: useAmPmTimeDefaultsKey)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: useAmPmTimeDefaultsKey)
         }
     }
     private var toolbarDisplayStyle: ToolbarDisplayStyle {
@@ -2483,7 +2610,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 usedSkipAPI = result.status == 0
             }
             let parsed = result.status == 0 ? self.parseAccounts(result.output, usageIsLive: !usedSkipAPI) : []
-            let resetResults = result.status == 0
+            let resetResults = result.status == 0 && !usedSkipAPI
                 ? self.fetchResetCredits(for: parsed)
                 : [:]
             DispatchQueue.main.async {
@@ -2754,6 +2881,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             resetCreditsByEmail: resetCreditsByEmail,
             healthStatuses: healthStatusRows(),
             usageMode: usageMode,
+            menuBarShowsWeekly: menuBarShowsWeekly,
+            menuBarShowsFiveHour: menuBarShowsFiveHour,
+            useAmPmTime: useAmPmTime,
             toolbarDisplayStyle: toolbarDisplayStyle,
             activeRefreshInterval: activeRefreshInterval,
             idleRefreshInterval: idleRefreshInterval,
@@ -2919,11 +3049,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         case .removeAccount:
             showRemoveAccountDialog()
         case .usageWeekly:
-            usageMode = .weekly
-            rebuildMenu()
+            toggleMenuBarMetric(.weekly)
         case .usageFiveHour:
-            usageMode = .fiveHour
-            rebuildMenu()
+            toggleMenuBarMetric(.fiveHour)
+        case .toggleAmPmTime:
+            useAmPmTime.toggle()
         case .styleDetailed:
             toolbarDisplayStyle = .detailed
             rebuildMenu()
@@ -2960,6 +3090,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if accountPanel?.isVisible == true {
             refreshAccountPanelContent()
         }
+    }
+
+    private func toggleMenuBarMetric(_ mode: UsageDisplayMode) {
+        switch mode {
+        case .weekly:
+            guard menuBarShowsFiveHour || !menuBarShowsWeekly else { return }
+            menuBarShowsWeekly.toggle()
+            usageMode = .weekly
+        case .fiveHour:
+            guard menuBarShowsWeekly || !menuBarShowsFiveHour else { return }
+            menuBarShowsFiveHour.toggle()
+            usageMode = .fiveHour
+        }
+        updateStatusTitle()
+        rebuildMenu()
+        refreshAccountPanelContentIfVisible()
     }
 
     private func showSettingsMenu(from sender: NSView) {
@@ -3168,12 +3314,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func clearStatusTitle() {
+        let title = NSAttributedString(string: "Codex", attributes: toolbarTitleAttributes(for: nil))
+        let stableLength = statusItemLength(for: title)
         statusItem.button?.title = ""
-        statusItem.button?.attributedTitle = NSAttributedString(string: "")
-        statusItem.length = NSStatusItem.variableLength
+        statusItem.button?.attributedTitle = title
+        statusItem.length = stableLength
         statusItem.button?.needsDisplay = true
-        currentStatusTitleKey = ""
-        currentStatusItemLength = 0
+        currentStatusTitleKey = "empty"
+        currentStatusItemLength = stableLength
     }
 
     private func statusAttributedTitle() -> NSAttributedString {
@@ -3197,8 +3345,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 account.email,
                 account.isActive ? "active" : "inactive",
                 accountNeedsLogin(account) ? "login" : "ok",
-                "\(toolbarUsagePercent(for: account) ?? -1)",
-                usageMode.rawValue,
+                "\(account.fiveHourUsedPercent ?? -1)",
+                "\(account.weeklyUsedPercent ?? -1)",
+                menuBarShowsFiveHour ? "5h" : "",
+                menuBarShowsWeekly ? "weekly" : "",
                 toolbarDisplayStyle.rawValue
             ].joined(separator: "|")
         }.joined(separator: "||")
@@ -3210,13 +3360,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func toolbarStatusText(for account: CodexAccount) -> String {
         let label = toolbarLabel(for: account)
-        let percent = toolbarUsagePercent(for: account)
-        switch toolbarDisplayStyle {
-        case .detailed:
-            return "\(label)\(remainingPercentText(fromUsed: percent))"
-        case .compact:
-            return "\(label)\(remainingPercentNumberText(fromUsed: percent))"
+        var parts = [label]
+        if menuBarShowsFiveHour {
+            parts.append(remainingPercentText(fromUsed: account.fiveHourUsedPercent))
         }
+        if menuBarShowsWeekly {
+            parts.append(remainingPercentText(fromUsed: account.weeklyUsedPercent))
+        }
+        return parts.joined(separator: " ")
     }
 
     private func toolbarTitleAttributes(for account: CodexAccount?) -> [NSAttributedString.Key: Any] {
@@ -3236,6 +3387,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func toolbarUsagePercent(for account: CodexAccount) -> Int? {
+        if menuBarShowsFiveHour {
+            return account.fiveHourUsedPercent
+        }
+        if menuBarShowsWeekly {
+            return account.weeklyUsedPercent
+        }
         switch usageMode {
         case .fiveHour:
             return account.fiveHourUsedPercent
@@ -4347,20 +4504,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func beginSwitchAnimation(label: String) {
         switchAnimationTimer?.invalidate()
-        switchAnimationFrame = 0
-        switchingTitle = "\(limitedLabel(label)) · switching"
+        switchAnimationTimer = nil
+        switchingTitle = "\(limitedLabel(label)) switching"
         updateSwitchAnimationTitle()
-        switchAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.switchAnimationFrame += 1
-            self.updateSwitchAnimationTitle()
-        }
     }
 
     private func updateSwitchAnimationTitle() {
-        let frame = switchAnimationFrames[switchAnimationFrame % switchAnimationFrames.count]
-        statusItem.button?.attributedTitle = NSAttributedString(string: "")
-        statusItem.button?.title = "\(switchingTitle) \(frame)"
+        let title = NSAttributedString(string: switchingTitle, attributes: toolbarTitleAttributes(for: nil))
+        let stableLength = statusItemLength(for: title)
+        statusItem.button?.title = ""
+        statusItem.button?.attributedTitle = title
+        statusItem.length = stableLength
+        statusItem.button?.needsDisplay = true
+        currentStatusTitleKey = "switching|\(switchingTitle)"
+        currentStatusItemLength = stableLength
     }
 
     private func endSwitchAnimation() {
