@@ -41,12 +41,6 @@ It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop t
 ## What It Looks Like
 
 <p align="center">
-  <img src="assets/screenshot-resets.png" alt="Codex Account Switcher reset credits screen with placeholder accounts and color-coded expiry urgency" width="720">
-</p>
-
-The reset-credit view is one of the main reasons to use the switcher: it can show available Codex reset credits across saved accounts, group them by account, color-code expiry urgency, and keep each reset behind an explicit confirmation before anything is spent.
-
-<p align="center">
   <img src="assets/screenshot-menubar.png" alt="Codex Account Switcher menu-bar status with placeholder account labels" width="720">
 </p>
 
@@ -60,6 +54,12 @@ The reset-credit view is one of the main reasons to use the switcher: it can sho
     </td>
   </tr>
 </table>
+
+<p align="center">
+  <img src="assets/screenshot-resets.png" alt="Codex Account Switcher reset credits screen with placeholder accounts and color-coded expiry urgency" width="360">
+</p>
+
+The reset-credit view is one of the main reasons to use the switcher: it can show available Codex reset credits across saved accounts, group them by account, color-code expiry urgency, and keep each reset behind an explicit confirmation before anything is spent.
 
 By default, each account uses the first letter or number from its email address. For example:
 
