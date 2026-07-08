@@ -22,6 +22,55 @@ struct HealthStatus {
     let color: NSColor
 }
 
+enum RouteBCapabilityState {
+    case ready
+    case testRequired
+    case blocked
+}
+
+struct RouteBCapability {
+    let label: String
+    let state: RouteBCapabilityState
+}
+
+struct RouteBProviderProfile {
+    let id: String
+    let name: String
+    let provider: String
+    let model: String
+    let summary: String
+    let capabilities: [RouteBCapability]
+}
+
+private let routeBProviderProfiles = [
+    RouteBProviderProfile(
+        id: "openrouter-text-helper",
+        name: "Text Helper",
+        provider: "OpenRouter",
+        model: "z-ai/glm-5.2",
+        summary: "Low-risk drafting, summaries, and read-only checks.",
+        capabilities: [
+            RouteBCapability(label: "Chat ready", state: .ready),
+            RouteBCapability(label: "MCP test required", state: .testRequired),
+            RouteBCapability(label: "Browser test required", state: .testRequired),
+            RouteBCapability(label: "Live ops blocked", state: .blocked)
+        ]
+    ),
+    RouteBProviderProfile(
+        id: "openrouter-visual-helper",
+        name: "Visual Helper",
+        provider: "OpenRouter",
+        model: "z-ai/glm-5v-turbo",
+        summary: "Image review and visual context; no account actions.",
+        capabilities: [
+            RouteBCapability(label: "Chat ready", state: .ready),
+            RouteBCapability(label: "Vision ready", state: .ready),
+            RouteBCapability(label: "MCP blocked", state: .blocked),
+            RouteBCapability(label: "Live ops blocked", state: .blocked)
+        ]
+    )
+]
+
 struct ApiUsageSnapshot: Equatable {
     let usedTokens: Int
     let limitTokens: Int
@@ -92,10 +141,15 @@ enum AccountPanelMode {
     case usage
     case settings
     case api
+    case routeB
+    case resets
 }
 
 enum SettingsPanelAction: String {
     case usageView
+    case settingsView
+    case routeBView
+    case resetCreditsView
     case addAccount
     case addDeviceAccount
     case apiView
@@ -268,6 +322,8 @@ final class AccountSwitcherPanelView: NSView {
     private let apiUsage: ApiUsageSnapshot
     private let resetCreditsByEmail: [String: ResetCreditsSnapshot]
     private let healthStatuses: [HealthStatus]
+    private let routeBProfiles: [RouteBProviderProfile]
+    private let selectedRouteBProfileID: String?
     private let usageMode: UsageDisplayMode
     private let toolbarDisplayStyle: ToolbarDisplayStyle
     private let activeRefreshInterval: Int
@@ -279,7 +335,9 @@ final class AccountSwitcherPanelView: NSView {
     private let showSettings: () -> Void
     private let checkUpdates: () -> Void
     private let editAccountLabel: (String) -> Void
-    private let showResetCredits: (NSView) -> Void
+    private let showResetCredits: () -> Void
+    private let redeemResetCredit: (String, String) -> Void
+    private let selectRouteBProfile: (String) -> Void
     private let performSettingsAction: (SettingsPanelAction) -> Void
     private let close: () -> Void
     private let toggleLaunchAtLogin: () -> Void
@@ -318,6 +376,8 @@ final class AccountSwitcherPanelView: NSView {
         apiUsage: ApiUsageSnapshot,
         resetCreditsByEmail: [String: ResetCreditsSnapshot],
         healthStatuses: [HealthStatus],
+        routeBProfiles: [RouteBProviderProfile],
+        selectedRouteBProfileID: String?,
         usageMode: UsageDisplayMode,
         toolbarDisplayStyle: ToolbarDisplayStyle,
         activeRefreshInterval: Int,
@@ -329,7 +389,9 @@ final class AccountSwitcherPanelView: NSView {
         showSettings: @escaping () -> Void,
         checkUpdates: @escaping () -> Void,
         editAccountLabel: @escaping (String) -> Void,
-        showResetCredits: @escaping (NSView) -> Void,
+        showResetCredits: @escaping () -> Void,
+        redeemResetCredit: @escaping (String, String) -> Void,
+        selectRouteBProfile: @escaping (String) -> Void,
         performSettingsAction: @escaping (SettingsPanelAction) -> Void,
         close: @escaping () -> Void,
         toggleLaunchAtLogin: @escaping () -> Void
@@ -356,6 +418,8 @@ final class AccountSwitcherPanelView: NSView {
         self.apiUsage = apiUsage
         self.resetCreditsByEmail = resetCreditsByEmail
         self.healthStatuses = healthStatuses
+        self.routeBProfiles = routeBProfiles
+        self.selectedRouteBProfileID = selectedRouteBProfileID
         self.usageMode = usageMode
         self.toolbarDisplayStyle = toolbarDisplayStyle
         self.activeRefreshInterval = activeRefreshInterval
@@ -368,6 +432,8 @@ final class AccountSwitcherPanelView: NSView {
         self.checkUpdates = checkUpdates
         self.editAccountLabel = editAccountLabel
         self.showResetCredits = showResetCredits
+        self.redeemResetCredit = redeemResetCredit
+        self.selectRouteBProfile = selectRouteBProfile
         self.performSettingsAction = performSettingsAction
         self.close = close
         self.toggleLaunchAtLogin = toggleLaunchAtLogin
@@ -392,6 +458,12 @@ final class AccountSwitcherPanelView: NSView {
         if mode == .settings {
             return NSSize(width: 370, height: 500)
         }
+        if mode == .routeB {
+            return NSSize(width: 430, height: 520)
+        }
+        if mode == .resets && accountCount >= 3 {
+            return NSSize(width: 430, height: 580)
+        }
         return NSSize(width: 370, height: 450)
     }
 
@@ -407,6 +479,10 @@ final class AccountSwitcherPanelView: NSView {
             buildSettingsContent()
         case .api:
             buildApiContent()
+        case .routeB:
+            buildRouteBContent()
+        case .resets:
+            buildResetCreditsContent()
         }
     }
 
@@ -491,6 +567,328 @@ final class AccountSwitcherPanelView: NSView {
         addSubview(settingsFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
     }
 
+    private func buildRouteBContent() {
+        let contentWidth = bounds.width - (outerInset * 2)
+        addSubview(routeBHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 44)))
+        addSubview(routeBSafetyBanner(frame: NSRect(x: outerInset, y: 72, width: contentWidth, height: 62)))
+
+        for (index, profile) in routeBProfiles.prefix(2).enumerated() {
+            let y = 146 + CGFloat(index) * 142
+            addSubview(routeBProfileCard(profile, frame: NSRect(x: outerInset, y: y, width: contentWidth, height: 130)))
+        }
+
+        addSubview(routeBFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
+    }
+
+    private func buildResetCreditsContent() {
+        let contentWidth = bounds.width - (outerInset * 2)
+        addSubview(resetCreditsHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 44)))
+
+        if accounts.isEmpty {
+            let empty = emptyStateCard()
+            empty.frame = NSRect(x: outerInset, y: 74, width: contentWidth, height: bounds.height - 74 - outerInset)
+            addSubview(empty)
+            return
+        }
+
+        let orderedAccounts = orderedSettingsAccounts()
+        let areaY: CGFloat = 74
+        let areaHeight = bounds.height - areaY - outerInset
+        let columns = orderedAccounts.count >= 4 ? 2 : 1
+        let rows = Int(ceil(Double(orderedAccounts.count) / Double(columns)))
+        let cardWidth = columns == 1 ? contentWidth : (contentWidth - cardGap) / 2
+        let cardHeight = (areaHeight - CGFloat(max(0, rows - 1)) * cardGap) / CGFloat(max(1, rows))
+
+        for (index, account) in orderedAccounts.enumerated() {
+            let column = index % columns
+            let row = index / columns
+            let x = outerInset + CGFloat(column) * (cardWidth + cardGap)
+            let y = areaY + CGFloat(row) * (cardHeight + cardGap)
+            addSubview(resetCreditAccountCard(account, frame: NSRect(x: x, y: y, width: cardWidth, height: cardHeight)))
+        }
+    }
+
+    private func resetCreditsHeader(frame: NSRect) -> NSView {
+        let header = FlippedContainerView(frame: frame)
+        header.addSubview(label("Resets", frame: NSRect(x: 2, y: 1, width: 170, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
+        header.addSubview(label(resetCreditsHeaderSubtitle(), frame: NSRect(x: 2, y: 28, width: frame.width - 96, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
+
+        let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
+        back.target = self
+        back.action = #selector(settingsActionPressed(_:))
+        header.addSubview(back)
+        return header
+    }
+
+    private func resetCreditsHeaderSubtitle() -> String {
+        let state = resetCreditsSummaryState()
+        if state.knownAccounts == 0 {
+            return "Checking saved accounts"
+        }
+        if state.knownTotal == 0 {
+            return state.hasError ? "Some accounts could not be checked" : "No available reset credits"
+        }
+        let suffix = state.hasError ? " plus unchecked accounts" : ""
+        return state.knownTotal == 1 ? "1 available reset\(suffix)" : "\(state.knownTotal) available resets\(suffix)"
+    }
+
+    private func resetCreditAccountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
+        let snapshot = resetCreditsByEmail[account.email]
+        let count = snapshot?.displayCount
+        let countText: String
+        if let count {
+            countText = count == 1 ? "1 RESET" : "\(count) RESETS"
+        } else {
+            countText = "CHECKING"
+        }
+
+        let color = resetCreditsAccentColor(snapshot: snapshot)
+        let card = RoundedPanelView(
+            frame: frame,
+            fillColor: account.isActive ? cardFillColor(isActive: true) : cardFillColor(isActive: false),
+            borderColor: account.isActive ? color.withAlphaComponent(0.45) : cardBorderColor(isActive: false),
+            cornerRadius: accounts.count >= 4 ? 10 : 16
+        )
+
+        let labelText = labelForAccount(account)
+        card.addSubview(label(labelText, frame: NSRect(x: 14, y: 13, width: 42, height: 24), size: 18, weight: .semibold, color: color, alignment: .center))
+        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 58, y: 15, width: frame.width - 148, height: 18), size: 11.5, weight: .semibold, color: theme.primaryText))
+
+        let badge = ResetTimeBadgeView(frame: NSRect(x: frame.width - 86, y: 13, width: 72, height: 22), text: countText, color: color, isActive: account.isActive)
+        card.addSubview(badge)
+
+        let divider = NSView(frame: NSRect(x: 14, y: 48, width: frame.width - 28, height: 1))
+        divider.wantsLayer = true
+        divider.layer?.backgroundColor = theme.divider.cgColor
+        card.addSubview(divider)
+
+        if let error = snapshot?.lastError {
+            card.addSubview(label("Unavailable", frame: NSRect(x: 16, y: 64, width: frame.width - 32, height: 18), size: 12, weight: .semibold, color: NSColor.systemOrange))
+            card.addSubview(label(error, frame: NSRect(x: 16, y: 86, width: frame.width - 32, height: 36), size: 10, weight: .medium, color: theme.secondaryText))
+            return card
+        }
+
+        guard let snapshot else {
+            card.addSubview(label("Checking reset credits...", frame: NSRect(x: 16, y: 72, width: frame.width - 32, height: 18), size: 11.5, weight: .semibold, color: theme.secondaryText))
+            return card
+        }
+
+        let credits = sortedAvailableResetCredits(snapshot)
+        if credits.isEmpty {
+            card.addSubview(label("No available reset credits", frame: NSRect(x: 16, y: 72, width: frame.width - 32, height: 18), size: 11.5, weight: .semibold, color: theme.secondaryText))
+            let updated = "Updated \(snapshot.lastUpdatedText)"
+            card.addSubview(label(updated, frame: NSRect(x: 16, y: 94, width: frame.width - 32, height: 16), size: 10, weight: .medium, color: theme.tertiaryText))
+            return card
+        }
+
+        let rowHeight: CGFloat = accounts.count >= 4 ? 34 : 22
+        let maxRows = max(1, Int((frame.height - 58) / rowHeight))
+        for (index, credit) in credits.prefix(maxRows).enumerated() {
+            let y = 58 + CGFloat(index) * rowHeight
+            card.addSubview(resetCreditRow(credit, index: index + 1, account: account, frame: NSRect(x: 14, y: y, width: frame.width - 28, height: rowHeight)))
+        }
+
+        if credits.count > maxRows {
+            let remaining = credits.count - maxRows
+            let text = remaining == 1 ? "1 more reset available" : "\(remaining) more resets available"
+            card.addSubview(label(text, frame: NSRect(x: 16, y: frame.height - 22, width: frame.width - 32, height: 14), size: 9.5, weight: .medium, color: theme.tertiaryText))
+        }
+        return card
+    }
+
+    private func resetCreditsAccentColor(snapshot: ResetCreditsSnapshot?) -> NSColor {
+        if snapshot?.lastError != nil {
+            return .systemOrange
+        }
+        if let count = snapshot?.displayCount, count > 0 {
+            return .systemBlue
+        }
+        return theme.inactiveAccent
+    }
+
+    private func sortedAvailableResetCredits(_ snapshot: ResetCreditsSnapshot) -> [ResetCredit] {
+        snapshot.availableCredits.sorted { left, right in
+            switch (left.expiresAt, right.expiresAt) {
+            case let (left?, right?):
+                return left < right
+            case (.some, nil):
+                return true
+            case (nil, .some):
+                return false
+            case (nil, nil):
+                return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+            }
+        }
+    }
+
+    private func resetCreditRow(_ credit: ResetCredit, index: Int, account: CodexAccount, frame: NSRect) -> NSView {
+        let row = FlippedContainerView(frame: frame)
+        let urgencyColor = resetCreditUrgencyColor(for: credit)
+        let buttonWidth: CGFloat = 54
+        let buttonX = frame.width - buttonWidth
+        let indexWidth: CGFloat = 34
+        let expiresWidth: CGFloat = min(160, max(118, frame.width * 0.34))
+        let daysX = indexWidth + expiresWidth + 18
+        let daysWidth = max(82, buttonX - daysX - 16)
+        let primaryTextY: CGFloat = frame.height >= 28 ? 1 : 2
+        let buttonHeight: CGFloat = frame.height >= 28 ? 18 : 16
+        let buttonY: CGFloat = primaryTextY
+
+        row.addSubview(label("#\(index)", frame: NSRect(x: 0, y: primaryTextY, width: indexWidth, height: 16), size: 10.8, weight: .semibold, color: urgencyColor))
+        row.addSubview(label(resetCreditExpiryText(credit), frame: NSRect(x: indexWidth, y: primaryTextY, width: expiresWidth, height: 16), size: 10.8, weight: .semibold, color: urgencyColor))
+        row.addSubview(label(resetCreditDaysLeftText(credit), frame: NSRect(x: daysX, y: primaryTextY, width: daysWidth, height: 16), size: 10.8, weight: .semibold, color: urgencyColor))
+        if frame.height >= 28 {
+            row.addSubview(label(resetCreditGrantedText(credit), frame: NSRect(x: indexWidth, y: 17, width: frame.width - indexWidth - buttonWidth - 12, height: 14), size: 9.5, weight: .medium, color: theme.secondaryText))
+        }
+
+        let redeem = SettingsActionButton(frame: NSRect(x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight), title: "Use", color: urgencyColor.withAlphaComponent(theme.isDark ? 0.42 : 0.22), textColor: urgencyColor)
+        redeem.identifier = NSUserInterfaceItemIdentifier(resetCreditActionPayload(email: account.email, creditID: credit.id))
+        redeem.target = self
+        redeem.action = #selector(resetCreditRedeemPressed(_:))
+        redeem.toolTip = "Redeem this reset credit after confirmation"
+        row.addSubview(redeem)
+        return row
+    }
+
+    private func resetCreditExpiryText(_ credit: ResetCredit) -> String {
+        let expires = credit.expiresAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown expiry"
+        return expires
+    }
+
+    private func resetCreditDaysLeftText(_ credit: ResetCredit) -> String {
+        guard let days = resetCreditDaysLeft(credit) else {
+            return "unknown"
+        }
+        if days <= 0 {
+            return "today"
+        }
+        return days == 1 ? "1 day left" : "\(days) days left"
+    }
+
+    private func resetCreditGrantedText(_ credit: ResetCredit) -> String {
+        let granted = credit.grantedAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown grant"
+        return "Grant \(granted)"
+    }
+
+    private func resetCreditDaysLeft(_ credit: ResetCredit) -> Int? {
+        guard let expiresAt = credit.expiresAt else { return nil }
+        let seconds = expiresAt.timeIntervalSince(Date())
+        return max(0, Int(ceil(seconds / 86_400)))
+    }
+
+    private func resetCreditUrgencyColor(for credit: ResetCredit) -> NSColor {
+        guard let days = resetCreditDaysLeft(credit) else {
+            return .systemBlue
+        }
+        if days <= 7 {
+            return .systemRed
+        }
+        if days <= 20 {
+            return .systemOrange
+        }
+        return .systemGreen
+    }
+
+    private func routeBHeader(frame: NSRect) -> NSView {
+        let header = FlippedContainerView(frame: frame)
+        header.addSubview(label("OpenRouter", frame: NSRect(x: 2, y: 1, width: 190, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
+        header.addSubview(label("Route B · secondary profiles", frame: NSRect(x: 2, y: 28, width: 220, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
+
+        let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
+        back.target = self
+        back.action = #selector(settingsActionPressed(_:))
+        header.addSubview(back)
+        return header
+    }
+
+    private func routeBSafetyBanner(frame: NSRect) -> NSView {
+        let banner = RoundedPanelView(
+            frame: frame,
+            fillColor: NSColor.systemIndigo.withAlphaComponent(theme.isDark ? 0.16 : 0.09),
+            borderColor: NSColor.systemIndigo.withAlphaComponent(0.32),
+            cornerRadius: 14
+        )
+        banner.addSubview(label("SECONDARY LANE ONLY", frame: NSRect(x: 14, y: 10, width: frame.width - 28, height: 15), size: 10.5, weight: .bold, color: NSColor.systemIndigo))
+        banner.addSubview(label("No requests or keys in this prototype. Native Codex stays the default", frame: NSRect(x: 14, y: 27, width: frame.width - 28, height: 14), size: 10, weight: .medium, color: theme.secondaryText))
+        banner.addSubview(label("for sends, uploads, accounts, and other live operations.", frame: NSRect(x: 14, y: 41, width: frame.width - 28, height: 14), size: 10, weight: .medium, color: theme.secondaryText))
+        return banner
+    }
+
+    private func routeBProfileCard(_ profile: RouteBProviderProfile, frame: NSRect) -> NSView {
+        let isSelected = profile.id == selectedRouteBProfileID
+        let card = RoundedPanelView(
+            frame: frame,
+            fillColor: cardFillColor(isActive: isSelected),
+            borderColor: isSelected ? NSColor.systemGreen.withAlphaComponent(0.48) : cardBorderColor(isActive: false),
+            cornerRadius: 16
+        )
+        card.addSubview(label(profile.name, frame: NSRect(x: 16, y: 13, width: frame.width - 112, height: 20), size: 15, weight: .semibold, color: theme.primaryText))
+        card.addSubview(label("\(profile.provider) · \(profile.model)", frame: NSRect(x: 16, y: 34, width: frame.width - 32, height: 16), size: 10.5, weight: .medium, color: theme.secondaryText))
+        card.addSubview(label(profile.summary, frame: NSRect(x: 16, y: 53, width: frame.width - 32, height: 16), size: 10.5, weight: .medium, color: theme.valueText))
+
+        let button = SettingsActionButton(
+            frame: NSRect(x: frame.width - 88, y: 12, width: 72, height: 24),
+            title: isSelected ? "Selected" : "Switch",
+            color: isSelected ? NSColor.systemGreen : theme.inactiveButtonFill,
+            textColor: isSelected ? .white : theme.primaryText
+        )
+        button.identifier = NSUserInterfaceItemIdentifier("routeBSelect|\(profile.id)")
+        button.target = self
+        button.action = #selector(settingsActionPressed(_:))
+        button.isEnabled = !isSelected
+        card.addSubview(button)
+
+        var x: CGFloat = 16
+        var y: CGFloat = 82
+        for capability in profile.capabilities {
+            let width = routeBCapabilityWidth(capability.label)
+            if x + width > frame.width - 16 {
+                x = 16
+                y += 27
+            }
+            card.addSubview(routeBCapabilityBadge(capability, frame: NSRect(x: x, y: y, width: width, height: 21)))
+            x += width + 8
+        }
+        return card
+    }
+
+    private func routeBCapabilityBadge(_ capability: RouteBCapability, frame: NSRect) -> NSView {
+        let color: NSColor
+        let symbol: String
+        switch capability.state {
+        case .ready:
+            color = .systemGreen
+            symbol = "✓"
+        case .testRequired:
+            color = .systemOrange
+            symbol = "!"
+        case .blocked:
+            color = .systemRed
+            symbol = "×"
+        }
+
+        let badge = RoundedPanelView(frame: frame, fillColor: color.withAlphaComponent(theme.isDark ? 0.16 : 0.10), borderColor: color.withAlphaComponent(0.34), cornerRadius: 10)
+        badge.addSubview(label("\(symbol)  \(capability.label)", frame: NSRect(x: 8, y: 3, width: frame.width - 16, height: 15), size: 9.5, weight: .semibold, color: color))
+        return badge
+    }
+
+    private func routeBCapabilityWidth(_ text: String) -> CGFloat {
+        max(100, min(180, CGFloat(text.count) * 6.4 + 36))
+    }
+
+    private func routeBFooter(frame: NSRect) -> NSView {
+        let footer = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 14)
+        footer.addSubview(label("Profile selection only · execution disabled", frame: NSRect(x: 14, y: 12, width: frame.width - 110, height: 18), size: 10.5, weight: .semibold, color: theme.secondaryText))
+        let settings = SettingsActionButton(frame: NSRect(x: frame.width - 88, y: 8, width: 76, height: 26), title: "Settings", color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        settings.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.settingsView.rawValue)
+        settings.target = self
+        settings.action = #selector(settingsActionPressed(_:))
+        footer.addSubview(settings)
+        return footer
+    }
+
     private func autoSwitchDetailText() -> String {
         switch autoSwitchMode {
         case .off:
@@ -531,6 +929,12 @@ final class AccountSwitcherPanelView: NSView {
         let header = FlippedContainerView(frame: frame)
         header.addSubview(label("Settings", frame: NSRect(x: 2, y: 1, width: 120, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
         header.addSubview(label("Switcher controls", frame: NSRect(x: 2, y: 27, width: 180, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
+        let openRouter = SettingsActionButton(frame: NSRect(x: frame.width - 164, y: 4, width: 78, height: 28), title: "OpenRouter", color: NSColor.systemIndigo.withAlphaComponent(0.82), textColor: .white)
+        openRouter.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.routeBView.rawValue)
+        openRouter.target = self
+        openRouter.action = #selector(settingsActionPressed(_:))
+        header.addSubview(openRouter)
+
         let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
         back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
         back.target = self
@@ -1239,6 +1643,18 @@ final class AccountSwitcherPanelView: NSView {
         return (total, knownCounts.count, hasError)
     }
 
+    private func resetCreditActionPayload(email: String, creditID: String) -> String {
+        "redeemReset|\(email)\u{1F}\(creditID)"
+    }
+
+    private func resetCreditActionParts(from rawValue: String) -> (email: String, creditID: String)? {
+        guard rawValue.hasPrefix("redeemReset|") else { return nil }
+        let payload = String(rawValue.dropFirst("redeemReset|".count))
+        let parts = payload.split(separator: "\u{1F}", maxSplits: 1).map(String.init)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        return (parts[0], parts[1])
+    }
+
     private func usageColor(for percent: Int?) -> NSColor {
         usageStatusColor(for: percent)
     }
@@ -1344,7 +1760,17 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     @objc private func resetCreditsPressed(_ sender: NSButton) {
-        showResetCredits(sender)
+        showResetCredits()
+    }
+
+    @objc private func resetCreditRedeemPressed(_ sender: NSControl) {
+        guard
+            let rawValue = sender.identifier?.rawValue,
+            let action = resetCreditActionParts(from: rawValue)
+        else {
+            return
+        }
+        redeemResetCredit(action.email, action.creditID)
     }
 
     @objc private func settingsPressed(_ sender: NSButton) {
@@ -1373,8 +1799,14 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     @objc private func settingsActionPressed(_ sender: NSControl) {
-        guard let rawValue = sender.identifier?.rawValue,
-              let action = SettingsPanelAction(rawValue: rawValue) else { return }
+        guard let rawValue = sender.identifier?.rawValue else { return }
+        if rawValue.hasPrefix("routeBSelect|") {
+            let profileID = String(rawValue.dropFirst("routeBSelect|".count))
+            guard !profileID.isEmpty else { return }
+            selectRouteBProfile(profileID)
+            return
+        }
+        guard let action = SettingsPanelAction(rawValue: rawValue) else { return }
         performSettingsAction(action)
     }
 
@@ -2032,6 +2464,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let idleRefreshIntervalDefaultsKey = "idleRefreshIntervalSeconds"
     private let protectFrontmostCodexDefaultsKey = "protectFrontmostCodex"
     private let toolbarDisplayStyleDefaultsKey = "toolbarDisplayStyle"
+    private let selectedRouteBProfileDefaultsKey = "selectedRouteBProfileID"
     private let apiDailyLimitDefaultsKey = "apiDailyLimitTokens"
     private let apiWarningPercentDefaultsKey = "apiWarningPercent"
     private let apiUsageNotificationDefaultsKey = "apiUsageNotificationEnabled"
@@ -2259,6 +2692,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var showSettingsOnLaunch: Bool {
         ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_SHOW_SETTINGS"] == "1"
     }
+    private var showRouteBOnLaunch: Bool {
+        ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_SHOW_ROUTE_B"] == "1"
+    }
+    private var showResetsOnLaunch: Bool {
+        ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_SHOW_RESETS"] == "1"
+    }
 
     private func disableApiMode() {
         UserDefaults.standard.set(false, forKey: apiModeActiveDefaultsKey)
@@ -2279,7 +2718,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.showAccountPanel()
             }
-            if showSettingsOnLaunch {
+            if showResetsOnLaunch {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                    self?.showResetCreditsPanel()
+                }
+            } else if showRouteBOnLaunch {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                    self?.showRouteBPanel()
+                }
+            } else if showSettingsOnLaunch {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                     self?.showSettingsPanel()
                 }
@@ -2698,6 +3145,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         panel.makeKey()
     }
 
+    private func showRouteBPanel() {
+        accountPanelMode = .routeB
+        let panel = accountPanel ?? makeAccountPanel()
+        accountPanel = panel
+        refreshAccountPanelContent()
+        positionAccountPanel()
+        NSApp.activate(ignoringOtherApps: true)
+        panel.orderFrontRegardless()
+        panel.makeKey()
+    }
+
     @objc private func showApiModePanel() {
         showAccountPanel()
     }
@@ -2753,6 +3211,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             apiUsage: apiUsageSnapshot(),
             resetCreditsByEmail: resetCreditsByEmail,
             healthStatuses: healthStatusRows(),
+            routeBProfiles: routeBProviderProfiles,
+            selectedRouteBProfileID: UserDefaults.standard.string(forKey: selectedRouteBProfileDefaultsKey),
             usageMode: usageMode,
             toolbarDisplayStyle: toolbarDisplayStyle,
             activeRefreshInterval: activeRefreshInterval,
@@ -2778,8 +3238,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             editAccountLabel: { [weak self] email in
                 self?.showAccountDisplayLabelsDialogForAccount(email)
             },
-            showResetCredits: { [weak self] sender in
-                self?.showResetCreditsMenu(from: sender)
+            showResetCredits: { [weak self] in
+                self?.showResetCreditsPanel()
+            },
+            redeemResetCredit: { [weak self] email, creditID in
+                self?.redeemResetCreditFromPanel(email: email, creditID: creditID)
+            },
+            selectRouteBProfile: { [weak self] profileID in
+                self?.selectRouteBProfile(profileID)
             },
             performSettingsAction: { [weak self] action in
                 self?.handleSettingsPanelAction(action)
@@ -2895,6 +3361,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         case .usageView:
             accountPanelMode = .usage
             refreshAccountPanelContent()
+        case .settingsView:
+            accountPanelMode = .settings
+            refreshAccountPanelContent()
+        case .routeBView:
+            accountPanelMode = .routeB
+            refreshAccountPanelContent()
+        case .resetCreditsView:
+            accountPanelMode = .resets
+            refreshAccountPanelContent()
         case .apiView:
             accountPanelMode = .usage
             refreshAccountPanelContent()
@@ -2960,6 +3435,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if accountPanel?.isVisible == true {
             refreshAccountPanelContent()
         }
+    }
+
+    private func selectRouteBProfile(_ profileID: String) {
+        guard routeBProviderProfiles.contains(where: { $0.id == profileID }) else { return }
+        UserDefaults.standard.set(profileID, forKey: selectedRouteBProfileDefaultsKey)
+        if accountPanel?.isVisible == true {
+            refreshAccountPanelContent()
+        }
+    }
+
+    private func showResetCreditsPanel() {
+        accountPanelMode = .resets
+        refreshAccountPanelContent()
+    }
+
+    private func redeemResetCreditFromPanel(email: String, creditID: String) {
+        guard
+            let account = accounts.first(where: { $0.email == email }),
+            let credit = resetCreditsByEmail[email]?.credits.first(where: { $0.id == creditID })
+        else {
+            showAlert(title: "Reset unavailable", message: "The selected reset credit could not be found. Refresh the switcher and try again.")
+            return
+        }
+
+        confirmAndRedeemResetCredit(account: account, credit: credit)
     }
 
     private func showSettingsMenu(from sender: NSView) {
@@ -5044,6 +5544,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 weeklyUsedPercent: 64,
                 lastActivity: "1h ago",
                 isActive: false
+            ),
+            CodexAccount(
+                selector: "03",
+                email: "gamma@example.com",
+                plan: "plus",
+                fiveHourUsage: "68% (20:25)",
+                weeklyUsage: "41% (Fri 09:00)",
+                fiveHourUsedPercent: 68,
+                weeklyUsedPercent: 41,
+                lastActivity: "2h ago",
+                isActive: false
             )
         ]
     }
@@ -5052,19 +5563,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let now = Date()
         var snapshots: [String: ResetCreditsSnapshot] = [:]
         for (index, account) in accounts.enumerated() {
-            let count: Int
-            if index == 0 {
-                count = 2
-            } else if index == 1 {
-                count = 0
-            } else {
-                count = 1
-            }
+            let expiryDaysByAccount: [[Int]] = [
+                [24],
+                [5, 10, 19, 24],
+                [5, 10, 19, 24]
+            ]
+            let expiryDays = index < expiryDaysByAccount.count ? expiryDaysByAccount[index] : [14]
 
             var credits: [ResetCredit] = []
-            for creditIndex in 0..<count {
-                let grantOffset = TimeInterval(-(creditIndex + 1) * 86_400)
-                let expiryOffset = TimeInterval((12 + creditIndex * 7) * 86_400)
+            for (creditIndex, daysUntilExpiry) in expiryDays.enumerated() {
+                let grantOffset = TimeInterval(-(30 - daysUntilExpiry) * 86_400)
+                let expiryOffset = TimeInterval(daysUntilExpiry * 86_400)
                 credits.append(
                     ResetCredit(
                         id: "demo-\(account.selector)-\(creditIndex)",
@@ -5078,7 +5587,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
 
             snapshots[account.email] = ResetCreditsSnapshot(
-                availableCount: count,
+                availableCount: credits.count,
                 credits: credits,
                 lastUpdatedText: "just now",
                 lastError: nil

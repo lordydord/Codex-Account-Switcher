@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.34"><img alt="Download v1.34" src="https://img.shields.io/badge/Download-v1.34-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.5"><img alt="Download v1.5" src="https://img.shields.io/badge/Download-v1.5-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.34/Codex-Account-Switcher-v1.34.zip"><strong>Download v1.34</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.5/Codex-Account-Switcher-v1.5.zip"><strong>Download v1.5</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -30,6 +30,7 @@ If you use the Codex Desktop app heavily, swapping between personal and work Cha
 
 - active account usage in the menu bar
 - 5-hour and weekly usage in a compact account panel
+- reset-credit tracking across saved accounts, including expiry urgency colours
 - clearer active and inactive account styling without extra panel badges
 - safer switch previews before relaunching Codex
 - health checks for `codex-auth`, Codex, notifications, refresh freshness, and updates
@@ -38,6 +39,12 @@ If you use the Codex Desktop app heavily, swapping between personal and work Cha
 It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
 
 ## What It Looks Like
+
+<p align="center">
+  <img src="assets/screenshot-resets.png" alt="Codex Account Switcher reset credits screen with placeholder accounts and color-coded expiry urgency" width="720">
+</p>
+
+The reset-credit view is one of the main reasons to use the switcher: it can show available Codex reset credits across saved accounts, group them by account, color-code expiry urgency, and keep each reset behind an explicit confirmation before anything is spent.
 
 <p align="center">
   <img src="assets/screenshot-menubar.png" alt="Codex Account Switcher menu-bar status with placeholder account labels" width="720">
@@ -65,6 +72,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
 - Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
+- In-window reset-credit screen grouped by account, with color-coded expiry urgency and guarded redemption.
 - Compact 2x2 account panel layout for three or four saved accounts.
 - Bright active account card and dim inactive accounts, with green, orange, and red status colours retained across cards.
 - Dropdown showing 5-hour usage for all saved accounts.
@@ -76,8 +84,24 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - `Switch Now` notification action for low usage.
 - Refresh interval controls for active and idle states.
 - In-panel settings for display mode, launch-at-login, usage reminders, card confirmation, auto-switching, auto-resume, account actions, health checks, update checks, and maintenance.
+- A safe Route B prototype with selectable OpenRouter text and visual helper profiles plus explicit ready, test-required, and blocked capability labels.
 - Account backup cleanup.
 - No bundled credentials, tokens, account registry, or usage snapshots.
+
+## Route B Prototype
+
+Open **Settings → OpenRouter** to inspect and switch the selected secondary-lane profile.
+
+This first prototype deliberately stops at profile selection:
+
+- `Text Helper` uses the public model identifier `z-ai/glm-5.2`.
+- `Visual Helper` uses the public model identifier `z-ai/glm-5v-turbo`.
+- Green labels are ready for the profile's narrow purpose.
+- Orange labels require a smoke test before they can be enabled.
+- Red labels are blocked.
+- Selecting a profile stores only its public profile ID in macOS preferences.
+
+Route B does not make provider requests, accept or store provider keys, change Codex configuration, or replace normal Codex Desktop account switching. Native Codex remains the default for sends, uploads, account changes, invoices, and other live operations.
 
 ## Requirements
 
@@ -146,6 +170,7 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
+- Version 1.5: adds the in-window reset-credit screen, replacing the old floating reset submenu. Reset credits are grouped by account, sorted by expiry, color-coded by time left (green for 20+ days, orange for 8-20 days, red for 7 days or less), and use slimmer guarded action buttons. This release also includes the safe Route B profile-selection prototype and refreshed README screenshots/docs.
 - Version 1.4: major reset-credit update. The switcher now checks reset credits across every saved Codex account, shows the total resets available in the compact panel bar, and opens a per-account breakdown with each reset credit's grant time and expiry date. Reset rows can be redeemed from the menu after an explicit confirmation, then the app refreshes usage and reset-credit state so you can see the new limits immediately.
 - Version 1.34: removes per-account live/snapshot badges from the panel, keeps clearer active/inactive account styling, and refreshes public screenshots without badge overlays.
 - Version 1.33: adds switch previews, expanded health checks, GitHub update checking, clearer refresh wording, better empty/error actions, and refreshed public screenshots/README presentation.
