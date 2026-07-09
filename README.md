@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.5"><img alt="Download v1.5" src="https://img.shields.io/badge/Download-v1.5-16a34a?style=flat-square"></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.6.1"><img alt="Download v1.6.1" src="https://img.shields.io/badge/Download-v1.6.1-16a34a?style=flat-square"></a>
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.5/Codex-Account-Switcher-v1.5.zip"><strong>Download v1.5</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.6.1/Codex-Account-Switcher-v1.6.1.zip"><strong>Download v1.6.1</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -79,6 +79,7 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - Email-based switching, avoiding brittle numeric selectors.
 - Optional panel-card confirmation plus switch previews showing target 5-hour and weekly usage.
 - Codex relaunch after switching so Desktop picks up the new account.
+- Optional **Follow Codex / ChatGPT** lifecycle mode: opens the switcher when either desktop surface opens, then closes it only after both have been absent for 5 seconds. The grace period keeps the switcher alive during its own account-change relaunch.
 - Configurable notification and auto-switch thresholds.
 - Optional auto-switching from a low-usage active account to another saved account.
 - `Switch Now` notification action for low usage.

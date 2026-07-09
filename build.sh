@@ -12,6 +12,7 @@ BIN_PATH="$MACOS_DIR/CodexAccountSwitcher"
 MODULE_CACHE_DIR="$BUILD_DIR/ModuleCache"
 ICON_SOURCE="$ROOT_DIR/Sources/icon.png"
 TOOLBAR_ICON_SOURCE="$ROOT_DIR/Sources/toolbar-icon.png"
+LIFECYCLE_MONITOR_SOURCE="$ROOT_DIR/Scripts/lifecycle-monitor.sh"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$MODULE_CACHE_DIR"
@@ -26,6 +27,11 @@ fi
 
 if [[ -f "$TOOLBAR_ICON_SOURCE" ]]; then
   cp "$TOOLBAR_ICON_SOURCE" "$RESOURCES_DIR/ToolbarIcon.png"
+fi
+
+if [[ -f "$LIFECYCLE_MONITOR_SOURCE" ]]; then
+  cp "$LIFECYCLE_MONITOR_SOURCE" "$RESOURCES_DIR/lifecycle-monitor.sh"
+  chmod 755 "$RESOURCES_DIR/lifecycle-monitor.sh"
 fi
 
 CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc "$ROOT_DIR/Sources/main.swift" \
@@ -59,9 +65,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.6</string>
+  <string>1.6.1</string>
   <key>CFBundleVersion</key>
-  <string>160</string>
+  <string>161</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>

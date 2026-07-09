@@ -23,4 +23,6 @@ if [[ -x "$LSREGISTER" ]]; then
   "$LSREGISTER" -f "$DEST_APP" >/dev/null 2>&1 || true
 fi
 
+"$DEST_APP/Contents/MacOS/CodexAccountSwitcher" --install-lifecycle-monitor >/dev/null
+
 echo "$DEST_APP"

@@ -556,7 +556,7 @@ final class AccountSwitcherPanelView: NSView {
         addSubview(displaySection)
 
         let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 152, width: contentWidth, height: 158), title: "Automation")
-        automationSection.addSubview(settingToggleRow(title: "Launch at login", detail: "Open this helper automatically", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 14, y: 26, width: contentWidth - 28, height: 28)))
+        automationSection.addSubview(settingToggleRow(title: "Follow Codex / ChatGPT", detail: "Show only while either app is open", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 14, y: 26, width: contentWidth - 28, height: 28)))
         automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 14, y: 52, width: contentWidth - 28, height: 28)))
         automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: autoSwitchDetailText(), isOn: autoSwitchEnabled, action: .editAutoSwitch, frame: NSRect(x: 14, y: 78, width: contentWidth - 28, height: 28)))
         automationSection.addSubview(settingToggleRow(title: "Auto resume", detail: autoResumeDetailText(), isOn: autoResumeMode != .off, action: .editAutoResume, frame: NSRect(x: 14, y: 104, width: contentWidth - 28, height: 28)))
@@ -2710,6 +2710,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if ProcessInfo.processInfo.arguments.contains("--install-lifecycle-monitor") {
+            do {
+                try installLaunchAgent()
+            } catch {
+                NSLog("Codex Account Switcher lifecycle monitor install failed: \(error.localizedDescription)")
+            }
+            NSApp.terminate(nil)
+            return
+        }
         disableApiMode()
         configureNotifications()
         configureStatusButton()
@@ -5121,7 +5130,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func installLaunchAgent() throws {
-        let appPath = Bundle.main.bundlePath
+        let monitorPath = Bundle.main.resourceURL!
+            .appendingPathComponent("lifecycle-monitor.sh")
+            .path
+        guard FileManager.default.isExecutableFile(atPath: monitorPath) else {
+            throw NSError(
+                domain: "CodexAccountSwitcher",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The lifecycle monitor is missing from the app bundle. Reinstall Codex Account Switcher."]
+            )
+        }
         let plist = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -5131,21 +5149,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
           <string>\(launchAgentIdentifier)</string>
           <key>ProgramArguments</key>
           <array>
-            <string>/usr/bin/open</string>
-            <string>\(appPath)</string>
+            <string>\(monitorPath)</string>
           </array>
           <key>RunAtLoad</key>
           <true/>
+          <key>KeepAlive</key>
+          <true/>
+          <key>ThrottleInterval</key>
+          <integer>5</integer>
         </dict>
         </plist>
         """
         let url = launchAgentURL()
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try plist.write(to: url, atomically: true, encoding: .utf8)
+        let userDomain = "gui/\(getuid())"
+        _ = run("/bin/launchctl", ["bootout", userDomain, url.path])
+        let bootstrap = run("/bin/launchctl", ["bootstrap", userDomain, url.path])
+        guard bootstrap.status == 0 else {
+            throw NSError(
+                domain: "CodexAccountSwitcher",
+                code: Int(bootstrap.status),
+                userInfo: [NSLocalizedDescriptionKey: "Could not start the lifecycle monitor: \(bootstrap.output)"]
+            )
+        }
     }
 
     private func removeLaunchAgent() throws {
         let url = launchAgentURL()
+        let userDomain = "gui/\(getuid())"
+        _ = run("/bin/launchctl", ["bootout", userDomain, url.path])
         if FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)
         }
