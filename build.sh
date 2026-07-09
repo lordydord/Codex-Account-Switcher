@@ -18,6 +18,8 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$MODULE_CACHE_DIR"
 
 if [[ -f "$ICON_SOURCE" ]]; then
   cp "$ICON_SOURCE" "$RESOURCES_DIR/AccountSwitcherIcon.png"
+elif [[ -f "/Applications/ChatGPT.app/Contents/Resources/icon.icns" ]]; then
+  cp "/Applications/ChatGPT.app/Contents/Resources/icon.icns" "$RESOURCES_DIR/AccountSwitcherIcon.icns"
 elif [[ -f "/Applications/Codex.app/Contents/Resources/icon.icns" ]]; then
   cp "/Applications/Codex.app/Contents/Resources/icon.icns" "$RESOURCES_DIR/AccountSwitcherIcon.icns"
 fi
@@ -57,9 +59,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.5</string>
+  <string>1.6</string>
   <key>CFBundleVersion</key>
-  <string>150</string>
+  <string>160</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>

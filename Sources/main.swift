@@ -2871,9 +2871,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             Bundle.main.path(forResource: "AccountSwitcherIcon", ofType: "icns")
         ].compactMap { $0 }
         let candidates = bundledCandidates + [
-            "/Applications/Codex.app/Contents/Resources/icon.icns",
-            "/Applications/Codex.app/Contents/Resources/codexTemplate@2x.png",
-            "/Applications/Codex.app/Contents/Resources/codexTemplate.png"
+            "\(codexDesktopAppPath)/Contents/Resources/icon.icns",
+            "\(codexDesktopAppPath)/Contents/Resources/codexTemplate@2x.png",
+            "\(codexDesktopAppPath)/Contents/Resources/codexTemplate.png"
         ]
 
         guard let path = candidates.first(where: { FileManager.default.fileExists(atPath: $0) }),
@@ -3303,7 +3303,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func healthStatusRows() -> [HealthStatus] {
         let codexAuthOK = codexAuthPath() != nil
-        let codexAppOK = FileManager.default.fileExists(atPath: "/Applications/Codex.app")
+        let codexAppOK = FileManager.default.fileExists(atPath: codexDesktopAppPath)
         return [
             HealthStatus(title: "Auth", value: codexAuthOK ? "OK" : "Missing", color: codexAuthOK ? .systemGreen : .systemRed),
             HealthStatus(title: "Codex", value: codexAppOK ? "Found" : "Missing", color: codexAppOK ? .systemGreen : .systemRed),
@@ -3809,9 +3809,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func codexIsFrontmost() -> Bool {
         guard let app = NSWorkspace.shared.frontmostApplication else { return false }
+        return isCodexDesktopApplication(app)
+    }
+
+    // ChatGPT Work now contains the Codex desktop surface. Keep the legacy
+    // Codex.app fallback so standalone installations remain supported.
+    private var codexDesktopAppPath: String {
+        if FileManager.default.fileExists(atPath: "/Applications/ChatGPT.app") {
+            return "/Applications/ChatGPT.app"
+        }
+        return "/Applications/Codex.app"
+    }
+
+    private var codexDesktopAppName: String {
+        URL(fileURLWithPath: codexDesktopAppPath).deletingPathExtension().lastPathComponent
+    }
+
+    private var codexDesktopResourcesPath: String {
+        "\(codexDesktopAppPath)/Contents/Resources"
+    }
+
+    private func isCodexDesktopApplication(_ app: NSRunningApplication) -> Bool {
         let name = app.localizedName?.lowercased() ?? ""
         let bundleIdentifier = app.bundleIdentifier?.lowercased() ?? ""
-        return name == "codex" || bundleIdentifier.contains("codex")
+        return name == "codex" || name == "chatgpt" || bundleIdentifier == "com.openai.codex"
     }
 
     private func remainingSummary(for account: CodexAccount) -> String {
@@ -5273,15 +5294,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func activateCodex() {
-        if let app = NSWorkspace.shared.runningApplications.first(where: { app in
-            let name = app.localizedName?.lowercased() ?? ""
-            let bundleIdentifier = app.bundleIdentifier?.lowercased() ?? ""
-            return name == "codex" || bundleIdentifier.contains("codex")
-        }) {
+        if let app = NSWorkspace.shared.runningApplications.first(where: isCodexDesktopApplication) {
             app.activate(options: [.activateAllWindows])
         } else {
             NSWorkspace.shared.openApplication(
-                at: URL(fileURLWithPath: "/Applications/Codex.app"),
+                at: URL(fileURLWithPath: codexDesktopAppPath),
                 configuration: NSWorkspace.OpenConfiguration()
             )
         }
@@ -5382,7 +5399,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func restartCodexApp() -> CommandResult {
         var transcript: [String] = []
-        transcript.append("Force-quitting Codex App process tree...")
+        transcript.append("Quitting \(codexDesktopAppName) process tree...")
 
         for attempt in 1...6 {
             let pids = codexAppPIDs()
@@ -5401,20 +5418,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             transcript.append(configMessage)
         }
 
-        transcript.append("Opening Codex App through codex-auth...")
-        let appResult = runCodexAuth(["app", "--platform", "mac"])
-        if appResult.status != 0 {
-            transcript.append("codex-auth app failed; falling back to open -a Codex.")
-            let openResult = run("/usr/bin/open", ["-a", "Codex"])
-            if openResult.status != 0 {
-                return CommandResult(status: openResult.status, output: transcript.joined(separator: "\n") + "\n" + openResult.output)
-            }
+        transcript.append("Opening \(codexDesktopAppName)...")
+        let openResult = run("/usr/bin/open", [codexDesktopAppPath])
+        if openResult.status != 0 {
+            return CommandResult(status: openResult.status, output: transcript.joined(separator: "\n") + "\n" + openResult.output)
         }
 
         Thread.sleep(forTimeInterval: 4)
-        let runningResult = run("/usr/bin/osascript", ["-e", "application \"Codex\" is running"])
+        let runningResult = run("/usr/bin/osascript", ["-e", "application \"\(codexDesktopAppName)\" is running"])
         if runningResult.output.trimmingCharacters(in: .whitespacesAndNewlines) != "true" {
-            transcript.append("Codex App did not report as running after launch.")
+            transcript.append("\(codexDesktopAppName) did not report as running after launch.")
             let stillRemaining = codexAppPIDs()
             if !stillRemaining.isEmpty {
                 transcript.append("Remaining Codex process IDs: \(stillRemaining.joined(separator: ", "))")
@@ -5445,7 +5458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
 
             if !config.contains("SKY_CUA_SERVICE_PATH") {
-                let codePathLine = "CODEX_CLI_PATH = \"/Applications/Codex.app/Contents/Resources/codex\""
+                let codePathLine = "CODEX_CLI_PATH = \"\(codexDesktopResourcesPath)/codex\""
                 let servicePathLine = "SKY_CUA_SERVICE_PATH = \"\(home)/.codex/plugins/cache/openai-bundled/computer-use/1.0.799/Codex Computer Use.app\""
                 if config.contains(codePathLine) {
                     config = config.replacingOccurrences(of: codePathLine, with: "\(servicePathLine)\n\(codePathLine)")
@@ -5478,7 +5491,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func codexAppPIDs() -> [String] {
-        let result = run("/usr/bin/pgrep", ["-f", "/Applications/Codex\\.app/Contents/"])
+        let escapedPath = NSRegularExpression.escapedPattern(for: codexDesktopAppPath)
+        let result = run("/usr/bin/pgrep", ["-f", "\(escapedPath)/Contents/"])
         guard result.status == 0 else { return [] }
         return result.output
             .split(whereSeparator: \.isNewline)
@@ -5905,7 +5919,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func runCodexLoginWithApiKey(_ apiKey: String) -> CommandResult {
-        let bundledCodex = "/Applications/Codex.app/Contents/Resources/codex"
+        let bundledCodex = "\(codexDesktopResourcesPath)/codex"
         let codexPath = FileManager.default.isExecutableFile(atPath: bundledCodex) ? bundledCodex : "codex"
         return runWithInput(codexPath, ["login", "--with-api-key"], input: apiKey)
     }
@@ -5970,11 +5984,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         process.standardOutput = pipe
         process.standardError = pipe
         var environment = augmentedEnvironment()
-        let bundledNode = "/Applications/Codex.app/Contents/Resources/node"
+        let bundledNode = "\(codexDesktopResourcesPath)/node"
         if FileManager.default.isExecutableFile(atPath: bundledNode) {
             environment["CODEX_AUTH_NODE_EXECUTABLE"] = bundledNode
         }
-        let bundledCodex = "/Applications/Codex.app/Contents/Resources/codex"
+        let bundledCodex = "\(codexDesktopResourcesPath)/codex"
         if FileManager.default.isExecutableFile(atPath: bundledCodex) {
             environment["CODEX_CLI_PATH"] = bundledCodex
         }
@@ -6026,7 +6040,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func augmentedPath(from currentPath: String?) -> String {
         let home = NSHomeDirectory()
         let candidates = [
-            "/Applications/Codex.app/Contents/Resources",
+            codexDesktopResourcesPath,
             "\(home)/.nvm/versions/node/v20.11.0/bin",
             "\(home)/.local/bin",
             "/opt/homebrew/bin",
@@ -6050,11 +6064,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func shellEnvironmentSetupCommand() -> String {
         let path = augmentedPath(from: nil)
         var commands = ["export PATH=\(shellEscaped(path))"]
-        let bundledNode = "/Applications/Codex.app/Contents/Resources/node"
+        let bundledNode = "\(codexDesktopResourcesPath)/node"
         if FileManager.default.isExecutableFile(atPath: bundledNode) {
             commands.append("export CODEX_AUTH_NODE_EXECUTABLE=\(shellEscaped(bundledNode))")
         }
-        let bundledCodex = "/Applications/Codex.app/Contents/Resources/codex"
+        let bundledCodex = "\(codexDesktopResourcesPath)/codex"
         if FileManager.default.isExecutableFile(atPath: bundledCodex) {
             commands.append("export CODEX_CLI_PATH=\(shellEscaped(bundledCodex))")
         }
