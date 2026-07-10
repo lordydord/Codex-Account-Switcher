@@ -12,7 +12,7 @@ BIN_PATH="$MACOS_DIR/CodexAccountSwitcher"
 MODULE_CACHE_DIR="$BUILD_DIR/ModuleCache"
 ICON_SOURCE="$ROOT_DIR/Sources/icon.png"
 TOOLBAR_ICON_SOURCE="$ROOT_DIR/Sources/toolbar-icon.png"
-LIFECYCLE_MONITOR_SOURCE="$ROOT_DIR/Scripts/lifecycle-monitor.sh"
+LIFECYCLE_MONITOR_SOURCE="$ROOT_DIR/Sources/LifecycleMonitor.swift"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$MODULE_CACHE_DIR"
@@ -29,10 +29,11 @@ if [[ -f "$TOOLBAR_ICON_SOURCE" ]]; then
   cp "$TOOLBAR_ICON_SOURCE" "$RESOURCES_DIR/ToolbarIcon.png"
 fi
 
-if [[ -f "$LIFECYCLE_MONITOR_SOURCE" ]]; then
-  cp "$LIFECYCLE_MONITOR_SOURCE" "$RESOURCES_DIR/lifecycle-monitor.sh"
-  chmod 755 "$RESOURCES_DIR/lifecycle-monitor.sh"
-fi
+CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc "$LIFECYCLE_MONITOR_SOURCE" \
+  -target arm64-apple-macosx14.0 \
+  -module-cache-path "$MODULE_CACHE_DIR" \
+  -framework AppKit \
+  -o "$RESOURCES_DIR/CodexLifecycleMonitor"
 
 CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc "$ROOT_DIR/Sources/main.swift" \
   -target arm64-apple-macosx14.0 \
@@ -65,9 +66,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.6.1</string>
+  <string>1.7</string>
   <key>CFBundleVersion</key>
-  <string>161</string>
+  <string>170</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
@@ -75,5 +76,27 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+if command -v xattr >/dev/null 2>&1; then
+  /usr/bin/xattr -cr "$APP_DIR"
+  /usr/bin/xattr -d com.apple.FinderInfo "$APP_DIR" 2>/dev/null || true
+  /usr/bin/xattr -d 'com.apple.fileprovider.fpfs#P' "$APP_DIR" 2>/dev/null || true
+fi
+if command -v codesign >/dev/null 2>&1; then
+  signed=0
+  for _ in 1 2 3 4 5; do
+    /usr/bin/xattr -cr "$APP_DIR" 2>/dev/null || true
+    /usr/bin/xattr -d com.apple.FinderInfo "$APP_DIR" 2>/dev/null || true
+    /usr/bin/xattr -d 'com.apple.fileprovider.fpfs#P' "$APP_DIR" 2>/dev/null || true
+    if /usr/bin/codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1; then
+      signed=1
+      break
+    fi
+  done
+  if [[ "$signed" != "1" ]]; then
+    echo "Could not ad-hoc sign the build bundle after five metadata-cleanup attempts." >&2
+    exit 1
+  fi
+fi
 
 echo "$APP_DIR"

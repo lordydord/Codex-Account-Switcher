@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.6.1"><img alt="Download v1.6.1" src="https://img.shields.io/badge/Download-v1.6.1-16a34a?style=flat-square"></a>
+  <img alt="Current version 1.7" src="https://img.shields.io/badge/Current-v1.7-16a34a?style=flat-square">
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.6.1/Codex-Account-Switcher-v1.6.1.zip"><strong>Download v1.6.1</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.7/Codex-Account-Switcher-v1.7.zip"><strong>Download v1.7</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -33,7 +33,7 @@ If you use the Codex Desktop app heavily, swapping between personal and work Cha
 - reset-credit tracking across saved accounts, including expiry urgency colours
 - clearer active and inactive account styling without extra panel badges
 - safer switch previews before relaunching Codex
-- health checks for `codex-auth`, Codex, notifications, refresh freshness, and updates
+- health checks for `codex-auth`, ChatGPT/Codex, notifications, refresh freshness, and updates
 - optional automatic switching and resume prompts when quota gets tight
 
 It is deliberately small: a single Swift/AppKit menu-bar app for Codex Desktop that talks to [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth).
@@ -82,6 +82,11 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - Optional **Follow Codex / ChatGPT** lifecycle mode: opens the switcher when either desktop surface opens, then closes it only after both have been absent for 5 seconds. The grace period keeps the switcher alive during its own account-change relaunch.
 - Configurable notification and auto-switch thresholds.
 - Optional auto-switching from a low-usage active account to another saved account.
+- Transactional switching with verification and automatic rollback on failure.
+- Best-account scoring using both usage windows, reset credits, login health, and an anti-bounce cooldown.
+- Event-driven native lifecycle monitoring without a two-second polling loop.
+- Privacy-safe local switch history and copyable diagnostics.
+- Clipboard restoration after automatic continuation.
 - `Switch Now` notification action for low usage.
 - Refresh interval controls for active and idle states.
 - In-panel settings for display mode, launch-at-login, usage reminders, card confirmation, auto-switching, auto-resume, account actions, health checks, update checks, and maintenance.
@@ -108,7 +113,7 @@ Route B does not make provider requests, accept or store provider keys, change C
 
 - macOS 14 or later.
 - Xcode command line tools / Swift compiler.
-- Codex Desktop installed at `/Applications/Codex.app`.
+- ChatGPT Desktop installed at `/Applications/ChatGPT.app`; legacy `/Applications/Codex.app` remains supported.
 - [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth) installed and configured.
 
 Install `codex-auth`:
@@ -171,6 +176,8 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
+- Version 1.7: reliability and efficiency update. Adds native event-driven lifecycle monitoring, verified switching with rollback, best-account scoring and cooldown, privacy-safe history and diagnostics, clipboard restoration, and ad-hoc signed release packages with SHA-256 checksums.
+
 - Version 1.5: adds the in-window reset-credit screen, replacing the old floating reset submenu. Reset credits are grouped by account, sorted by expiry, color-coded by time left (green for 20+ days, orange for 8-20 days, red for 7 days or less), and use slimmer guarded action buttons. This release also includes the safe Route B profile-selection prototype and refreshed README screenshots/docs.
 - Version 1.4: major reset-credit update. The switcher now checks reset credits across every saved Codex account, shows the total resets available in the compact panel bar, and opens a per-account breakdown with each reset credit's grant time and expiry date. Reset rows can be redeemed from the menu after an explicit confirmation, then the app refreshes usage and reset-credit state so you can see the new limits immediately.
 - Version 1.34: removes per-account live/snapshot badges from the panel, keeps clearer active/inactive account styling, and refreshes public screenshots without badge overlays.
@@ -184,9 +191,13 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 - Version 1.1: adds the account panel UI and dialog-based settings controls.
 - Version 1.00: first public release.
 
+## Unsigned Distribution
+
+Version 1.7 uses ad-hoc code signing and SHA-256 checksums. This improves local bundle integrity without a paid Apple Developer account, but it cannot provide Apple notarization or remove every first-launch Gatekeeper warning. Build a checked package with `./package-release.sh` and verify an installation with `./verify-install.sh`.
+
 ## Roadmap Ideas
 
-- Signed release builds.
+- Developer ID signing and notarization if the project later gains an Apple Developer account.
 - Homebrew cask.
 - Preferences window if the menu grows too large.
 - Optional sound or banner style settings for switch prompts.

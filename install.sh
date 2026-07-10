@@ -13,6 +13,8 @@ cp -R "$APP_PATH" "$DEST_APP"
 
 if command -v xattr >/dev/null 2>&1; then
   /usr/bin/xattr -cr "$DEST_APP"
+  /usr/bin/xattr -d com.apple.FinderInfo "$DEST_APP" 2>/dev/null || true
+  /usr/bin/xattr -d 'com.apple.fileprovider.fpfs#P' "$DEST_APP" 2>/dev/null || true
 fi
 
 if command -v codesign >/dev/null 2>&1; then

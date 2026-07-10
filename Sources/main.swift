@@ -22,6 +22,15 @@ struct HealthStatus {
     let color: NSColor
 }
 
+struct SwitchHistoryEntry: Codable {
+    let date: Date
+    let fromLabel: String
+    let toLabel: String
+    let automatic: Bool
+    let reason: String
+    let result: String
+}
+
 enum RouteBCapabilityState {
     case ready
     case testRequired
@@ -176,6 +185,7 @@ enum SettingsPanelAction: String {
     case forceRefresh
     case checkUpdates
     case cleanBackups
+    case diagnostics
     case quit
 }
 
@@ -1118,7 +1128,8 @@ final class AccountSwitcherPanelView: NSView {
             ("Device", .addDeviceAccount, 54),
             ("Reminder", .editUsageReminder, 68),
             ("Refresh", .editRefresh, 58),
-            ("Update", .checkUpdates, 54)
+            ("Update", .checkUpdates, 54),
+            ("History", .diagnostics, 58)
         ]
         var x: CGFloat = 12
         for action in actions {
@@ -2410,6 +2421,14 @@ private extension NSRect {
 }
 
 private extension DateFormatter {
+    static let diagnosticStamp: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        return formatter
+    }()
+
     static let resetCreditISO: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -2479,6 +2498,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let cancelResumeActionIdentifier = "CANCEL_RESUME"
     private let autoResumeCodexReadyDelay: TimeInterval = 3.0
     private let launchAgentIdentifier = "com.mohamedfuad.codexaccountswitcher"
+    private let switchHistoryDefaultsKey = "switchHistoryV1"
+    private let lastSwitchDateDefaultsKey = "lastSuccessfulSwitchDate"
+    private let switchCooldown: TimeInterval = 90
     private var refreshTimer: Timer?
     private var statusAnimationTimer: Timer?
     private var statusAnimationFrame = 0
@@ -2507,6 +2529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var notifiedAutoSwitchPauseKeys = Set<String>()
     private var notifiedApiUsageKeys = Set<String>()
     private var pendingResumeWorkItems: [String: DispatchWorkItem] = [:]
+    private var savedClipboardString: String?
     private var settingsMenu = NSMenu()
     private weak var accountLabelDialogField: NSTextField?
     private weak var accountLabelDialogPopup: NSPopUpButton?
@@ -3438,6 +3461,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             checkForUpdates(showResult: true)
         case .cleanBackups:
             cleanAccountBackups()
+        case .diagnostics:
+            showDiagnostics()
         case .quit:
             NSApp.terminate(nil)
         }
@@ -4825,6 +4850,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return
         }
         isSwitching = true
+        let previous = accounts.first(where: { $0.isActive })
+        let automatic = allowAutoResume
         beginSwitchAnimation(label: target.map(displayLabel(for:)) ?? query)
         refreshAccountPanelContentIfVisible()
 
@@ -4843,10 +4870,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let switchResult = self.runCodexAuth(["switch", query])
             if switchResult.status != 0 {
                 DispatchQueue.main.async {
+                    self.recordSwitch(from: previous, to: target, automatic: automatic, reason: "auth switch", result: "failed")
                     self.isSwitching = false
                     self.endSwitchAnimation()
                     self.updateStatusTitle()
                     self.showAlert(title: "Switch failed", message: switchResult.output)
+                    self.refreshAccounts(force: true)
+                }
+                return
+            }
+
+            let verification = self.verifyActiveAccount(expectedEmail: target?.email ?? query)
+            guard verification.status == 0 else {
+                var rollbackMessage = "Verification failed: \(verification.output)"
+                if let previous {
+                    let rollback = self.runCodexAuth(["switch", previous.email])
+                    rollbackMessage += rollback.status == 0 ? "\nThe previous account was restored." : "\nRollback also failed: \(rollback.output)"
+                }
+                DispatchQueue.main.async {
+                    self.recordSwitch(from: previous, to: target, automatic: automatic, reason: "verification", result: "rolled back")
+                    self.isSwitching = false
+                    self.endSwitchAnimation()
+                    self.updateStatusTitle()
+                    self.showAlert(title: "Switch could not be verified", message: rollbackMessage)
                     self.refreshAccounts(force: true)
                 }
                 return
@@ -4866,13 +4912,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let restartResult = self.restartCodexApp()
             DispatchQueue.main.async {
                 if restartResult.status != 0 {
+                    self.recordSwitch(from: previous, to: target, automatic: automatic, reason: "desktop relaunch", result: "account changed; relaunch failed")
                     self.showAlert(title: "Codex relaunch failed", message: restartResult.output)
-                } else if allowAutoResume {
-                    self.handleAutoResumeAfterSwitch(to: target)
+                } else {
+                    UserDefaults.standard.set(Date(), forKey: self.lastSwitchDateDefaultsKey)
+                    self.recordSwitch(from: previous, to: target, automatic: automatic, reason: automatic ? "automatic best account" : "manual", result: "verified")
+                    if allowAutoResume {
+                        self.handleAutoResumeAfterSwitch(to: target)
+                    }
                 }
                 self.refreshAccounts(force: true)
             }
         }
+    }
+
+    private func verifyActiveAccount(expectedEmail: String) -> CommandResult {
+        for attempt in 1...3 {
+            let result = runCodexAuth(["list", "--skip-api"])
+            if result.status == 0 {
+                let parsed = parseAccounts(result.output, usageIsLive: false)
+                if parsed.contains(where: { $0.isActive && $0.email.caseInsensitiveCompare(expectedEmail) == .orderedSame }) {
+                    return CommandResult(status: 0, output: "active account verified")
+                }
+            }
+            if attempt < 3 { Thread.sleep(forTimeInterval: 0.6) }
+        }
+        return CommandResult(status: 1, output: "codex-auth did not report the requested account as active after three checks")
     }
 
     private func beginSwitchAnimation(label: String) {
@@ -4914,6 +4979,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let mode = autoSwitchMode
         guard mode != .off,
               !isSwitching,
+              Date().timeIntervalSince(UserDefaults.standard.object(forKey: lastSwitchDateDefaultsKey) as? Date ?? .distantPast) >= switchCooldown,
               accounts.count > 1,
               let active = accounts.first(where: { $0.isActive }),
               let activeFiveHour = active.fiveHourUsedPercent,
@@ -4946,8 +5012,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         accounts
             .filter { $0.email != activeEmail }
             .filter { ($0.fiveHourUsedPercent ?? -1) > autoSwitchThreshold }
-            .sorted { ($0.fiveHourUsedPercent ?? -1) > ($1.fiveHourUsedPercent ?? -1) }
+            .filter { !accountNeedsLogin($0) }
+            .sorted { accountScore($0) > accountScore($1) }
             .first
+    }
+
+    private func accountScore(_ account: CodexAccount) -> Int {
+        let fiveHour = account.fiveHourUsedPercent ?? -100
+        let weekly = account.weeklyUsedPercent ?? -100
+        let resets = resetCreditsByEmail[account.email]?.displayCount ?? 0
+        return (fiveHour * 3) + weekly + min(resets, 5) * 4
     }
 
     private func sendAutoSwitchPrompt(active: CodexAccount, target: CodexAccount, activeFiveHour: Int) {
@@ -5131,7 +5205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func installLaunchAgent() throws {
         let monitorPath = Bundle.main.resourceURL!
-            .appendingPathComponent("lifecycle-monitor.sh")
+            .appendingPathComponent("CodexLifecycleMonitor")
             .path
         guard FileManager.default.isExecutableFile(atPath: monitorPath) else {
             throw NSError(
@@ -5151,6 +5225,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
           <array>
             <string>\(monitorPath)</string>
           </array>
+          <key>EnvironmentVariables</key>
+          <dict>
+            <key>PATH</key>
+            <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+            <key>HOME</key>
+            <string>\(NSHomeDirectory())</string>
+          </dict>
           <key>RunAtLoad</key>
           <true/>
           <key>KeepAlive</key>
@@ -5287,6 +5368,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func resumeCodexTask(submit: Bool, promptForPermission: Bool) {
+        savedClipboardString = NSPasteboard.general.string(forType: .string)
         copyResumePromptToClipboard()
         guard accessibilityTrusted(prompt: promptForPermission) else {
             sendNotification(
@@ -5313,12 +5395,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     self.sendReturnKeystroke()
                 }
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.restoreClipboardAfterResume()
+            }
         }
     }
 
     private func copyResumePromptToClipboard() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(autoResumePrompt, forType: .string)
+    }
+
+    private func restoreClipboardAfterResume() {
+        guard let savedClipboardString else { return }
+        if NSPasteboard.general.string(forType: .string) == autoResumePrompt {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(savedClipboardString, forType: .string)
+        }
+        self.savedClipboardString = nil
     }
 
     private func accessibilityTrusted(prompt: Bool) -> Bool {
@@ -6114,6 +6208,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         alert.informativeText = message.trimmingCharacters(in: .whitespacesAndNewlines)
         alert.alertStyle = .warning
         alert.runModal()
+    }
+
+    private func recordSwitch(from: CodexAccount?, to: CodexAccount?, automatic: Bool, reason: String, result: String) {
+        let entry = SwitchHistoryEntry(
+            date: Date(),
+            fromLabel: from.map(displayLabel(for:)) ?? "?",
+            toLabel: to.map(displayLabel(for:)) ?? "?",
+            automatic: automatic,
+            reason: reason,
+            result: result
+        )
+        var entries = switchHistory()
+        entries.insert(entry, at: 0)
+        entries = Array(entries.prefix(30))
+        if let data = try? JSONEncoder().encode(entries) {
+            UserDefaults.standard.set(data, forKey: switchHistoryDefaultsKey)
+        }
+    }
+
+    private func switchHistory() -> [SwitchHistoryEntry] {
+        guard let data = UserDefaults.standard.data(forKey: switchHistoryDefaultsKey) else { return [] }
+        return (try? JSONDecoder().decode([SwitchHistoryEntry].self, from: data)) ?? []
+    }
+
+    private func diagnosticsText() -> String {
+        let version = currentAppVersion()
+        let auth = codexAuthPath() == nil ? "missing" : "available"
+        let desktop = FileManager.default.fileExists(atPath: codexDesktopAppPath) ? codexDesktopAppName : "missing"
+        let entries = switchHistory().prefix(12).map { entry in
+            let stamp = DateFormatter.diagnosticStamp.string(from: entry.date)
+            return "\(stamp) | \(entry.fromLabel)->\(entry.toLabel) | \(entry.automatic ? "automatic" : "manual") | \(entry.reason) | \(entry.result)"
+        }
+        return ([
+            "Codex Account Switcher \(version)",
+            "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
+            "codex-auth: \(auth)",
+            "desktop: \(desktop)",
+            "saved accounts: \(accounts.count)",
+            "auto switch: \(autoSwitchMode.rawValue)",
+            "auto resume: \(autoResumeMode.rawValue)",
+            "refresh: \(lastUpdatedText())",
+            "history:"
+        ] + (entries.isEmpty ? ["none"] : entries)).joined(separator: "\n")
+    }
+
+    private func showDiagnostics() {
+        let text = diagnosticsText()
+        let alert = NSAlert()
+        alert.messageText = "Reliability diagnostics"
+        alert.informativeText = text
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Copy")
+        alert.addButton(withTitle: "Close")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
     }
 
     private func displayLabel(for account: CodexAccount) -> String {

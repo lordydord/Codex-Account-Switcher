@@ -6,3 +6,5 @@ ModuleCache/
 derivedData/
 *.swp
 *.swo
+*.zip
+*.sha256
