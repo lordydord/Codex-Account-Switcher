@@ -12,12 +12,12 @@
   <a href="https://developer.apple.com/swift/"><img alt="Swift" src="https://img.shields.io/badge/Swift-5.9+-f97316?style=flat-square"></a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14+-111827?style=flat-square">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-2563eb?style=flat-square">
-  <img alt="Current version 1.7" src="https://img.shields.io/badge/Current-v1.7-16a34a?style=flat-square">
+  <img alt="Current version 1.8.2" src="https://img.shields.io/badge/Current-v1.8.2-16a34a?style=flat-square">
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-16a34a?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.7/Codex-Account-Switcher-v1.7.zip"><strong>Download v1.7</strong></a>
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/download/v1.8.2/Codex-Account-Switcher-v1.8.2.zip"><strong>Download v1.8.2</strong></a>
   ·
   <a href="#install"><strong>Install from source</strong></a>
   ·
@@ -73,6 +73,9 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - Menu-bar usage display with weekly or 5-hour usage, active account color, large percentage and small compact styles.
 - Click-to-open account panel with 5-hour rings, weekly progress, refresh, settings, and close controls.
 - In-window reset-credit screen grouped by account, with color-coded expiry urgency and guarded redemption.
+- Verified reset redemption that checks both the spent credit and the refreshed live usage windows before reporting success.
+- Five-minute reset-credit caching, while the active account's usage display can still refresh every five seconds.
+- Bounded concurrent reset checks and non-blocking async networking, with safe GET retries and no automatic retry of credit-spending POST requests.
 - Compact 2x2 account panel layout for three or four saved accounts.
 - Bright active account card and dim inactive accounts, with green, orange, and red status colours retained across cards.
 - Dropdown showing 5-hour usage for all saved accounts.
@@ -92,6 +95,9 @@ You can switch the menu bar to a smaller `A93 B84` style, or override account la
 - In-panel settings for display mode, launch-at-login, usage reminders, card confirmation, auto-switching, auto-resume, account actions, health checks, update checks, and maintenance.
 - A safe Route B prototype with selectable OpenRouter text and visual helper profiles plus explicit ready, test-required, and blocked capability labels.
 - Account backup cleanup.
+- Automatic retention of the ten newest authentication backups per account.
+- Dynamic Computer Use plugin discovery instead of a hard-coded plugin version.
+- Helper-command timeouts so a stalled dependency cannot leave the menu bar permanently refreshing.
 - No bundled credentials, tokens, account registry, or usage snapshots.
 
 ## Route B Prototype
@@ -142,6 +148,12 @@ The app bundle is created at:
 build/Codex Account Switcher.app
 ```
 
+Run the infrastructure and reset-logic regression checks with:
+
+```bash
+./run-tests.sh
+```
+
 ## Install
 
 ```bash
@@ -176,6 +188,7 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Releases
 
+- Version 1.8.2: graphite control-deck redesign plus a reset and efficiency hardening pass. Reset redemption now verifies both credit consumption and live usage recovery, reset-credit reads are cached separately from fast usage refreshes, account reset checks run concurrently with a small cap, network calls use async URLSession, helper commands have timeouts, Computer Use discovery is version-independent, old auth backups are pruned safely, and infrastructure/reset regression checks are included.
 - Version 1.7: reliability and efficiency update. Adds native event-driven lifecycle monitoring, verified switching with rollback, best-account scoring and cooldown, privacy-safe history and diagnostics, clipboard restoration, and ad-hoc signed release packages with SHA-256 checksums.
 
 - Version 1.5: adds the in-window reset-credit screen, replacing the old floating reset submenu. Reset credits are grouped by account, sorted by expiry, color-coded by time left (green for 20+ days, orange for 8-20 days, red for 7 days or less), and use slimmer guarded action buttons. This release also includes the safe Route B profile-selection prototype and refreshed README screenshots/docs.
@@ -193,7 +206,7 @@ Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions.
 
 ## Unsigned Distribution
 
-Version 1.7 uses ad-hoc code signing and SHA-256 checksums. This improves local bundle integrity without a paid Apple Developer account, but it cannot provide Apple notarization or remove every first-launch Gatekeeper warning. Build a checked package with `./package-release.sh` and verify an installation with `./verify-install.sh`.
+Version 1.8.2 uses ad-hoc code signing and SHA-256 checksums. This improves local bundle integrity without a paid Apple Developer account, but it cannot provide Apple notarization or remove every first-launch Gatekeeper warning. Build a checked package with `./package-release.sh` and verify an installation with `./verify-install.sh`.
 
 ## Roadmap Ideas
 

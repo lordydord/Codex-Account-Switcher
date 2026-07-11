@@ -32,11 +32,15 @@ Work from the root of this repository.
 
 ## Behavior Summary
 
-- Current local update is v1.34 / build 134.
-- Menu bar defaults to large weekly usage with percent signs, with a compact number-only option.
+- Current local update is v1.8.2 / build 182.
+- Menu bar supports detailed and compact 5-hour or weekly usage displays.
 - Active account is bright; inactive accounts are dimmed.
 - Dropdown shows 5-hour usage for all accounts.
 - The main panel supports three/four saved accounts with a compact 2x2 card grid and an empty slot.
+- Reset-credit reads use a five-minute cache independent from the fast active-usage refresh, and account reset checks run concurrently with a cap of three.
+- Reset redemption is not automatically retried and is only reported as confirmed after both the credit count and live usage windows agree.
+- External helper commands have timeouts, Computer Use discovery is version-independent, and only the ten newest auth backups per account are retained.
+- Verification is `./run-tests.sh`, `./build.sh`, `./install.sh`, then `./verify-install.sh`.
 - Live usage values that come back as 400/401 should be treated as expired login, not healthy unknown usage. Ask Graham to remove/re-add or re-login that labelled account.
 - The relaunch path may see leftover Codex helper PIDs; if Codex can still open, do not treat helper survivors alone as a failed relaunch.
 - Low-usage auto-switch is notification/action based: the user clicks `Switch Now`.

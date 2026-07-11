@@ -11,7 +11,7 @@ Rules for future work:
 - The app depends on `codex-auth`; do not vendor or copy private `~/.codex/accounts` data into the repository.
 - Build verification is `./build.sh`.
 - Install verification is `./install.sh`, then confirm the app runs from `/Applications/Codex Account Switcher.app`.
-- Current local app update is v1.7 / build 170 with transactional verified switching, rollback, best-account scoring, a native lifecycle monitor, privacy-safe diagnostics, clipboard restoration, local ad-hoc signing, API-mode rollback, and the non-executing Route B prototype.
+- Current local app update is v1.8.2 / build 182 with cached concurrent reset-credit refreshes, bounded async networking, command timeouts, dynamic Computer Use discovery, automated infrastructure tests, backup pruning, verified reset-credit redemption, direct live usage refresh, the graphite control-deck redesign, transactional verified switching, rollback, best-account scoring, a native lifecycle monitor, privacy-safe diagnostics, clipboard restoration, local ad-hoc signing, API-mode rollback, and the non-executing Route B prototype.
 
 Potential v2.5 idea:
 

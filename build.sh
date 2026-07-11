@@ -9,12 +9,12 @@ CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 BIN_PATH="$MACOS_DIR/CodexAccountSwitcher"
-MODULE_CACHE_DIR="$BUILD_DIR/ModuleCache"
+MODULE_CACHE_DIR="${CODEX_SWITCHER_MODULE_CACHE_DIR:-$HOME/Library/Caches/CodexAccountSwitcher/ModuleCache}"
 ICON_SOURCE="$ROOT_DIR/Sources/icon.png"
 TOOLBAR_ICON_SOURCE="$ROOT_DIR/Sources/toolbar-icon.png"
 LIFECYCLE_MONITOR_SOURCE="$ROOT_DIR/Sources/LifecycleMonitor.swift"
 
-rm -rf "$APP_DIR"
+rm -rf "$APP_DIR" "$BUILD_DIR/ModuleCache" "$BUILD_DIR/Codex Account Switcher 2.app" "$BUILD_DIR/Codex Account Switcher 3.app"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$MODULE_CACHE_DIR"
 
 if [[ -f "$ICON_SOURCE" ]]; then
@@ -35,7 +35,9 @@ CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc "$LIFECYCLE_MONITOR_SOURCE" \
   -framework AppKit \
   -o "$RESOURCES_DIR/CodexLifecycleMonitor"
 
-CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc "$ROOT_DIR/Sources/main.swift" \
+CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc \
+  "$ROOT_DIR/Sources/AppInfrastructure.swift" \
+  "$ROOT_DIR/Sources/main.swift" \
   -target arm64-apple-macosx14.0 \
   -module-cache-path "$MODULE_CACHE_DIR" \
   -framework AppKit \
@@ -66,9 +68,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.7</string>
+  <string>1.8.2</string>
   <key>CFBundleVersion</key>
-  <string>170</string>
+  <string>182</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>

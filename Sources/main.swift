@@ -31,6 +31,17 @@ struct SwitchHistoryEntry: Codable {
     let result: String
 }
 
+struct ResetHistoryEntry: Codable {
+    let date: Date
+    let accountLabel: String
+    let result: String
+    let creditBefore: Int?
+    let creditAfter: Int?
+    let fiveHourRemaining: Int?
+    let weeklyRemaining: Int?
+    let detail: String
+}
+
 enum RouteBCapabilityState {
     case ready
     case testRequired
@@ -119,6 +130,31 @@ struct ResetCreditsSnapshot: Equatable {
     var displayCount: Int? {
         availableCount ?? (credits.isEmpty ? nil : availableCredits.count)
     }
+}
+
+struct UsageLimitWindowSnapshot: Equatable {
+    let remainingPercent: Int
+    let resetAt: Date?
+}
+
+struct DirectUsageSnapshot: Equatable {
+    let fiveHour: UsageLimitWindowSnapshot
+    let weekly: UsageLimitWindowSnapshot
+}
+
+struct ResetConsumeReceipt {
+    let code: String
+    let windowsReset: Int
+    let message: String
+}
+
+struct ResetVerificationOutcome {
+    let resetSnapshot: ResetCreditsSnapshot?
+    let usageSnapshot: DirectUsageSnapshot?
+    let creditConfirmed: Bool
+    let usageConfirmed: Bool
+    let attempts: Int
+    let detail: String
 }
 
 enum UsageDisplayMode: String {
@@ -210,77 +246,72 @@ private struct PanelTheme {
     }
 
     var primaryText: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.94) : NSColor.black.withAlphaComponent(0.80)
+        isDark ? NSColor(red: 0.93, green: 0.95, blue: 0.97, alpha: 1) : NSColor(red: 0.10, green: 0.12, blue: 0.15, alpha: 1)
     }
 
     var secondaryText: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.52) : NSColor.black.withAlphaComponent(0.50)
+        isDark ? NSColor(red: 0.58, green: 0.62, blue: 0.68, alpha: 1) : NSColor(red: 0.37, green: 0.41, blue: 0.46, alpha: 1)
     }
 
     var tertiaryText: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.38) : NSColor.black.withAlphaComponent(0.38)
+        isDark ? NSColor(red: 0.40, green: 0.44, blue: 0.50, alpha: 1) : NSColor(red: 0.49, green: 0.53, blue: 0.58, alpha: 1)
     }
 
     var valueText: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.72) : NSColor.black.withAlphaComponent(0.66)
+        isDark ? NSColor(red: 0.75, green: 0.79, blue: 0.84, alpha: 1) : NSColor(red: 0.24, green: 0.28, blue: 0.33, alpha: 1)
     }
 
     var inactiveAccent: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.34) : NSColor.black.withAlphaComponent(0.32)
+        isDark ? NSColor(red: 0.42, green: 0.46, blue: 0.52, alpha: 1) : NSColor(red: 0.47, green: 0.51, blue: 0.56, alpha: 1)
     }
 
     var activeCardFill: NSColor {
-        isDark ? NSColor(red: 0.045, green: 0.105, blue: 0.085, alpha: 0.70) : NSColor(red: 0.91, green: 0.98, blue: 0.94, alpha: 0.95)
+        isDark ? NSColor(red: 0.045, green: 0.105, blue: 0.088, alpha: 0.94) : NSColor(red: 0.91, green: 0.97, blue: 0.935, alpha: 0.98)
     }
 
     var inactiveCardFill: NSColor {
-        isDark ? NSColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 0.76) : NSColor(red: 0.965, green: 0.975, blue: 0.985, alpha: 0.94)
+        isDark ? NSColor(red: 0.060, green: 0.073, blue: 0.093, alpha: 0.96) : NSColor(red: 0.955, green: 0.965, blue: 0.978, alpha: 0.98)
     }
 
     var inactiveCardHoverFill: NSColor {
-        isDark ? NSColor(red: 0.08, green: 0.105, blue: 0.135, alpha: 0.82) : NSColor(red: 0.99, green: 0.995, blue: 1.0, alpha: 0.98)
+        isDark ? NSColor(red: 0.082, green: 0.101, blue: 0.128, alpha: 1) : NSColor(red: 0.985, green: 0.99, blue: 1.0, alpha: 1)
     }
 
     var inactiveCardBorder: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.08) : NSColor.black.withAlphaComponent(0.08)
+        isDark ? NSColor(red: 0.42, green: 0.48, blue: 0.56, alpha: 0.16) : NSColor(red: 0.18, green: 0.23, blue: 0.29, alpha: 0.12)
     }
 
     var bottomBarFill: NSColor {
-        isDark ? NSColor(red: 0.07, green: 0.10, blue: 0.14, alpha: 0.72) : NSColor(red: 0.93, green: 0.95, blue: 0.97, alpha: 0.94)
+        isDark ? NSColor(red: 0.055, green: 0.068, blue: 0.087, alpha: 0.98) : NSColor(red: 0.93, green: 0.945, blue: 0.965, alpha: 0.98)
     }
 
     var divider: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.08)
+        isDark ? NSColor(red: 0.48, green: 0.54, blue: 0.62, alpha: 0.14) : NSColor(red: 0.18, green: 0.22, blue: 0.27, alpha: 0.10)
     }
 
     var iconTint: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.58) : NSColor.black.withAlphaComponent(0.46)
+        isDark ? NSColor(red: 0.64, green: 0.69, blue: 0.75, alpha: 1) : NSColor(red: 0.34, green: 0.39, blue: 0.44, alpha: 1)
     }
 
     var ringTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.08) : NSColor.black.withAlphaComponent(0.08)
+        isDark ? NSColor.white.withAlphaComponent(0.075) : NSColor.black.withAlphaComponent(0.075)
     }
 
     var progressTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.085) : NSColor.black.withAlphaComponent(0.085)
+        isDark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.08)
     }
 
     var inactiveButtonFill: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.22) : NSColor(red: 0.90, green: 0.925, blue: 0.94, alpha: 1)
+        isDark ? NSColor(red: 0.12, green: 0.145, blue: 0.18, alpha: 1) : NSColor(red: 0.88, green: 0.905, blue: 0.935, alpha: 1)
     }
 
     var usageInactiveButtonFill: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.15) : NSColor(red: 0.36, green: 0.39, blue: 0.43, alpha: 0.92)
+        isDark ? NSColor(red: 0.14, green: 0.165, blue: 0.20, alpha: 1) : NSColor(red: 0.31, green: 0.35, blue: 0.40, alpha: 0.96)
     }
 
     var switchOffFill: NSColor {
         isDark ? NSColor.white.withAlphaComponent(0.18) : NSColor.black.withAlphaComponent(0.18)
     }
-}
-
-struct CommandResult {
-    let status: Int32
-    let output: String
 }
 
 enum ApiUsageFetchResult {
@@ -294,7 +325,12 @@ enum ResetCreditsFetchResult {
 }
 
 enum ResetCreditRedemptionResult {
-    case success(String)
+    case success(ResetConsumeReceipt)
+    case failure(String)
+}
+
+enum DirectUsageFetchResult {
+    case success(DirectUsageSnapshot)
     case failure(String)
 }
 
@@ -353,14 +389,17 @@ final class AccountSwitcherPanelView: NSView {
     private let toggleLaunchAtLogin: () -> Void
     private var theme: PanelTheme { PanelTheme.current(for: effectiveAppearance) }
     private let outerInset: CGFloat = 18
-    private let cardGap: CGFloat = 14
-    private let bottomBarTopGap: CGFloat = 12
-    private let bottomBarHeight: CGFloat = 42
+    private let usageInset: CGFloat = 14
+    private let cardGap: CGFloat = 12
+    private let bottomBarTopGap: CGFloat = 10
+    private let bottomBarHeight: CGFloat = 44
+    private let usageHeaderHeight: CGFloat = 66
+    private let usageHeaderGap: CGFloat = 10
     private var usesCompactGrid: Bool {
         mode == .usage && accounts.count >= 3
     }
     private var accountCardHeight: CGFloat {
-        bounds.height - (outerInset * 2) - cardGap - bottomBarTopGap - bottomBarHeight
+        bounds.height - (usageInset * 2) - usageHeaderHeight - usageHeaderGap - bottomBarTopGap - bottomBarHeight
     }
 
     init(
@@ -463,18 +502,21 @@ final class AccountSwitcherPanelView: NSView {
 
     static func preferredSize(mode: AccountPanelMode, accountCount: Int) -> NSSize {
         if mode == .usage && accountCount >= 3 {
-            return NSSize(width: 430, height: 520)
+            return NSSize(width: 448, height: 560)
+        }
+        if mode == .usage {
+            return NSSize(width: 424, height: 500)
         }
         if mode == .settings {
-            return NSSize(width: 370, height: 500)
+            return NSSize(width: 432, height: 650)
         }
         if mode == .routeB {
-            return NSSize(width: 430, height: 520)
+            return NSSize(width: 468, height: 600)
         }
         if mode == .resets && accountCount >= 3 {
-            return NSSize(width: 430, height: 580)
+            return NSSize(width: 468, height: 640)
         }
-        return NSSize(width: 370, height: 450)
+        return NSSize(width: 432, height: 520)
     }
 
     private func build() {
@@ -497,8 +539,13 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func buildUsageContent() {
+        addSubview(usageHeader(frame: NSRect(x: usageInset, y: usageInset, width: bounds.width - (usageInset * 2), height: usageHeaderHeight)))
+        let cardsY = usageInset + usageHeaderHeight + usageHeaderGap
+
         if accounts.isEmpty {
-            addSubview(emptyStateCard())
+            let empty = emptyStateCard()
+            empty.frame.origin.y = cardsY
+            addSubview(empty)
         } else if accounts.count >= 3 {
             buildCompactGridUsageContent()
         } else {
@@ -511,15 +558,15 @@ final class AccountSwitcherPanelView: NSView {
                 return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
             }
             let columns = min(orderedAccounts.count, 2)
-            let contentWidth = bounds.width - (outerInset * 2)
+            let contentWidth = bounds.width - (usageInset * 2)
             let cardWidth = columns == 1 ? contentWidth : (contentWidth - cardGap) / 2
             for (index, account) in orderedAccounts.prefix(2).enumerated() {
-                let x = columns == 1 ? outerInset : outerInset + CGFloat(index) * (cardWidth + cardGap)
-                addSubview(accountCard(account, frame: NSRect(x: x, y: outerInset, width: cardWidth, height: accountCardHeight)))
+                let x = columns == 1 ? usageInset : usageInset + CGFloat(index) * (cardWidth + cardGap)
+                addSubview(accountCard(account, frame: NSRect(x: x, y: cardsY, width: cardWidth, height: accountCardHeight)))
             }
         }
 
-        addSubview(bottomBar(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: bounds.width - (outerInset * 2), height: bottomBarHeight)))
+        addSubview(bottomBar(frame: NSRect(x: usageInset, y: bounds.height - usageInset - bottomBarHeight, width: bounds.width - (usageInset * 2), height: bottomBarHeight)))
     }
 
     private func buildCompactGridUsageContent() {
@@ -532,15 +579,17 @@ final class AccountSwitcherPanelView: NSView {
             return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
         }
 
-        let contentWidth = bounds.width - (outerInset * 2)
+        let contentWidth = bounds.width - (usageInset * 2)
         let cardWidth = (contentWidth - cardGap) / 2
-        let cardHeight = (bounds.height - (outerInset * 2) - cardGap - bottomBarTopGap - bottomBarHeight) / 2
+        let cardsY = usageInset + usageHeaderHeight + usageHeaderGap
+        let cardAreaHeight = bounds.height - cardsY - usageInset - bottomBarTopGap - bottomBarHeight
+        let cardHeight = (cardAreaHeight - cardGap) / 2
 
         for index in 0..<4 {
             let column = index % 2
             let row = index / 2
-            let x = outerInset + CGFloat(column) * (cardWidth + cardGap)
-            let y = outerInset + CGFloat(row) * (cardHeight + cardGap)
+            let x = usageInset + CGFloat(column) * (cardWidth + cardGap)
+            let y = cardsY + CGFloat(row) * (cardHeight + cardGap)
             let frame = NSRect(x: x, y: y, width: cardWidth, height: cardHeight)
             if index < orderedAccounts.count {
                 addSubview(compactAccountCard(orderedAccounts[index], frame: frame))
@@ -552,29 +601,29 @@ final class AccountSwitcherPanelView: NSView {
 
     private func buildSettingsContent() {
         let contentWidth = bounds.width - (outerInset * 2)
-        addSubview(settingsHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 38)))
+        addSubview(settingsHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 54)))
 
-        let displaySection = settingsSection(frame: NSRect(x: outerInset, y: 64, width: contentWidth, height: 80), title: "Display")
-        displaySection.addSubview(segmentedRow(label: "Menu bar", frame: NSRect(x: 14, y: 29, width: contentWidth - 28, height: 24), options: [
+        let displaySection = settingsSection(frame: NSRect(x: outerInset, y: 84, width: contentWidth, height: 104), title: "Display")
+        displaySection.addSubview(segmentedRow(label: "Menu bar", frame: NSRect(x: 16, y: 38, width: contentWidth - 32, height: 24), options: [
             ("Weekly", usageMode == .weekly, SettingsPanelAction.usageWeekly),
             ("5H", usageMode == .fiveHour, SettingsPanelAction.usageFiveHour)
         ]))
-        displaySection.addSubview(segmentedRow(label: "Style", frame: NSRect(x: 14, y: 54, width: contentWidth - 28, height: 24), options: [
+        displaySection.addSubview(segmentedRow(label: "Density", frame: NSRect(x: 16, y: 70, width: contentWidth - 32, height: 24), options: [
             ("Large", toolbarDisplayStyle == .detailed, SettingsPanelAction.styleDetailed),
             ("Small", toolbarDisplayStyle == .compact, SettingsPanelAction.styleCompact)
         ]))
         addSubview(displaySection)
 
-        let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 152, width: contentWidth, height: 158), title: "Automation")
-        automationSection.addSubview(settingToggleRow(title: "Follow Codex / ChatGPT", detail: "Show only while either app is open", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 14, y: 26, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 14, y: 52, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: autoSwitchDetailText(), isOn: autoSwitchEnabled, action: .editAutoSwitch, frame: NSRect(x: 14, y: 78, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Auto resume", detail: autoResumeDetailText(), isOn: autoResumeMode != .off, action: .editAutoResume, frame: NSRect(x: 14, y: 104, width: contentWidth - 28, height: 28)))
-        automationSection.addSubview(settingToggleRow(title: "Card confirmation", detail: "Arm card first, then switch", isOn: confirmBeforeSwitching, action: .toggleConfirmSwitch, frame: NSRect(x: 14, y: 130, width: contentWidth - 28, height: 28)))
+        let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 200, width: contentWidth, height: 220), title: "Automation")
+        automationSection.addSubview(settingToggleRow(title: "Follow Codex / ChatGPT", detail: "Show only while either app is open", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 16, y: 34, width: contentWidth - 32, height: 34)))
+        automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 16, y: 70, width: contentWidth - 32, height: 34)))
+        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: autoSwitchDetailText(), isOn: autoSwitchEnabled, action: .editAutoSwitch, frame: NSRect(x: 16, y: 106, width: contentWidth - 32, height: 34)))
+        automationSection.addSubview(settingToggleRow(title: "Auto resume", detail: autoResumeDetailText(), isOn: autoResumeMode != .off, action: .editAutoResume, frame: NSRect(x: 16, y: 142, width: contentWidth - 32, height: 34)))
+        automationSection.addSubview(settingToggleRow(title: "Confirm before switching", detail: "Arm the account card before relaunch", isOn: confirmBeforeSwitching, action: .toggleConfirmSwitch, frame: NSRect(x: 16, y: 178, width: contentWidth - 32, height: 34)))
         addSubview(automationSection)
 
-        addSubview(healthSection(frame: NSRect(x: outerInset, y: 318, width: contentWidth, height: 106)))
-        addSubview(settingsFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
+        addSubview(healthSection(frame: NSRect(x: outerInset, y: 432, width: contentWidth, height: 104)))
+        addSubview(settingsFooter(frame: NSRect(x: outerInset, y: 556, width: contentWidth, height: 76)))
     }
 
     private func buildRouteBContent() {
@@ -605,8 +654,20 @@ final class AccountSwitcherPanelView: NSView {
         let areaY: CGFloat = 74
         let areaHeight = bounds.height - areaY - outerInset
         let columns = orderedAccounts.count >= 4 ? 2 : 1
-        let rows = Int(ceil(Double(orderedAccounts.count) / Double(columns)))
         let cardWidth = columns == 1 ? contentWidth : (contentWidth - cardGap) / 2
+
+        if columns == 1 {
+            var y = areaY
+            for account in orderedAccounts {
+                let creditCount = resetCreditsByEmail[account.email]?.availableCredits.count ?? 0
+                let cardHeight = min(188, 132 + CGFloat(max(0, creditCount - 1)) * 19)
+                addSubview(resetCreditAccountCard(account, frame: NSRect(x: outerInset, y: y, width: cardWidth, height: cardHeight)))
+                y += cardHeight + cardGap
+            }
+            return
+        }
+
+        let rows = Int(ceil(Double(orderedAccounts.count) / Double(columns)))
         let cardHeight = (areaHeight - CGFloat(max(0, rows - 1)) * cardGap) / CGFloat(max(1, rows))
 
         for (index, account) in orderedAccounts.enumerated() {
@@ -620,10 +681,11 @@ final class AccountSwitcherPanelView: NSView {
 
     private func resetCreditsHeader(frame: NSRect) -> NSView {
         let header = FlippedContainerView(frame: frame)
-        header.addSubview(label("Resets", frame: NSRect(x: 2, y: 1, width: 170, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
-        header.addSubview(label(resetCreditsHeaderSubtitle(), frame: NSRect(x: 2, y: 28, width: frame.width - 96, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
+        header.addSubview(label("RESET VAULT", frame: NSRect(x: 2, y: 0, width: 130, height: 14), size: 9.5, weight: .bold, color: theme.tertiaryText))
+        header.addSubview(label("Usage resets", frame: NSRect(x: 2, y: 13, width: 190, height: 28), size: 24, weight: .bold, color: theme.primaryText))
+        header.addSubview(label(resetCreditsHeaderSubtitle(), frame: NSRect(x: 196, y: 21, width: frame.width - 302, height: 15), size: 10.5, weight: .medium, color: theme.secondaryText, alignment: .right))
 
-        let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        let back = SettingsActionButton(frame: NSRect(x: frame.width - 92, y: 7, width: 92, height: 30), title: "Accounts", color: theme.inactiveButtonFill, textColor: theme.primaryText)
         back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
         back.target = self
         back.action = #selector(settingsActionPressed(_:))
@@ -937,15 +999,16 @@ final class AccountSwitcherPanelView: NSView {
 
     private func settingsHeader(frame: NSRect) -> NSView {
         let header = FlippedContainerView(frame: frame)
-        header.addSubview(label("Settings", frame: NSRect(x: 2, y: 1, width: 120, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
-        header.addSubview(label("Switcher controls", frame: NSRect(x: 2, y: 27, width: 180, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
-        let openRouter = SettingsActionButton(frame: NSRect(x: frame.width - 164, y: 4, width: 78, height: 28), title: "OpenRouter", color: NSColor.systemIndigo.withAlphaComponent(0.82), textColor: .white)
+        header.addSubview(label("CONTROL ROOM", frame: NSRect(x: 2, y: 0, width: 130, height: 14), size: 9.5, weight: .bold, color: theme.tertiaryText))
+        header.addSubview(label("Settings", frame: NSRect(x: 2, y: 14, width: 160, height: 28), size: 24, weight: .bold, color: theme.primaryText))
+        header.addSubview(label("Display, automation and switcher health", frame: NSRect(x: 2, y: 41, width: 240, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
+        let openRouter = SettingsActionButton(frame: NSRect(x: frame.width - 176, y: 13, width: 82, height: 30), title: "Route B", color: NSColor.systemIndigo.withAlphaComponent(0.78), textColor: .white)
         openRouter.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.routeBView.rawValue)
         openRouter.target = self
         openRouter.action = #selector(settingsActionPressed(_:))
         header.addSubview(openRouter)
 
-        let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        let back = SettingsActionButton(frame: NSRect(x: frame.width - 86, y: 13, width: 86, height: 30), title: "Accounts", color: theme.inactiveButtonFill, textColor: theme.primaryText)
         back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
         back.target = self
         back.action = #selector(settingsActionPressed(_:))
@@ -1036,8 +1099,8 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func settingsSection(frame: NSRect, title: String) -> NSView {
-        let section = RoundedPanelView(frame: frame, fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false), cornerRadius: 16)
-        section.addSubview(label(title, frame: NSRect(x: 14, y: 10, width: frame.width - 28, height: 18), size: 12, weight: .semibold, color: theme.primaryText))
+        let section = RoundedPanelView(frame: frame, fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false), cornerRadius: 18, shadowOpacity: 0.07, shadowRadius: 10)
+        section.addSubview(label(title, frame: NSRect(x: 16, y: 12, width: frame.width - 32, height: 18), size: 12.5, weight: .bold, color: theme.primaryText))
         return section
     }
 
@@ -1110,9 +1173,9 @@ final class AccountSwitcherPanelView: NSView {
 
     private func settingToggleRow(title: String, detail: String, isOn: Bool, action: SettingsPanelAction, frame: NSRect) -> NSView {
         let row = FlippedContainerView(frame: frame)
-        row.addSubview(label(title, frame: NSRect(x: 0, y: 1, width: frame.width - 44, height: 15), size: 11.2, weight: .semibold, color: theme.primaryText))
-        row.addSubview(label(detail, frame: NSRect(x: 0, y: 15, width: frame.width - 44, height: 13), size: 9.5, weight: .medium, color: theme.secondaryText))
-        let toggle = MiniSwitchButton(frame: NSRect(x: frame.width - 36, y: 3, width: 34, height: 22), isOn: isOn, offColor: theme.switchOffFill)
+        row.addSubview(label(title, frame: NSRect(x: 0, y: 1, width: frame.width - 52, height: 16), size: 11.5, weight: .semibold, color: theme.primaryText))
+        row.addSubview(label(detail, frame: NSRect(x: 0, y: 18, width: frame.width - 52, height: 14), size: 9.5, weight: .medium, color: theme.secondaryText))
+        let toggle = MiniSwitchButton(frame: NSRect(x: frame.width - 40, y: 6, width: 38, height: 24), isOn: isOn, offColor: theme.switchOffFill)
         toggle.identifier = NSUserInterfaceItemIdentifier(action.rawValue)
         toggle.target = self
         toggle.action = #selector(settingsActionPressed(_:))
@@ -1121,24 +1184,28 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func settingsFooter(frame: NSRect) -> NSView {
-        let footer = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 14)
-        let buttonY: CGFloat = 8
-        let actions: [(String, SettingsPanelAction, CGFloat)] = [
-            ("Add", .addAccount, 40),
-            ("Device", .addDeviceAccount, 54),
-            ("Reminder", .editUsageReminder, 68),
-            ("Refresh", .editRefresh, 58),
-            ("Update", .checkUpdates, 54),
-            ("History", .diagnostics, 58)
+        let footer = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 18, shadowOpacity: 0.06)
+        let actions: [(String, SettingsPanelAction)] = [
+            ("Add account", .addAccount),
+            ("Device login", .addDeviceAccount),
+            ("Reminder", .editUsageReminder),
+            ("Refresh rate", .editRefresh),
+            ("Check update", .checkUpdates),
+            ("Diagnostics", .diagnostics)
         ]
-        var x: CGFloat = 12
-        for action in actions {
-            let button = SettingsActionButton(frame: NSRect(x: x, y: buttonY, width: action.2, height: 26), title: action.0, color: theme.inactiveButtonFill, textColor: theme.primaryText)
+        let inset: CGFloat = 10
+        let gap: CGFloat = 8
+        let buttonWidth = (frame.width - (inset * 2) - (gap * 2)) / 3
+        for (index, action) in actions.enumerated() {
+            let column = index % 3
+            let row = index / 3
+            let x = inset + CGFloat(column) * (buttonWidth + gap)
+            let y = 8 + CGFloat(row) * 32
+            let button = SettingsActionButton(frame: NSRect(x: x, y: y, width: buttonWidth, height: 26), title: action.0, color: theme.inactiveButtonFill, textColor: theme.primaryText)
             button.identifier = NSUserInterfaceItemIdentifier(action.1.rawValue)
             button.target = self
             button.action = #selector(settingsActionPressed(_:))
             footer.addSubview(button)
-            x += action.2 + 8
         }
         return footer
     }
@@ -1169,30 +1236,68 @@ final class AccountSwitcherPanelView: NSView {
         return view
     }
 
+    private func usageHeader(frame: NSRect) -> NSView {
+        let header = RoundedPanelView(
+            frame: frame,
+            fillColor: theme.bottomBarFill,
+            borderColor: theme.inactiveCardBorder,
+            cornerRadius: 18,
+            shadowOpacity: 0.08,
+            shadowRadius: 12
+        )
+
+        let signalColor = activeAccount.map { usageColor(for: $0.fiveHourUsedPercent) } ?? NSColor.systemOrange
+        header.addSubview(PanelMarkView(frame: NSRect(x: 14, y: 12, width: 42, height: 42), color: signalColor))
+        header.addSubview(label("CODEX ACCOUNT ROUTER", frame: NSRect(x: 68, y: 9, width: frame.width - 190, height: 15), size: 9.5, weight: .bold, color: theme.tertiaryText))
+
+        let activeTitle = activeAccount.map { "Account \(labelForAccount($0)) is live" } ?? "No active account"
+        header.addSubview(label(activeTitle, frame: NSRect(x: 68, y: 24, width: frame.width - 190, height: 24), size: 17.5, weight: .semibold, color: theme.primaryText))
+
+        let detail: String
+        if let activeAccount {
+            let plan = activeAccount.plan.isEmpty ? "ChatGPT" : activeAccount.plan.capitalized
+            detail = "\(plan)  ·  5-hour \(percentText(activeAccount.fiveHourUsedPercent))  ·  weekly \(percentText(activeAccount.weeklyUsedPercent))"
+        } else {
+            detail = lastError ?? "Open settings to add or repair an account"
+        }
+        header.addSubview(label(detail, frame: NSRect(x: 68, y: 47, width: frame.width - 184, height: 15), size: 10.5, weight: .medium, color: theme.secondaryText))
+
+        let stateFill = signalColor.withAlphaComponent(theme.isDark ? 0.13 : 0.10)
+        let state = RoundedPanelView(frame: NSRect(x: frame.width - 118, y: 17, width: 104, height: 32), fillColor: stateFill, borderColor: signalColor.withAlphaComponent(0.28), cornerRadius: 10, shadowOpacity: 0)
+        state.addSubview(DotView(frame: NSRect(x: 13, y: 13, width: 6, height: 6), color: signalColor))
+        state.addSubview(CenteredTextView(frame: NSRect(x: 0, y: 5, width: 104, height: 22), text: activeAccount == nil ? "OFFLINE" : "CONNECTED", size: 9.2, weight: .bold, color: signalColor, alignment: .center))
+        header.addSubview(state)
+        return header
+    }
+
     private func compactAccountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
         let weeklyPercent = account.weeklyUsedPercent
         let fiveHourPercent = account.fiveHourUsedPercent
         let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
         let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
-        let usageWeight: NSFont.Weight = account.isActive ? .semibold : .medium
-        let compactProgressHeight = progressLineHeight(isActive: account.isActive)
+        let usageWeight: NSFont.Weight = account.isActive ? .bold : .semibold
         let card = RoundedPanelView(
             frame: frame,
             fillColor: cardFillColor(for: account),
             borderColor: cardBorderColor(for: account),
-            cornerRadius: 10,
+            cornerRadius: 16,
             hoverFillColor: account.isActive || isSwitching ? nil : theme.inactiveCardHoverFill,
             clickAction: account.isActive || isSwitching ? nil : { [weak self] in
                 self?.switchAccount(account.email)
-            }
+            },
+            shadowOpacity: account.isActive ? 0.18 : 0.09,
+            shadowRadius: account.isActive ? 18 : 10
         )
 
-        let labelText = labelForAccount(account)
+        if account.isActive {
+            card.addSubview(AccentRailView(frame: NSRect(x: 0, y: 18, width: 3, height: frame.height - 36), color: fiveHourColor))
+        }
+
         let isArmed = confirmBeforeSwitching && armedSwitchEmail == account.email && !account.isActive
         let statusTitle = account.isActive ? "ACTIVE" : (isSwitching ? "..." : (isArmed ? "CONFIRM" : "SWITCH"))
-        let buttonColor = account.isActive ? fiveHourColor : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
-        let switchButtonWidth: CGFloat = isArmed ? 76 : 64
-        let switchButton = PillButton(frame: NSRect(x: 12, y: 12, width: switchButtonWidth, height: 24), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
+        let buttonColor = account.isActive ? fiveHourColor.withAlphaComponent(0.82) : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
+        let switchButtonWidth: CGFloat = isArmed ? 68 : 58
+        let switchButton = PillButton(frame: NSRect(x: frame.width - switchButtonWidth - 14, y: 14, width: switchButtonWidth, height: 24), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
         switchButton.toolTip = isArmed ? "Confirm \(switchPreviewText(for: account))" : switchPreviewText(for: account)
         switchButton.target = self
         switchButton.action = #selector(accountSwitchPressed(_:))
@@ -1200,46 +1305,57 @@ final class AccountSwitcherPanelView: NSView {
         switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
         card.addSubview(switchButton)
 
-        let accountSettingsButton = AccountMoreButton(frame: NSRect(x: frame.width - 50, y: 8, width: 40, height: 34), tintColor: account.isActive ? fiveHourColor : theme.iconTint, label: labelText)
-        accountSettingsButton.identifier = NSUserInterfaceItemIdentifier("label|\(account.email)")
-        accountSettingsButton.target = self
-        accountSettingsButton.action = #selector(accountSettingsActionPressed(_:))
-        card.addSubview(accountSettingsButton)
+        let identityWidth = max(80, frame.width - switchButtonWidth - 46)
+        let emailText = compactCardEmail(account.email)
+        card.addSubview(label(emailText, frame: NSRect(x: 16, y: 16, width: identityWidth, height: 20), size: 10.8, weight: .semibold, color: account.isActive ? fiveHourColor : theme.primaryText))
+        let emailButton = NSButton(frame: NSRect(x: 16, y: 14, width: identityWidth, height: 24))
+        emailButton.title = ""
+        emailButton.bezelStyle = .regularSquare
+        emailButton.isBordered = false
+        emailButton.isTransparent = true
+        emailButton.focusRingType = .exterior
+        emailButton.setAccessibilityLabel(emailText)
+        emailButton.identifier = NSUserInterfaceItemIdentifier("label|\(account.email)")
+        emailButton.target = self
+        emailButton.action = #selector(accountSettingsActionPressed(_:))
+        emailButton.toolTip = "Edit account label"
+        card.addSubview(emailButton)
 
-        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 12, y: 46, width: frame.width - 24, height: 16), size: 11.2, weight: .semibold, color: theme.tertiaryText, alignment: .center))
+        let contentX: CGFloat = 16
+        let contentWidth = frame.width - 32
+        let valueY: CGFloat = 50
+        card.addSubview(MetricValueView(frame: NSRect(x: contentX, y: valueY, width: 94, height: 44), percent: fiveHourPercent, color: fiveHourColor, isActive: account.isActive))
+        card.addSubview(label("5-hour left", frame: NSRect(x: frame.width - 96, y: valueY + 4, width: 80, height: 16), size: 10.5, weight: .semibold, color: theme.secondaryText, alignment: .right))
+        card.addSubview(label("resets \(fiveHourResetTimeText(from: account.fiveHourUsage))", frame: NSRect(x: frame.width - 110, y: valueY + 21, width: 94, height: 15), size: 9.5, weight: .medium, color: theme.tertiaryText, alignment: .right))
+        card.addSubview(ProgressLineView(frame: NSRect(x: contentX, y: 96, width: contentWidth, height: account.isActive ? 9 : 7), color: fiveHourColor, trackColor: theme.progressTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100))
 
-        let contentX: CGFloat = 14
-        let contentWidth = frame.width - 28
-        let fiveHourY: CGFloat = 68
-        card.addSubview(label("5H REMAINING", frame: NSRect(x: contentX, y: fiveHourY, width: contentWidth - 58, height: 16), size: 10.2, weight: usageWeight, color: fiveHourColor))
-        card.addSubview(label(percentText(fiveHourPercent), frame: NSRect(x: frame.width - 72, y: fiveHourY - 3, width: 58, height: 22), size: 20, weight: usageWeight, color: fiveHourColor, alignment: .right))
-        card.addSubview(ProgressLineView(frame: NSRect(x: contentX, y: fiveHourY + 25, width: contentWidth, height: compactProgressHeight), color: fiveHourColor, trackColor: theme.progressTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100))
-
-        let fiveHourResetY = fiveHourY + 41
-        card.addSubview(label("5H", frame: NSRect(x: contentX, y: fiveHourResetY, width: 44, height: 16), size: 10.2, weight: .semibold, color: theme.tertiaryText))
-        card.addSubview(label(fiveHourResetTimeText(from: account.fiveHourUsage), frame: NSRect(x: frame.width - 78, y: fiveHourResetY - 1, width: 64, height: 18), size: 11.2, weight: .semibold, color: fiveHourColor, alignment: .right))
-
-        let dividerY = fiveHourResetY + 20
+        let dividerY: CGFloat = 112
         let divider = NSView(frame: NSRect(x: contentX, y: dividerY, width: contentWidth, height: 1))
         divider.wantsLayer = true
         divider.layer?.backgroundColor = theme.divider.cgColor
         card.addSubview(divider)
 
-        let weeklyY = dividerY + 12
-        card.addSubview(label("WEEKLY", frame: NSRect(x: contentX, y: weeklyY, width: 74, height: 16), size: 10.2, weight: .semibold, color: theme.tertiaryText))
-        card.addSubview(label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 70, y: weeklyY - 1, width: 56, height: 18), size: 11.5, weight: usageWeight, color: weeklyColor, alignment: .right))
-        card.addSubview(ProgressLineView(frame: NSRect(x: contentX, y: weeklyY + 23, width: contentWidth, height: compactProgressHeight), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100))
+        let lowerY: CGFloat = 125
+        let halfWidth = (contentWidth - 13) / 2
+        card.addSubview(label("Weekly", frame: NSRect(x: contentX, y: lowerY, width: halfWidth, height: 14), size: 9.5, weight: .semibold, color: theme.tertiaryText))
+        card.addSubview(label(percentText(weeklyPercent), frame: NSRect(x: contentX, y: lowerY + 16, width: halfWidth, height: 20), size: 15, weight: usageWeight, color: weeklyColor))
 
-        let resetY = weeklyY + 38
-        card.addSubview(label("RESET", frame: NSRect(x: contentX, y: resetY, width: 58, height: 16), size: 10.2, weight: .semibold, color: theme.tertiaryText))
-        card.addSubview(label(weeklyResetText(from: account.weeklyUsage), frame: NSRect(x: frame.width - 92, y: resetY - 1, width: 78, height: 18), size: 11.2, weight: .semibold, color: weeklyColor, alignment: .right))
+        let lowerDivider = NSView(frame: NSRect(x: contentX + halfWidth + 6, y: lowerY, width: 1, height: 37))
+        lowerDivider.wantsLayer = true
+        lowerDivider.layer?.backgroundColor = theme.divider.cgColor
+        card.addSubview(lowerDivider)
+
+        let resetX = contentX + halfWidth + 14
+        card.addSubview(label("Weekly reset", frame: NSRect(x: resetX, y: lowerY, width: halfWidth, height: 14), size: 9.5, weight: .semibold, color: theme.tertiaryText))
+        card.addSubview(label(weeklyResetText(from: account.weeklyUsage), frame: NSRect(x: resetX, y: lowerY + 16, width: halfWidth - 2, height: 20), size: 12, weight: .semibold, color: weeklyColor))
+        card.addSubview(ProgressLineView(frame: NSRect(x: contentX, y: lowerY + 44, width: contentWidth, height: 6), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100))
         return card
     }
 
     private func emptyCompactAccountSlot(frame: NSRect) -> NSView {
-        let card = RoundedPanelView(frame: frame, fillColor: theme.inactiveCardFill.withAlphaComponent(theme.isDark ? 0.36 : 0.48), borderColor: theme.inactiveCardBorder, cornerRadius: 10)
-        card.addSubview(SymbolIconView(frame: NSRect(x: (frame.width - 24) / 2, y: (frame.height - 38) / 2, width: 24, height: 24), symbol: "plus.circle", color: theme.iconTint.withAlphaComponent(0.45)))
-        card.addSubview(label("Account slot", frame: NSRect(x: 14, y: (frame.height / 2) + 12, width: frame.width - 28, height: 16), size: 10.5, weight: .medium, color: theme.tertiaryText, alignment: .center))
+        let card = RoundedPanelView(frame: frame, fillColor: theme.inactiveCardFill.withAlphaComponent(theme.isDark ? 0.42 : 0.58), borderColor: theme.inactiveCardBorder, cornerRadius: 16, hoverFillColor: theme.inactiveCardHoverFill, clickAction: { [weak self] in self?.showSettings() }, shadowOpacity: 0.05)
+        card.addSubview(SymbolIconView(frame: NSRect(x: (frame.width - 28) / 2, y: (frame.height - 54) / 2, width: 28, height: 28), symbol: "plus", color: theme.iconTint.withAlphaComponent(0.62)))
+        card.addSubview(label("Add another account", frame: NSRect(x: 14, y: (frame.height / 2) + 13, width: frame.width - 28, height: 18), size: 11, weight: .semibold, color: theme.secondaryText, alignment: .center))
         return card
     }
 
@@ -1527,7 +1643,7 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func emptyStateCard() -> NSView {
-        let card = RoundedPanelView(frame: NSRect(x: outerInset, y: outerInset, width: bounds.width - (outerInset * 2), height: accountCardHeight), fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false))
+        let card = RoundedPanelView(frame: NSRect(x: usageInset, y: usageInset, width: bounds.width - (usageInset * 2), height: accountCardHeight), fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false))
         card.addSubview(label("No accounts available", frame: NSRect(x: 22, y: 28, width: 240, height: 24), size: 18, weight: .semibold, color: theme.primaryText))
         card.addSubview(label(lastError ?? "Open settings to add an account.", frame: NSRect(x: 22, y: 62, width: 276, height: 40), size: 12, weight: .medium, color: theme.secondaryText))
         let settingsButton = SettingsActionButton(frame: NSRect(x: 22, y: 118, width: 92, height: 28), title: "Settings", color: theme.inactiveButtonFill, textColor: theme.primaryText)
@@ -1851,26 +1967,45 @@ final class DashboardBackgroundView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         let rect = bounds
         let isDark = effectiveAppearance.isDarkMode
-        let gradientColors = isDark
-            ? [
-                NSColor(red: 0.12, green: 0.16, blue: 0.21, alpha: 1),
-                NSColor(red: 0.035, green: 0.055, blue: 0.075, alpha: 1),
-                NSColor(red: 0.018, green: 0.028, blue: 0.04, alpha: 1)
-            ]
-            : [
-                NSColor(red: 0.86, green: 0.89, blue: 0.92, alpha: 1),
-                NSColor(red: 0.975, green: 0.985, blue: 0.99, alpha: 1),
-                NSColor(red: 0.90, green: 0.94, blue: 0.925, alpha: 1)
-            ]
-        let gradient = NSGradient(colors: gradientColors)
-        gradient?.draw(in: rect, angle: -72)
+        let base = isDark
+            ? NSColor(red: 0.027, green: 0.034, blue: 0.045, alpha: 1)
+            : NSColor(red: 0.925, green: 0.94, blue: 0.958, alpha: 1)
+        base.setFill()
+        rect.fill()
 
-        NSColor(red: 0.16, green: 0.42, blue: 0.31, alpha: isDark ? 0.10 : 0.08).setFill()
-        NSBezierPath(ovalIn: NSRect(x: rect.midX - 120, y: 132, width: 260, height: 300)).fill()
+        let topGlow = NSGradient(
+            starting: isDark ? NSColor(red: 0.12, green: 0.19, blue: 0.18, alpha: 0.42) : NSColor(red: 0.70, green: 0.90, blue: 0.82, alpha: 0.42),
+            ending: base.withAlphaComponent(0)
+        )
+        topGlow?.draw(in: NSRect(x: -90, y: -150, width: rect.width + 180, height: 360), relativeCenterPosition: NSPoint(x: -0.10, y: 0.18))
 
-        (isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.black.withAlphaComponent(0.10)).setStroke()
+        let sideGlow = NSGradient(
+            starting: isDark ? NSColor(red: 0.14, green: 0.20, blue: 0.30, alpha: 0.28) : NSColor(red: 0.74, green: 0.82, blue: 0.94, alpha: 0.30),
+            ending: base.withAlphaComponent(0)
+        )
+        sideGlow?.draw(in: NSRect(x: rect.width * 0.36, y: rect.height * 0.42, width: rect.width * 0.88, height: rect.height * 0.72), relativeCenterPosition: NSPoint(x: 0.22, y: -0.10))
+
+        let gridColor = isDark ? NSColor.white.withAlphaComponent(0.024) : NSColor.black.withAlphaComponent(0.022)
+        gridColor.setStroke()
+        let grid = NSBezierPath()
+        grid.lineWidth = 0.5
+        var x: CGFloat = 22
+        while x < rect.width {
+            grid.move(to: NSPoint(x: x, y: 0))
+            grid.line(to: NSPoint(x: x, y: rect.height))
+            x += 44
+        }
+        var y: CGFloat = 22
+        while y < rect.height {
+            grid.move(to: NSPoint(x: 0, y: y))
+            grid.line(to: NSPoint(x: rect.width, y: y))
+            y += 44
+        }
+        grid.stroke()
+
+        (isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.09)).setStroke()
         let border = rect.insetBy(dx: 1, dy: 1).roundedPath(radius: 24)
-        border.lineWidth = 1.2
+        border.lineWidth = 1
         border.stroke()
     }
 }
@@ -1887,7 +2022,7 @@ final class RoundedPanelView: NSView {
     private let clickAction: (() -> Void)?
     private var trackingArea: NSTrackingArea?
 
-    init(frame: NSRect, fillColor: NSColor, borderColor: NSColor, cornerRadius: CGFloat = 18, hoverFillColor: NSColor? = nil, clickAction: (() -> Void)? = nil) {
+    init(frame: NSRect, fillColor: NSColor, borderColor: NSColor, cornerRadius: CGFloat = 18, hoverFillColor: NSColor? = nil, clickAction: (() -> Void)? = nil, shadowOpacity: Float = 0.12, shadowRadius: CGFloat = 12) {
         self.fillColor = fillColor
         self.hoverFillColor = hoverFillColor
         self.borderColor = borderColor
@@ -1897,12 +2032,12 @@ final class RoundedPanelView: NSView {
         wantsLayer = true
         layer?.cornerRadius = cornerRadius
         layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 0.9
+        layer?.borderWidth = 1
         layer?.borderColor = borderColor.cgColor
-        layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.18
-        layer?.shadowRadius = 14
-        layer?.shadowOffset = NSSize(width: 0, height: -6)
+        layer?.shadowColor = NSColor(red: 0.01, green: 0.02, blue: 0.035, alpha: 1).cgColor
+        layer?.shadowOpacity = shadowOpacity
+        layer?.shadowRadius = shadowRadius
+        layer?.shadowOffset = NSSize(width: 0, height: -5)
     }
 
     required init?(coder: NSCoder) {
@@ -1990,6 +2125,102 @@ final class SymbolIconView: NSView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+}
+
+final class PanelMarkView: NSView {
+    private let color: NSColor
+
+    init(frame: NSRect, color: NSColor) {
+        self.color = color
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let plate = bounds.insetBy(dx: 1, dy: 1)
+        color.withAlphaComponent(0.12).setFill()
+        plate.roundedPath(radius: 12).fill()
+        color.withAlphaComponent(0.34).setStroke()
+        let outline = plate.roundedPath(radius: 12)
+        outline.lineWidth = 1
+        outline.stroke()
+
+        let bars: [NSRect] = [
+            NSRect(x: 11, y: 11, width: 20, height: 3),
+            NSRect(x: 11, y: 19, width: 14, height: 3),
+            NSRect(x: 11, y: 27, width: 20, height: 3)
+        ]
+        color.withAlphaComponent(0.96).setFill()
+        for (index, bar) in bars.enumerated() {
+            let shifted = index == 1 ? bar.offsetBy(dx: 6, dy: 0) : bar
+            shifted.roundedPath(radius: 1.5).fill()
+        }
+    }
+}
+
+final class AccentRailView: NSView {
+    private let color: NSColor
+
+    init(frame: NSRect, color: NSColor) {
+        self.color = color
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        color.withAlphaComponent(0.92).setFill()
+        bounds.roundedPath(radius: bounds.width / 2).fill()
+    }
+}
+
+final class MetricValueView: NSView {
+    private let percent: Int?
+    private let color: NSColor
+    private let isActive: Bool
+
+    init(frame: NSRect, percent: Int?, color: NSColor, isActive: Bool) {
+        self.percent = percent
+        self.color = color
+        self.isActive = isActive
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
+        let text = NSMutableAttributedString(
+            string: value,
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 32, weight: isActive ? .bold : .semibold),
+                .foregroundColor: color,
+                .kern: -1.3
+            ]
+        )
+        text.append(NSAttributedString(
+            string: "\u{2009}%",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+                .foregroundColor: color.withAlphaComponent(0.90),
+                .baselineOffset: 3.0,
+                .kern: 0.2
+            ]
+        ))
+        text.draw(at: NSPoint(x: 0, y: 3))
     }
 }
 
@@ -2171,7 +2402,7 @@ final class MiniSwitchButton: NSButton {
     override func draw(_ dirtyRect: NSRect) {
         let on = state == .on
         let track = bounds.insetBy(dx: 1, dy: 3)
-        (on ? NSColor.systemBlue : offColor).setFill()
+        (on ? NSColor.systemGreen : offColor).setFill()
         track.roundedPath(radius: track.height / 2).fill()
 
         let knobSize = track.height - 4
@@ -2254,10 +2485,11 @@ final class PillButton: NSButton {
         self.title = title
         bezelStyle = .rounded
         isBordered = false
-        font = .systemFont(ofSize: 13, weight: .semibold)
+        font = .systemFont(ofSize: frame.height <= 24 ? 9.5 : 11.5, weight: .bold)
         contentTintColor = .white
+        focusRingType = .exterior
         wantsLayer = true
-        layer?.cornerRadius = frame.height / 2
+        layer?.cornerRadius = min(9, frame.height * 0.38)
         layer?.backgroundColor = pillColor.cgColor
         layer?.borderWidth = showsDot ? 1 : 0
         layer?.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
@@ -2281,9 +2513,9 @@ final class PillButton: NSButton {
     override func mouseEntered(with event: NSEvent) {
         guard allowsHover, isEnabled else { return }
         layer?.backgroundColor = pillColor.blended(withFraction: 0.16, of: .white)?.cgColor ?? pillColor.cgColor
-        layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.12
-        layer?.shadowRadius = 6
+        layer?.shadowColor = pillColor.cgColor
+        layer?.shadowOpacity = 0.22
+        layer?.shadowRadius = 8
         layer?.shadowOffset = NSSize(width: 0, height: -2)
     }
 
@@ -2314,10 +2546,11 @@ final class AccountMoreButton: NSButton {
         title = ""
         bezelStyle = .regularSquare
         isBordered = false
+        focusRingType = .exterior
         wantsLayer = true
-        layer?.cornerRadius = frame.height / 2
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.065).cgColor
-        layer?.borderWidth = 1.2
+        layer?.cornerRadius = min(10, frame.height * 0.30)
+        layer?.backgroundColor = tintColor.withAlphaComponent(0.08).cgColor
+        layer?.borderWidth = 1
         layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
         toolTip = "Edit account label"
     }
@@ -2342,7 +2575,7 @@ final class AccountMoreButton: NSButton {
     }
 
     override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.055).cgColor
+        layer?.backgroundColor = tintColor.withAlphaComponent(0.08).cgColor
         layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
     }
 
@@ -2383,8 +2616,9 @@ final class SettingsActionButton: NSButton {
         isBordered = false
         font = .systemFont(ofSize: min(12, max(10, frame.height * 0.42)), weight: .semibold)
         contentTintColor = textColor
+        focusRingType = .exterior
         wantsLayer = true
-        layer?.cornerRadius = min(12, frame.height / 2)
+        layer?.cornerRadius = min(9, frame.height * 0.34)
         layer?.backgroundColor = fillColor.cgColor
         layer?.borderWidth = 1
         layer?.borderColor = textColor.withAlphaComponent(0.08).cgColor
@@ -2438,6 +2672,22 @@ private extension DateFormatter {
     static let resetCreditDisplay: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE d MMM, HH:mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        return formatter
+    }()
+
+    static let directFiveHourUsage: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        return formatter
+    }()
+
+    static let directWeeklyUsage: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE HH:mm"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = .current
         return formatter
@@ -2499,21 +2749,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let autoResumeCodexReadyDelay: TimeInterval = 3.0
     private let launchAgentIdentifier = "com.mohamedfuad.codexaccountswitcher"
     private let switchHistoryDefaultsKey = "switchHistoryV1"
+    private let resetHistoryDefaultsKey = "resetHistoryV1"
     private let lastSwitchDateDefaultsKey = "lastSuccessfulSwitchDate"
     private let switchCooldown: TimeInterval = 90
+    private let resetCreditsRefreshInterval: TimeInterval = 300
     private var refreshTimer: Timer?
-    private var statusAnimationTimer: Timer?
-    private var statusAnimationFrame = 0
     private var currentStatusTitleKey = ""
     private var currentStatusItemLength: CGFloat = 0
     private var accounts: [CodexAccount] = []
     private var lastError: String?
     private var lastUpdatedAt: Date?
     private var lastRefreshStartedAt: Date?
+    private var lastResetCreditsRefreshAt: Date?
     private var lastUsageRefreshWasLocalOnly = false
     private var isRefreshing = false
+    private var isRefreshingResetCredits = false
     private var pendingForceRefresh = false
     private var isSwitching = false
+    private var isRedeemingReset = false
+    private var resetStatusText: String?
+    private var directUsageOverrides: [String: (usage: DirectUsageSnapshot, expiresAt: Date)] = [:]
     private var armedSwitchEmail: String?
     private var armedSwitchClearWorkItem: DispatchWorkItem?
     private var switchAnimationTimer: Timer?
@@ -2522,9 +2777,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var localClickMonitor: Any?
     private var didResignActiveObserver: NSObjectProtocol?
     private var suppressStatusToggleOpenUntil: Date?
+    private var panelRefreshScheduled = false
     private var switchingTitle = "Switching"
     private let switchAnimationFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-    private let statusPulseFrames = ["·", "•", "·", " "]
     private var notifiedLowUsageKeys = Set<String>()
     private var notifiedAutoSwitchPauseKeys = Set<String>()
     private var notifiedApiUsageKeys = Set<String>()
@@ -2742,7 +2997,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--self-test-reset-logic") {
+            let result = resetLogicSelfTest()
+            FileHandle.standardOutput.write(Data("\(result)\n".utf8))
+            NSApp.terminate(nil)
+            return
+        }
         disableApiMode()
+        DispatchQueue.global(qos: .utility).async {
+            let accountsDirectory = URL(fileURLWithPath: NSHomeDirectory())
+                .appendingPathComponent(".codex/accounts", isDirectory: true)
+            _ = AuthBackupPruner.prune(in: accountsDirectory, keepingPerAccount: 10)
+        }
         configureNotifications()
         configureStatusButton()
         refreshAccounts(force: true)
@@ -2770,11 +3036,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         RunLoop.current.add(timer, forMode: .common)
         refreshTimer = timer
 
-        let animationTimer = Timer(timeInterval: 0.65, repeats: true) { [weak self] _ in
-            self?.advanceStatusAnimation()
-        }
-        RunLoop.current.add(animationTimer, forMode: .common)
-        statusAnimationTimer = animationTimer
         installPanelDismissHandlers()
     }
 
@@ -2880,7 +3141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
 
                 if rebuildVisiblePanel, self.accountPanel?.isVisible == true {
-                    self.refreshAccountPanelContent()
+                    self.refreshAccountPanelContentIfVisible()
                 }
             }
         }
@@ -2927,7 +3188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func refreshAccounts(force: Bool = false) {
-        guard !isSwitching else { return }
+        guard !isSwitching, !isRedeemingReset else { return }
         if demoMode {
             accounts = demoAccounts()
             resetCreditsByEmail = demoResetCreditsByEmail(for: accounts)
@@ -2951,6 +3212,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         isRefreshing = true
         lastRefreshStartedAt = Date()
+        let shouldRefreshResets = !isRefreshingResetCredits && ResetRefreshPolicy.shouldRefresh(
+            lastRefresh: lastResetCreditsRefreshAt,
+            ttl: resetCreditsRefreshInterval,
+            force: force
+        )
+        if shouldRefreshResets {
+            isRefreshingResetCredits = true
+        }
         if force {
             rebuildMenu()
         }
@@ -2962,44 +3231,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 usedSkipAPI = result.status == 0
             }
             let parsed = result.status == 0 ? self.parseAccounts(result.output, usageIsLive: !usedSkipAPI) : []
-            let resetResults = result.status == 0
-                ? self.fetchResetCredits(for: parsed)
-                : [:]
-            DispatchQueue.main.async {
+            let completedResult = result
+            let completedUsedSkipAPI = usedSkipAPI
+            Task {
+                let resetResults: [String: ResetCreditsSnapshot]
+                if completedResult.status == 0 && shouldRefreshResets {
+                    resetResults = await self.fetchResetCredits(for: parsed)
+                } else {
+                    resetResults = [:]
+                }
+                await MainActor.run {
                 self.isRefreshing = false
-                let newAccounts: [CodexAccount]
+                if shouldRefreshResets {
+                    self.isRefreshingResetCredits = false
+                }
+                var newAccounts: [CodexAccount]
                 let newError: String?
-                if result.status == 0 {
+                if completedResult.status == 0 {
                     newAccounts = parsed
                     newError = parsed.isEmpty ? "No codex-auth accounts found." : nil
                 } else {
                     newAccounts = []
-                    newError = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    newError = completedResult.output.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
+                newAccounts = self.applyingDirectUsageOverrides(to: newAccounts)
 
                 let previousResetCredits = self.resetCreditsByEmail
-                if result.status == 0 {
-                    if usedSkipAPI {
-                        self.resetCreditsByEmail = Dictionary(uniqueKeysWithValues: parsed.map { account in
-                            (
-                                account.email,
-                                ResetCreditsSnapshot(
-                                    availableCount: nil,
-                                    credits: [],
-                                    lastUpdatedText: self.lastUpdatedText(),
-                                    lastError: "usage refresh was local only"
-                                )
-                            )
-                        })
-                    } else {
-                        self.resetCreditsByEmail = resetResults
-                    }
+                if completedResult.status == 0 && shouldRefreshResets {
+                    self.resetCreditsByEmail = resetResults
+                    self.lastResetCreditsRefreshAt = Date()
                 }
 
                 let stateChanged = newAccounts != self.accounts || newError != self.lastError || self.resetCreditsByEmail != previousResetCredits
-                if result.status == 0 {
+                if completedResult.status == 0 {
                     self.lastUpdatedAt = Date()
-                    self.lastUsageRefreshWasLocalOnly = !usedSkipAPI && (result.output.contains("mode=local-only") || !self.apiModeActive)
+                    self.lastUsageRefreshWasLocalOnly = !completedUsedSkipAPI && (completedResult.output.contains("mode=local-only") || !self.apiModeActive)
                 }
                 if stateChanged || force || self.accountPanel?.isVisible == true {
                     self.accounts = newAccounts
@@ -3012,6 +3278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 if self.pendingForceRefresh {
                     self.pendingForceRefresh = false
                     self.refreshAccounts(force: true)
+                }
                 }
             }
         }
@@ -3127,7 +3394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         settingsMenu = menu
         statusItem.menu = nil
         if accountPanel?.isVisible == true {
-            refreshAccountPanelContent()
+            refreshAccountPanelContentIfVisible()
         } else {
             accountPanel = nil
         }
@@ -3314,13 +3581,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func armSwitchConfirmation(for email: String) {
         armedSwitchClearWorkItem?.cancel()
         armedSwitchEmail = email
-        refreshAccountPanelContent()
+        refreshAccountPanelContentIfVisible()
 
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, self.armedSwitchEmail == email else { return }
             self.armedSwitchEmail = nil
             if self.accountPanel?.isVisible == true {
-                self.refreshAccountPanelContent()
+                self.refreshAccountPanelContentIfVisible()
             }
         }
         armedSwitchClearWorkItem = workItem
@@ -3392,19 +3659,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         switch action {
         case .usageView:
             accountPanelMode = .usage
-            refreshAccountPanelContent()
         case .settingsView:
             accountPanelMode = .settings
-            refreshAccountPanelContent()
         case .routeBView:
             accountPanelMode = .routeB
-            refreshAccountPanelContent()
         case .resetCreditsView:
             accountPanelMode = .resets
-            refreshAccountPanelContent()
+            refreshResetCreditsIfNeeded(force: false)
         case .apiView:
             accountPanelMode = .usage
-            refreshAccountPanelContent()
         case .addAccount:
             addAccountBrowser()
         case .addDeviceAccount:
@@ -3467,7 +3730,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
         }
         if accountPanel?.isVisible == true {
-            refreshAccountPanelContent()
+            refreshAccountPanelContentIfVisible()
         }
     }
 
@@ -3475,13 +3738,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard routeBProviderProfiles.contains(where: { $0.id == profileID }) else { return }
         UserDefaults.standard.set(profileID, forKey: selectedRouteBProfileDefaultsKey)
         if accountPanel?.isVisible == true {
-            refreshAccountPanelContent()
+            refreshAccountPanelContentIfVisible()
         }
     }
 
     private func showResetCreditsPanel() {
         accountPanelMode = .resets
-        refreshAccountPanelContent()
+        refreshAccountPanelContentIfVisible()
+        refreshResetCreditsIfNeeded(force: false)
+    }
+
+    private func refreshResetCreditsIfNeeded(force: Bool) {
+        guard !demoMode, !isRedeemingReset, !isRefreshingResetCredits else { return }
+        guard ResetRefreshPolicy.shouldRefresh(
+            lastRefresh: lastResetCreditsRefreshAt,
+            ttl: resetCreditsRefreshInterval,
+            force: force
+        ) else { return }
+
+        let accountSnapshot = accounts
+        guard !accountSnapshot.isEmpty else { return }
+        isRefreshingResetCredits = true
+        Task {
+            let refreshed = await fetchResetCredits(for: accountSnapshot)
+            await MainActor.run {
+                self.isRefreshingResetCredits = false
+                self.lastResetCreditsRefreshAt = Date()
+                self.resetCreditsByEmail = refreshed
+                self.rebuildMenu()
+            }
+        }
     }
 
     private func redeemResetCreditFromPanel(email: String, creditID: String) {
@@ -3637,6 +3923,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func confirmAndRedeemResetCredit(account: CodexAccount, credit: ResetCredit) {
+        guard !isRedeemingReset else {
+            showAlert(title: "Reset already running", message: "Wait for the current reset verification to finish before using another credit.")
+            return
+        }
         let expires = credit.expiresAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown expiry"
         let alert = NSAlert()
         alert.messageText = "Redeem reset for \(toolbarLabel(for: account))?"
@@ -3650,41 +3940,367 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func redeemResetCredit(account: CodexAccount, credit: ResetCredit) {
+        guard !isRedeemingReset else { return }
+        guard case .success(let auth) = savedAuth(forEmail: account.email) else {
+            showAlert(title: "Reset failed", message: "The saved ChatGPT session for this account could not be read.")
+            return
+        }
+
         closeAccountPanel()
         let label = toolbarLabel(for: account)
-        statusItem.button?.title = "\(label) · reset"
-        let accountsToRefresh = accounts
+        let creditBefore = resetCreditsByEmail[account.email]?.displayCount
+        isRedeemingReset = true
+        setResetStatus("\(label) · resetting…")
 
-        DispatchQueue.global(qos: .utility).async {
-            let result = self.consumeResetCredit(email: account.email, creditID: credit.id)
-            let resetResults = self.fetchResetCredits(for: accountsToRefresh)
-            let usageResult = self.runCodexAuth(["list", "--debug"])
-            let parsed = usageResult.status == 0 ? self.parseAccounts(usageResult.output, usageIsLive: true) : accountsToRefresh
-
-            DispatchQueue.main.async {
-                self.resetCreditsByEmail = resetResults
-                if usageResult.status == 0 {
-                    self.accounts = parsed
-                    self.lastUpdatedAt = Date()
-                    self.lastError = parsed.isEmpty ? "No codex-auth accounts found." : nil
+        Task {
+            let result = await self.consumeResetCredit(using: auth, creditID: credit.id)
+            switch result {
+            case .failure(let message):
+                await MainActor.run {
+                    self.isRedeemingReset = false
+                    self.setResetStatus("\(label) · reset failed")
+                    self.recordReset(
+                        label: label,
+                        result: "failed",
+                        creditBefore: creditBefore,
+                        creditAfter: nil,
+                        usage: nil,
+                        detail: message
+                    )
+                    self.showAlert(title: "Reset failed", message: message)
+                    self.setResetStatus(nil)
+                    self.rebuildMenu()
                 }
 
-                switch result {
-                case .success(let message):
+            case .success(let receipt):
+                await MainActor.run {
+                    self.setResetStatus("\(label) · verifying…")
+                }
+
+                let verification = await self.verifyResetRedemption(
+                    auth: auth,
+                    previousCreditCount: creditBefore,
+                    receipt: receipt
+                )
+
+                await MainActor.run {
+                    if let resetSnapshot = verification.resetSnapshot {
+                        self.resetCreditsByEmail[account.email] = resetSnapshot
+                        self.lastResetCreditsRefreshAt = Date()
+                    }
+                    if let usageSnapshot = verification.usageSnapshot {
+                        self.applyDirectUsage(usageSnapshot, toEmail: account.email)
+                    }
+                    self.lastUpdatedAt = Date()
+                    self.lastError = nil
+                    self.isRedeemingReset = false
+
+                    let creditAfter = verification.resetSnapshot?.displayCount
+                    let confirmed = verification.creditConfirmed && verification.usageConfirmed
+                    let resultName = confirmed ? "confirmed" : "pending"
+                    self.setResetStatus(confirmed ? "\(label) · reset ✓" : "\(label) · pending")
+                    self.recordReset(
+                        label: label,
+                        result: resultName,
+                        creditBefore: creditBefore,
+                        creditAfter: creditAfter,
+                        usage: verification.usageSnapshot,
+                        detail: verification.detail
+                    )
                     self.rebuildMenu()
-                    self.showAlert(title: "Reset redeemed", message: message)
-                case .failure(let message):
+
+                    if confirmed {
+                        self.showAlert(
+                            title: "Reset confirmed",
+                            message: self.resetConfirmationMessage(
+                                label: label,
+                                creditBefore: creditBefore,
+                                creditAfter: creditAfter,
+                                usage: verification.usageSnapshot,
+                                attempts: verification.attempts
+                            )
+                        )
+                    } else {
+                        self.scheduleResetFollowUps(
+                            auth: auth,
+                            label: label,
+                            previousCreditCount: creditBefore,
+                            receipt: receipt
+                        )
+                        self.showAlert(
+                            title: "Reset accepted — verification pending",
+                            message: self.resetPendingMessage(
+                                label: label,
+                                creditBefore: creditBefore,
+                                creditAfter: creditAfter,
+                                usage: verification.usageSnapshot,
+                                detail: verification.detail
+                            )
+                        )
+                    }
+
+                    self.setResetStatus(nil)
                     self.rebuildMenu()
-                    self.showAlert(title: "Reset failed", message: message)
+                    self.scheduleAllResetCreditsRefresh()
                 }
             }
         }
     }
 
-    private func advanceStatusAnimation() {
-        guard !isSwitching, !accounts.isEmpty else { return }
-        statusAnimationFrame += 1
-        updateStatusTitle()
+    private func verifyResetRedemption(
+        auth: SavedAccountAuth,
+        previousCreditCount: Int?,
+        receipt: ResetConsumeReceipt
+    ) async -> ResetVerificationOutcome {
+        let delays: [TimeInterval] = [0, 0.8, 1.5, 3.0]
+        var latestReset: ResetCreditsSnapshot?
+        var latestUsage: DirectUsageSnapshot?
+        var creditConfirmed = false
+        var usageConfirmed = false
+        var details: [String] = []
+
+        for (index, delay) in delays.enumerated() {
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+
+            async let resetResult = fetchResetCredits(using: auth)
+            async let usageResult = fetchDirectUsage(using: auth)
+            let (resolvedReset, resolvedUsage) = await (resetResult, usageResult)
+
+            switch resolvedReset {
+            case .success(let snapshot):
+                latestReset = snapshot
+                if let before = previousCreditCount, let after = snapshot.displayCount {
+                    creditConfirmed = after < before
+                } else if previousCreditCount == nil {
+                    creditConfirmed = receipt.windowsReset > 0
+                }
+            case .failure(let message):
+                details.append("credit check \(index + 1): \(message)")
+            }
+
+            switch resolvedUsage {
+            case .success(let snapshot):
+                latestUsage = snapshot
+                let primaryReady = snapshot.fiveHour.remainingPercent >= 95
+                let weeklyReady = receipt.windowsReset <= 1 || snapshot.weekly.remainingPercent >= 95
+                usageConfirmed = primaryReady && weeklyReady
+            case .failure(let message):
+                details.append("usage check \(index + 1): \(message)")
+            }
+
+            if creditConfirmed && usageConfirmed {
+                return ResetVerificationOutcome(
+                    resetSnapshot: latestReset,
+                    usageSnapshot: latestUsage,
+                    creditConfirmed: true,
+                    usageConfirmed: true,
+                    attempts: index + 1,
+                    detail: "Backend credit and usage windows confirmed."
+                )
+            }
+        }
+
+        let status = [
+            creditConfirmed ? "credit confirmed" : "credit not yet confirmed",
+            usageConfirmed ? "usage confirmed" : "usage not yet confirmed"
+        ].joined(separator: "; ")
+        let detail = details.isEmpty ? status : "\(status). \(details.suffix(2).joined(separator: "; "))"
+        return ResetVerificationOutcome(
+            resetSnapshot: latestReset,
+            usageSnapshot: latestUsage,
+            creditConfirmed: creditConfirmed,
+            usageConfirmed: usageConfirmed,
+            attempts: delays.count,
+            detail: detail
+        )
+    }
+
+    private func applyDirectUsage(_ usage: DirectUsageSnapshot, toEmail email: String) {
+        directUsageOverrides[email] = (usage, Date().addingTimeInterval(35))
+        accounts = accounts.map { account in
+            guard account.email == email else { return account }
+            return CodexAccount(
+                selector: account.selector,
+                email: account.email,
+                plan: account.plan,
+                fiveHourUsage: directUsageText(usage.fiveHour, weekly: false),
+                weeklyUsage: directUsageText(usage.weekly, weekly: true),
+                fiveHourUsedPercent: usage.fiveHour.remainingPercent,
+                weeklyUsedPercent: usage.weekly.remainingPercent,
+                lastActivity: account.lastActivity,
+                isActive: account.isActive
+            )
+        }
+        lastUsageRefreshWasLocalOnly = false
+    }
+
+    private func applyingDirectUsageOverrides(to source: [CodexAccount]) -> [CodexAccount] {
+        let now = Date()
+        directUsageOverrides = directUsageOverrides.filter { $0.value.expiresAt > now }
+        return source.map { account in
+            guard let override = directUsageOverrides[account.email] else { return account }
+            return CodexAccount(
+                selector: account.selector,
+                email: account.email,
+                plan: account.plan,
+                fiveHourUsage: directUsageText(override.usage.fiveHour, weekly: false),
+                weeklyUsage: directUsageText(override.usage.weekly, weekly: true),
+                fiveHourUsedPercent: override.usage.fiveHour.remainingPercent,
+                weeklyUsedPercent: override.usage.weekly.remainingPercent,
+                lastActivity: account.lastActivity,
+                isActive: account.isActive
+            )
+        }
+    }
+
+    private func directUsageText(_ window: UsageLimitWindowSnapshot, weekly: Bool) -> String {
+        guard let resetAt = window.resetAt else {
+            return "\(window.remainingPercent)%"
+        }
+        let formatter = weekly ? DateFormatter.directWeeklyUsage : DateFormatter.directFiveHourUsage
+        return "\(window.remainingPercent)% (\(formatter.string(from: resetAt)))"
+    }
+
+    private func resetConfirmationMessage(
+        label: String,
+        creditBefore: Int?,
+        creditAfter: Int?,
+        usage: DirectUsageSnapshot?,
+        attempts: Int
+    ) -> String {
+        let creditText = resetCreditChangeText(before: creditBefore, after: creditAfter)
+        let usageText = resetUsageSummary(usage)
+        return "ChatGPT confirmed the reset for account \(label).\n\n\(usageText)\n\(creditText)\nVerified after \(attempts) check\(attempts == 1 ? "" : "s")."
+    }
+
+    private func resetPendingMessage(
+        label: String,
+        creditBefore: Int?,
+        creditAfter: Int?,
+        usage: DirectUsageSnapshot?,
+        detail: String
+    ) -> String {
+        "ChatGPT accepted the reset request for account \(label), but both the credit count and live usage window have not agreed yet.\n\n\(resetUsageSummary(usage))\n\(resetCreditChangeText(before: creditBefore, after: creditAfter))\n\nThe switcher will retry silently. \(detail)"
+    }
+
+    private func resetCreditChangeText(before: Int?, after: Int?) -> String {
+        switch (before, after) {
+        case let (before?, after?):
+            return "Reset credits: \(before) → \(after)"
+        case let (nil, after?):
+            return "Reset credits now available: \(after)"
+        default:
+            return "Reset-credit count is still being checked."
+        }
+    }
+
+    private func resetUsageSummary(_ usage: DirectUsageSnapshot?) -> String {
+        guard let usage else { return "Live usage is still being checked." }
+        return "5-hour: \(usage.fiveHour.remainingPercent)% remaining · Weekly: \(usage.weekly.remainingPercent)% remaining"
+    }
+
+    private func scheduleResetFollowUps(
+        auth: SavedAccountAuth,
+        label: String,
+        previousCreditCount: Int?,
+        receipt: ResetConsumeReceipt
+    ) {
+        runResetFollowUp(
+            auth: auth,
+            label: label,
+            previousCreditCount: previousCreditCount,
+            receipt: receipt,
+            remainingDelays: [8, 22]
+        )
+    }
+
+    private func runResetFollowUp(
+        auth: SavedAccountAuth,
+        label: String,
+        previousCreditCount: Int?,
+        receipt: ResetConsumeReceipt,
+        remainingDelays: [TimeInterval]
+    ) {
+        guard let delay = remainingDelays.first else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            async let pendingReset = self.fetchResetCredits(using: auth)
+            async let pendingUsage = self.fetchDirectUsage(using: auth)
+            let (resetResult, usageResult) = await (pendingReset, pendingUsage)
+            let resetSnapshot: ResetCreditsSnapshot?
+            let usageSnapshot: DirectUsageSnapshot?
+
+            switch resetResult {
+            case .success(let snapshot): resetSnapshot = snapshot
+            case .failure: resetSnapshot = nil
+            }
+            switch usageResult {
+            case .success(let snapshot): usageSnapshot = snapshot
+            case .failure: usageSnapshot = nil
+            }
+
+            let creditConfirmed: Bool
+            if let before = previousCreditCount, let after = resetSnapshot?.displayCount {
+                creditConfirmed = after < before
+            } else {
+                creditConfirmed = previousCreditCount == nil && receipt.windowsReset > 0
+            }
+            let usageConfirmed: Bool
+            if let usageSnapshot {
+                usageConfirmed = usageSnapshot.fiveHour.remainingPercent >= 95
+                    && (receipt.windowsReset <= 1 || usageSnapshot.weekly.remainingPercent >= 95)
+            } else {
+                usageConfirmed = false
+            }
+
+            await MainActor.run {
+                if let resetSnapshot {
+                    self.resetCreditsByEmail[auth.email] = resetSnapshot
+                    self.lastResetCreditsRefreshAt = Date()
+                }
+                if let usageSnapshot {
+                    self.applyDirectUsage(usageSnapshot, toEmail: auth.email)
+                    self.lastUpdatedAt = Date()
+                }
+                self.rebuildMenu()
+
+                if creditConfirmed && usageConfirmed {
+                    self.recordReset(
+                        label: label,
+                        result: "confirmed-later",
+                        creditBefore: previousCreditCount,
+                        creditAfter: resetSnapshot?.displayCount,
+                        usage: usageSnapshot,
+                        detail: "Silent follow-up confirmed the backend credit and usage windows."
+                    )
+                } else {
+                    self.runResetFollowUp(
+                        auth: auth,
+                        label: label,
+                        previousCreditCount: previousCreditCount,
+                        receipt: receipt,
+                        remainingDelays: Array(remainingDelays.dropFirst())
+                    )
+                }
+            }
+        }
+    }
+
+    private func scheduleAllResetCreditsRefresh() {
+        let accountSnapshot = accounts
+        Task {
+            try? await Task.sleep(nanoseconds: 45_000_000_000)
+            let refreshed = await self.fetchResetCredits(for: accountSnapshot)
+            await MainActor.run {
+                for (email, snapshot) in refreshed where snapshot.lastError == nil {
+                    self.resetCreditsByEmail[email] = snapshot
+                }
+                self.lastResetCreditsRefreshAt = Date()
+                self.rebuildMenu()
+            }
+        }
     }
 
     private func updateStatusTitle() {
@@ -3711,6 +4327,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func statusAttributedTitle() -> NSAttributedString {
+        if let resetStatusText {
+            return NSAttributedString(
+                string: resetStatusText,
+                attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .semibold),
+                    .foregroundColor: NSColor.systemOrange
+                ]
+            )
+        }
         let result = NSMutableAttributedString()
         for (index, account) in toolbarStatusAccounts().enumerated() {
             if index > 0 {
@@ -3725,7 +4350,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func statusTitleKey() -> String {
-        toolbarStatusAccounts().map { account in
+        if let resetStatusText {
+            return "reset|\(resetStatusText)"
+        }
+        return toolbarStatusAccounts().map { account in
             [
                 toolbarStatusText(for: account),
                 account.email,
@@ -3736,6 +4364,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 toolbarDisplayStyle.rawValue
             ].joined(separator: "|")
         }.joined(separator: "||")
+    }
+
+    private func setResetStatus(_ text: String?) {
+        resetStatusText = text
+        currentStatusTitleKey = ""
+        updateStatusTitle()
     }
 
     private func statusItemLength(for title: NSAttributedString) -> CGFloat {
@@ -4964,8 +5598,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func refreshAccountPanelContentIfVisible() {
-        if accountPanel?.isVisible == true {
-            refreshAccountPanelContent()
+        guard accountPanel?.isVisible == true, !panelRefreshScheduled else { return }
+        panelRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.panelRefreshScheduled = false
+            guard self.accountPanel?.isVisible == true else { return }
+            self.refreshAccountPanelContent()
         }
     }
 
@@ -5484,6 +6123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 try FileManager.default.removeItem(at: accountAuthURL)
             }
             try FileManager.default.copyItem(at: activeAuthURL, to: accountAuthURL)
+            _ = AuthBackupPruner.prune(in: accountAuthURL.deletingLastPathComponent(), keepingPerAccount: 10)
             return nil
         } catch {
             return error.localizedDescription
@@ -5584,13 +6224,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 changed = true
             }
 
-            if !config.contains("SKY_CUA_SERVICE_PATH") {
+            if let computerUseApp = ComputerUsePluginLocator.latestApp(homeDirectory: home) {
                 let codePathLine = "CODEX_CLI_PATH = \"\(codexDesktopResourcesPath)/codex\""
-                let servicePathLine = "SKY_CUA_SERVICE_PATH = \"\(home)/.codex/plugins/cache/openai-bundled/computer-use/1.0.799/Codex Computer Use.app\""
-                if config.contains(codePathLine) {
+                let servicePathLine = "SKY_CUA_SERVICE_PATH = \"\(computerUseApp.path)\""
+                let pattern = #"(?m)^SKY_CUA_SERVICE_PATH = ".*"$"#
+                if let regex = try? NSRegularExpression(pattern: pattern),
+                   let match = regex.firstMatch(in: config, range: NSRange(config.startIndex..., in: config)),
+                   let range = Range(match.range, in: config) {
+                    if config[range] != servicePathLine {
+                        config.replaceSubrange(range, with: servicePathLine)
+                        changed = true
+                    }
+                } else if config.contains(codePathLine) {
                     config = config.replacingOccurrences(of: codePathLine, with: "\(servicePathLine)\n\(codePathLine)")
+                    changed = true
                 }
-                changed = true
             }
 
             if changed {
@@ -5790,25 +6438,136 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         .failure("API mode disabled")
     }
 
-    private func fetchResetCredits(for accounts: [CodexAccount]) -> [String: ResetCreditsSnapshot] {
-        Dictionary(uniqueKeysWithValues: accounts.map { account in
-            let snapshot: ResetCreditsSnapshot
-            switch savedAuth(forEmail: account.email) {
-            case .success(let auth):
-                switch fetchResetCredits(using: auth) {
-                case .success(let fetched):
-                    snapshot = fetched
-                case .failure(let message):
-                    snapshot = ResetCreditsSnapshot(availableCount: nil, credits: [], lastUpdatedText: "just now", lastError: message)
-                }
-            case .failure(let message):
-                snapshot = ResetCreditsSnapshot(availableCount: nil, credits: [], lastUpdatedText: "never", lastError: message)
-            }
-            return (account.email, snapshot)
-        })
+    private func fetchDirectUsage(using auth: SavedAccountAuth) async -> DirectUsageFetchResult {
+        guard let url = URL(string: "https://chatgpt.com/backend-api/wham/usage") else {
+            return .failure("usage endpoint URL is invalid")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 12
+        request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(auth.accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
+        request.setValue("codex-1", forHTTPHeaderField: "OpenAI-Beta")
+        request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
+
+        let payload: HTTPPayload
+        do {
+            payload = try await CodexHTTPClient.send(request, retries: 1)
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+        guard payload.statusCode == 200 else {
+            return .failure("usage endpoint returned \(payload.statusCode)")
+        }
+        return parseDirectUsageResponse(payload.data)
     }
 
-    private func fetchResetCredits(using auth: SavedAccountAuth) -> ResetCreditsFetchResult {
+    private func parseDirectUsageResponse(_ responseData: Data) -> DirectUsageFetchResult {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+            let rateLimit = object["rate_limit"] as? [String: Any],
+            let primary = rateLimit["primary_window"] as? [String: Any],
+            let secondary = rateLimit["secondary_window"] as? [String: Any],
+            let primaryUsed = integerValue(primary["used_percent"]),
+            let secondaryUsed = integerValue(secondary["used_percent"])
+        else {
+            return .failure("usage endpoint returned incomplete rate-limit data")
+        }
+
+        let primaryReset = integerValue(primary["reset_at"]).map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        let secondaryReset = integerValue(secondary["reset_at"]).map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        return .success(DirectUsageSnapshot(
+            fiveHour: UsageLimitWindowSnapshot(
+                remainingPercent: max(0, min(100, 100 - primaryUsed)),
+                resetAt: primaryReset
+            ),
+            weekly: UsageLimitWindowSnapshot(
+                remainingPercent: max(0, min(100, 100 - secondaryUsed)),
+                resetAt: secondaryReset
+            )
+        ))
+    }
+
+    private func integerValue(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        if let value = value as? String { return Int(value) }
+        return nil
+    }
+
+    private func resetLogicSelfTest() -> String {
+        let usageFixture: [String: Any] = [
+            "rate_limit": [
+                "primary_window": ["used_percent": 1, "reset_at": 1_800_000_000],
+                "secondary_window": ["used_percent": 17, "reset_at": 1_800_604_800]
+            ]
+        ]
+        guard
+            let usageData = try? JSONSerialization.data(withJSONObject: usageFixture),
+            case .success(let usage) = parseDirectUsageResponse(usageData),
+            usage.fiveHour.remainingPercent == 99,
+            usage.weekly.remainingPercent == 83
+        else {
+            return "Reset logic self-test FAILED: usage conversion"
+        }
+
+        let consumeFixture: [String: Any] = ["code": "reset", "windows_reset": 2]
+        guard
+            let consumeData = try? JSONSerialization.data(withJSONObject: consumeFixture),
+            case .success(let receipt) = parseResetConsumeResponse(consumeData),
+            receipt.windowsReset == 2
+        else {
+            return "Reset logic self-test FAILED: consume confirmation"
+        }
+
+        let rejectedFixture: [String: Any] = ["code": "noop", "windows_reset": 0]
+        guard
+            let rejectedData = try? JSONSerialization.data(withJSONObject: rejectedFixture),
+            case .failure = parseResetConsumeResponse(rejectedData)
+        else {
+            return "Reset logic self-test FAILED: false-success rejection"
+        }
+        return "Reset logic self-test passed"
+    }
+
+    private func fetchResetCredits(for accounts: [CodexAccount]) async -> [String: ResetCreditsSnapshot] {
+        var results: [String: ResetCreditsSnapshot] = [:]
+        let batchSize = 3
+        var startIndex = 0
+
+        while startIndex < accounts.count {
+            let endIndex = min(startIndex + batchSize, accounts.count)
+            let batch = Array(accounts[startIndex..<endIndex])
+            let batchResults = await withTaskGroup(of: (String, ResetCreditsSnapshot).self) { group in
+                for account in batch {
+                    group.addTask {
+                        let snapshot: ResetCreditsSnapshot
+                        switch self.savedAuth(forEmail: account.email) {
+                        case .success(let auth):
+                            switch await self.fetchResetCredits(using: auth) {
+                            case .success(let fetched):
+                                snapshot = fetched
+                            case .failure(let message):
+                                snapshot = ResetCreditsSnapshot(availableCount: nil, credits: [], lastUpdatedText: "just now", lastError: message)
+                            }
+                        case .failure(let message):
+                            snapshot = ResetCreditsSnapshot(availableCount: nil, credits: [], lastUpdatedText: "never", lastError: message)
+                        }
+                        return (account.email, snapshot)
+                    }
+                }
+                var resolved: [(String, ResetCreditsSnapshot)] = []
+                for await result in group { resolved.append(result) }
+                return resolved
+            }
+            for (email, snapshot) in batchResults { results[email] = snapshot }
+            startIndex = endIndex
+        }
+        return results
+    }
+
+    private func fetchResetCredits(using auth: SavedAccountAuth) async -> ResetCreditsFetchResult {
         guard let url = URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits") else {
             return .failure("reset endpoint URL is invalid")
         }
@@ -5821,30 +6580,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         request.setValue("codex-1", forHTTPHeaderField: "OpenAI-Beta")
         request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var responseData: Data?
-        var statusCode: Int?
-        var responseError: Error?
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            responseData = data
-            responseError = error
-            statusCode = (response as? HTTPURLResponse)?.statusCode
-            semaphore.signal()
-        }.resume()
-
-        guard semaphore.wait(timeout: .now() + 14) == .success else {
-            return .failure("reset endpoint timed out")
+        let payload: HTTPPayload
+        do {
+            payload = try await CodexHTTPClient.send(request, retries: 1)
+        } catch {
+            return .failure(error.localizedDescription)
         }
-
-        if let responseError {
-            return .failure(responseError.localizedDescription)
+        guard payload.statusCode == 200 else {
+            return .failure("reset endpoint returned \(payload.statusCode)")
         }
-        guard statusCode == 200, let responseData else {
-            let statusText = statusCode.map(String.init) ?? "unknown"
-            return .failure("reset endpoint returned \(statusText)")
-        }
-        guard let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
+        guard let object = try? JSONSerialization.jsonObject(with: payload.data) as? [String: Any] else {
             return .failure("reset endpoint returned unreadable JSON")
         }
 
@@ -5867,12 +6612,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ))
     }
 
-    private func consumeResetCredit(email: String, creditID: String) -> ResetCreditRedemptionResult {
+    private func consumeResetCredit(using auth: SavedAccountAuth, creditID: String) async -> ResetCreditRedemptionResult {
         guard !creditID.isEmpty else {
             return .failure("The selected reset credit is missing its backend id.")
-        }
-        guard case .success(let auth) = savedAuth(forEmail: email) else {
-            return .failure("Could not read the saved Codex auth for this account.")
         }
         guard let url = URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume") else {
             return .failure("Reset consume endpoint URL is invalid.")
@@ -5896,36 +6638,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         request.httpBody = bodyData
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var responseData: Data?
-        var statusCode: Int?
-        var responseError: Error?
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            responseData = data
-            responseError = error
-            statusCode = (response as? HTTPURLResponse)?.statusCode
-            semaphore.signal()
-        }.resume()
-
-        guard semaphore.wait(timeout: .now() + 24) == .success else {
-            return .failure("Reset request timed out.")
+        let payload: HTTPPayload
+        do {
+            // A reset POST is deliberately never retried: an ambiguous response must not spend two credits.
+            payload = try await CodexHTTPClient.send(request, retries: 0)
+        } catch {
+            return .failure(error.localizedDescription)
         }
-        if let responseError {
-            return .failure(responseError.localizedDescription)
+        guard payload.statusCode == 200 else {
+            return .failure("Reset endpoint returned \(payload.statusCode). No credit was treated as redeemed.")
         }
-        guard statusCode == 200, let responseData else {
-            let statusText = statusCode.map(String.init) ?? "unknown"
-            let detail = responseData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            return .failure("Reset endpoint returned \(statusText). \(detail)")
-        }
+        return parseResetConsumeResponse(payload.data)
+    }
 
+    private func parseResetConsumeResponse(_ responseData: Data) -> ResetCreditRedemptionResult {
         guard let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
-            return .success("The reset request completed, then the app refreshed the account state.")
+            return .failure("Reset endpoint returned HTTP 200 but did not provide readable confirmation.")
         }
-        let code = object["code"] as? String ?? "reset"
-        let windows = object["windows_reset"] as? Int ?? 0
-        return .success("Reset redeemed for \(compactEmail(email)). Code: \(code). Windows reset: \(windows).")
+        let code = (object["code"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let windows: Int
+        if let value = integerValue(object["windows_reset"]) {
+            windows = value
+        } else if let values = object["windows_reset"] as? [Any] {
+            windows = values.count
+        } else {
+            windows = 0
+        }
+        let successFlag = object["success"] as? Bool ?? false
+        let acceptedCodes = ["ok", "reset", "success", "rate_limits_reset", "reset_applied"]
+        let codeAccepted = acceptedCodes.contains(code.lowercased())
+        guard successFlag || windows > 0 || codeAccepted else {
+            return .failure("Reset endpoint returned HTTP 200 without confirming that any rate-limit window was reset.")
+        }
+
+        let displayCode = code.isEmpty ? "confirmed" : code
+        return .success(ResetConsumeReceipt(
+            code: displayCode,
+            windowsReset: max(1, windows),
+            message: "ChatGPT accepted the reset request (\(displayCode); \(max(1, windows)) window\(max(1, windows) == 1 ? "" : "s"))."
+        ))
     }
 
     private func savedAuth(forEmail email: String) -> SavedAccountAuthResult {
@@ -6060,56 +6811,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func codexAuthPath() -> String? {
         let home = NSHomeDirectory()
-        let nvmNodeDir = URL(fileURLWithPath: "\(home)/.nvm/versions/node")
-        if let versions = try? FileManager.default.contentsOfDirectory(at: nvmNodeDir, includingPropertiesForKeys: nil) {
-            for versionDir in versions {
-                let path = versionDir.appendingPathComponent("bin/codex-auth").path
-                if FileManager.default.isExecutableFile(atPath: path) {
-                    return path
-                }
-            }
-        }
-
-        let candidates = [
+        let stableCandidates = [
             "\(home)/.local/bin/codex-auth",
             "/opt/homebrew/bin/codex-auth",
             "/usr/local/bin/codex-auth"
         ]
-
-        if let path = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+        if let path = stableCandidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }),
+           ProcessRunner.run(path, ["--version"], environment: augmentedEnvironment(), timeout: 4).status == 0 {
             return path
         }
 
-        // Fallback using interactive zsh shell to check user's environment path
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-l", "-c", "which codex-auth"]
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                if let path = path, !path.isEmpty, FileManager.default.isExecutableFile(atPath: path) {
+        let nvmNodeDir = URL(fileURLWithPath: "\(home)/.nvm/versions/node")
+        if let versions = try? FileManager.default.contentsOfDirectory(at: nvmNodeDir, includingPropertiesForKeys: nil) {
+            let orderedVersions = versions.sorted {
+                $0.lastPathComponent.compare($1.lastPathComponent, options: .numeric) == .orderedDescending
+            }
+            for versionDir in orderedVersions {
+                let path = versionDir.appendingPathComponent("bin/codex-auth").path
+                if FileManager.default.isExecutableFile(atPath: path),
+                   ProcessRunner.run(path, ["--version"], environment: augmentedEnvironment(), timeout: 4).status == 0 {
                     return path
                 }
             }
-        } catch {}
+        }
+
+        let fallback = ProcessRunner.run(
+            "/bin/zsh",
+            ["-l", "-c", "which codex-auth"],
+            environment: augmentedEnvironment(),
+            timeout: 5
+        )
+        if fallback.status == 0 {
+            let path = fallback.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !path.isEmpty, FileManager.default.isExecutableFile(atPath: path) {
+                return path
+            }
+        }
 
         return nil
     }
 
     private func run(_ executable: String, _ args: [String]) -> CommandResult {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = args
-        process.standardOutput = pipe
-        process.standardError = pipe
         var environment = augmentedEnvironment()
         let bundledNode = "\(codexDesktopResourcesPath)/node"
         if FileManager.default.isExecutableFile(atPath: bundledNode) {
@@ -6119,43 +6861,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if FileManager.default.isExecutableFile(atPath: bundledCodex) {
             environment["CODEX_CLI_PATH"] = bundledCodex
         }
-        process.environment = environment
-
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            return CommandResult(status: process.terminationStatus, output: output)
-        } catch {
-            return CommandResult(status: 127, output: error.localizedDescription)
-        }
+        return ProcessRunner.run(executable, args, environment: environment, timeout: commandTimeout(for: executable, arguments: args))
     }
 
     private func runWithInput(_ executable: String, _ args: [String], input: String) -> CommandResult {
-        let process = Process()
-        let outputPipe = Pipe()
-        let inputPipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = args
-        process.standardInput = inputPipe
-        process.standardOutput = outputPipe
-        process.standardError = outputPipe
-        process.environment = augmentedEnvironment()
+        ProcessRunner.run(
+            executable,
+            args,
+            environment: augmentedEnvironment(),
+            input: input.data(using: .utf8),
+            timeout: 90
+        )
+    }
 
-        do {
-            try process.run()
-            if let data = input.data(using: .utf8) {
-                inputPipe.fileHandleForWriting.write(data)
-            }
-            inputPipe.fileHandleForWriting.closeFile()
-            let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            return CommandResult(status: process.terminationStatus, output: output)
-        } catch {
-            return CommandResult(status: 127, output: error.localizedDescription)
+    private func commandTimeout(for executable: String, arguments: [String]) -> TimeInterval {
+        let command = URL(fileURLWithPath: executable).lastPathComponent
+        if command == "codex-auth" {
+            return arguments.first == "login" ? 180 : 20
         }
+        if command == "open" || command == "osascript" { return 15 }
+        return 12
     }
 
     private func augmentedEnvironment() -> [String: String] {
@@ -6232,6 +6957,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return (try? JSONDecoder().decode([SwitchHistoryEntry].self, from: data)) ?? []
     }
 
+    private func recordReset(
+        label: String,
+        result: String,
+        creditBefore: Int?,
+        creditAfter: Int?,
+        usage: DirectUsageSnapshot?,
+        detail: String
+    ) {
+        let entry = ResetHistoryEntry(
+            date: Date(),
+            accountLabel: label,
+            result: result,
+            creditBefore: creditBefore,
+            creditAfter: creditAfter,
+            fiveHourRemaining: usage?.fiveHour.remainingPercent,
+            weeklyRemaining: usage?.weekly.remainingPercent,
+            detail: detail
+        )
+        var entries = resetHistory()
+        entries.insert(entry, at: 0)
+        entries = Array(entries.prefix(30))
+        if let data = try? JSONEncoder().encode(entries) {
+            UserDefaults.standard.set(data, forKey: resetHistoryDefaultsKey)
+        }
+    }
+
+    private func resetHistory() -> [ResetHistoryEntry] {
+        guard let data = UserDefaults.standard.data(forKey: resetHistoryDefaultsKey) else { return [] }
+        return (try? JSONDecoder().decode([ResetHistoryEntry].self, from: data)) ?? []
+    }
+
     private func diagnosticsText() -> String {
         let version = currentAppVersion()
         let auth = codexAuthPath() == nil ? "missing" : "available"
@@ -6239,6 +6995,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let entries = switchHistory().prefix(12).map { entry in
             let stamp = DateFormatter.diagnosticStamp.string(from: entry.date)
             return "\(stamp) | \(entry.fromLabel)->\(entry.toLabel) | \(entry.automatic ? "automatic" : "manual") | \(entry.reason) | \(entry.result)"
+        }
+        let resetEntries = resetHistory().prefix(8).map { entry in
+            let stamp = DateFormatter.diagnosticStamp.string(from: entry.date)
+            let credits = resetCreditChangeText(before: entry.creditBefore, after: entry.creditAfter)
+            let usage = entry.fiveHourRemaining.map { "5h \($0)%" } ?? "5h ?"
+            let weekly = entry.weeklyRemaining.map { "weekly \($0)%" } ?? "weekly ?"
+            return "\(stamp) | reset \(entry.accountLabel) | \(entry.result) | \(credits) | \(usage), \(weekly) | \(entry.detail)"
         }
         return ([
             "Codex Account Switcher \(version)",
@@ -6249,8 +7012,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             "auto switch: \(autoSwitchMode.rawValue)",
             "auto resume: \(autoResumeMode.rawValue)",
             "refresh: \(lastUpdatedText())",
-            "history:"
-        ] + (entries.isEmpty ? ["none"] : entries)).joined(separator: "\n")
+            "switch history:"
+        ] + (entries.isEmpty ? ["none"] : entries) + [
+            "reset history:"
+        ] + (resetEntries.isEmpty ? ["none"] : resetEntries)).joined(separator: "\n")
     }
 
     private func showDiagnostics() {
