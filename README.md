@@ -186,23 +186,23 @@ Screenshots are generated from demo account data and should stay that way for fu
 
 Usage refresh depends on `codex-auth` and normal saved ChatGPT account sessions. API token mode is disabled in the current local build.
 
-## Releases
+## Versions
 
-- Version 1.8.2: graphite control-deck redesign plus a reset and efficiency hardening pass. Reset redemption now verifies both credit consumption and live usage recovery, reset-credit reads are cached separately from fast usage refreshes, account reset checks run concurrently with a small cap, network calls use async URLSession, helper commands have timeouts, Computer Use discovery is version-independent, old auth backups are pruned safely, and infrastructure/reset regression checks are included.
-- Version 1.7: reliability and efficiency update. Adds native event-driven lifecycle monitoring, verified switching with rollback, best-account scoring and cooldown, privacy-safe history and diagnostics, clipboard restoration, and ad-hoc signed release packages with SHA-256 checksums.
-
-- Version 1.5: adds the in-window reset-credit screen, replacing the old floating reset submenu. Reset credits are grouped by account, sorted by expiry, color-coded by time left (green for 20+ days, orange for 8-20 days, red for 7 days or less), and use slimmer guarded action buttons. This release also includes the safe Route B profile-selection prototype and refreshed README screenshots/docs.
-- Version 1.4: major reset-credit update. The switcher now checks reset credits across every saved Codex account, shows the total resets available in the compact panel bar, and opens a per-account breakdown with each reset credit's grant time and expiry date. Reset rows can be redeemed from the menu after an explicit confirmation, then the app refreshes usage and reset-credit state so you can see the new limits immediately.
-- Version 1.34: removes per-account live/snapshot badges from the panel, keeps clearer active/inactive account styling, and refreshes public screenshots without badge overlays.
-- Version 1.33: adds switch previews, expanded health checks, GitHub update checking, clearer refresh wording, better empty/error actions, and refreshed public screenshots/README presentation.
-- Version 1.32: improves usage refresh freshness when values do not numerically change, clarifies inactive local snapshots, and refines the account panel so inactive accounts keep their green/orange/red usage colours while active accounts stand out with stronger weight and saturation.
-- Version 1.31: smooths the menu-bar percentage display on newer macOS releases, tightens the percentage padding, restores click-again-to-close behavior for the menu-bar panel, and keeps the recent three/four-account compact grid, expired-login detection, safer Codex relaunch handling, and ChatGPT-account-only switching updates.
-- Version 1.3: adds panel-card switch confirmation, account-label edit badges, a shorter account panel, cleaner compact Settings layout, compact Settings health checks, clearer refresh/stale status text, and tooltips on icon-only controls.
-- Version 1.2.2: fixes menu-bar percentage display issues and makes usage readings more stable when live Codex usage data is unavailable. Includes recent compact panel design refinements, clearer account controls, reset-time display polish, and lighter active/inactive visual styling.
-- Version 1.2.1: matches the in-app active account card, border, 5-hour ring, label, and active pill to the same green/orange/red usage status colors used in the menu bar, with light and dark mode background tints.
-- Version 1.2: adds the compact modern account panel redesign, in-panel settings redesign, visible account email labels, active account menu-bar usage colors, and a weekly/5-hour menu-bar usage selector.
-- Version 1.1: adds the account panel UI and dialog-based settings controls.
-- Version 1.00: first public release.
+- [v1.8.2](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.8.2)
+- [v1.7](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.7)
+- [v1.6.1](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.6.1)
+- [v1.5](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.5)
+- [v1.4](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.4)
+- [v1.34](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.34)
+- [v1.33](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.33)
+- [v1.32](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.32)
+- [v1.31](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.31)
+- [v1.3](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.3)
+- [v1.2.2](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.2.2)
+- [v1.2.1](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.2.1)
+- [v1.2](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.2)
+- [v1.1](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.1)
+- [v1.0](https://github.com/lordydord/Codex-Account-Switcher/releases/tag/v1.0)
 
 ## Unsigned Distribution
 
