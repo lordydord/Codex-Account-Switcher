@@ -2778,7 +2778,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var didResignActiveObserver: NSObjectProtocol?
     private var suppressStatusToggleOpenUntil: Date?
     private var panelRefreshScheduled = false
-    private var switchingTitle = "Switching"
+    private var statusAnimationTitle = "Switching"
+    private var statusAnimationGeneration = 0
     private let switchAnimationFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     private var notifiedLowUsageKeys = Set<String>()
     private var notifiedAutoSwitchPauseKeys = Set<String>()
@@ -3950,7 +3951,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let label = toolbarLabel(for: account)
         let creditBefore = resetCreditsByEmail[account.email]?.displayCount
         isRedeemingReset = true
-        setResetStatus("\(label) · resetting…")
+        beginStatusAnimation(title: "Resetting")
 
         Task {
             let result = await self.consumeResetCredit(using: auth, creditID: credit.id)
@@ -3958,6 +3959,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             case .failure(let message):
                 await MainActor.run {
                     self.isRedeemingReset = false
+                    self.endStatusAnimation()
                     self.setResetStatus("\(label) · reset failed")
                     self.recordReset(
                         label: label,
@@ -3974,7 +3976,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
             case .success(let receipt):
                 await MainActor.run {
-                    self.setResetStatus("\(label) · verifying…")
+                    _ = self.beginStatusAnimation(title: "Verifying")
                 }
 
                 let verification = await self.verifyResetRedemption(
@@ -3998,6 +4000,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     let creditAfter = verification.resetSnapshot?.displayCount
                     let confirmed = verification.creditConfirmed && verification.usageConfirmed
                     let resultName = confirmed ? "confirmed" : "pending"
+                    self.endStatusAnimation()
                     self.setResetStatus(confirmed ? "\(label) · reset ✓" : "\(label) · pending")
                     self.recordReset(
                         label: label,
@@ -5486,14 +5489,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         isSwitching = true
         let previous = accounts.first(where: { $0.isActive })
         let automatic = allowAutoResume
-        beginSwitchAnimation(label: target.map(displayLabel(for:)) ?? query)
+        let switchStatusAnimationGeneration = beginStatusAnimation(title: "Switching")
         refreshAccountPanelContentIfVisible()
 
         DispatchQueue.global(qos: .userInitiated).async {
             if !self.apiModeActive, let syncError = self.syncActiveAuthSnapshot() {
                 DispatchQueue.main.async {
                     self.isSwitching = false
-                    self.endSwitchAnimation()
+                    self.endStatusAnimation()
                     self.updateStatusTitle()
                     self.showAlert(title: "Could not save active token", message: syncError)
                     self.refreshAccounts(force: true)
@@ -5506,7 +5509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 DispatchQueue.main.async {
                     self.recordSwitch(from: previous, to: target, automatic: automatic, reason: "auth switch", result: "failed")
                     self.isSwitching = false
-                    self.endSwitchAnimation()
+                    self.endStatusAnimation()
                     self.updateStatusTitle()
                     self.showAlert(title: "Switch failed", message: switchResult.output)
                     self.refreshAccounts(force: true)
@@ -5524,7 +5527,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 DispatchQueue.main.async {
                     self.recordSwitch(from: previous, to: target, automatic: automatic, reason: "verification", result: "rolled back")
                     self.isSwitching = false
-                    self.endSwitchAnimation()
+                    self.endStatusAnimation()
                     self.updateStatusTitle()
                     self.showAlert(title: "Switch could not be verified", message: rollbackMessage)
                     self.refreshAccounts(force: true)
@@ -5535,7 +5538,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             DispatchQueue.main.sync {
                 self.apiModeActive = false
                 self.isSwitching = false
-                self.endSwitchAnimation()
                 self.refreshAccounts(force: true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                     guard let self, !self.isSwitching else { return }
@@ -5556,6 +5558,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     }
                 }
                 self.refreshAccounts(force: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    guard let self, !self.isSwitching else { return }
+                    self.endStatusAnimation(expectedGeneration: switchStatusAnimationGeneration)
+                    self.updateStatusTitle()
+                }
             }
         }
     }
@@ -5574,27 +5581,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return CommandResult(status: 1, output: "codex-auth did not report the requested account as active after three checks")
     }
 
-    private func beginSwitchAnimation(label: String) {
+    @discardableResult
+    private func beginStatusAnimation(title: String) -> Int {
         switchAnimationTimer?.invalidate()
+        statusAnimationGeneration += 1
         switchAnimationFrame = 0
-        switchingTitle = "\(limitedLabel(label)) · switching"
-        updateSwitchAnimationTitle()
+        statusAnimationTitle = title
+        updateStatusAnimationTitle()
         switchAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.switchAnimationFrame += 1
-            self.updateSwitchAnimationTitle()
+            self.updateStatusAnimationTitle()
         }
+        return statusAnimationGeneration
     }
 
-    private func updateSwitchAnimationTitle() {
+    private func updateStatusAnimationTitle() {
         let frame = switchAnimationFrames[switchAnimationFrame % switchAnimationFrames.count]
-        statusItem.button?.attributedTitle = NSAttributedString(string: "")
-        statusItem.button?.title = "\(switchingTitle) \(frame)"
+        setResetStatus("\(statusAnimationTitle) \(frame)")
     }
 
-    private func endSwitchAnimation() {
+    private func endStatusAnimation(expectedGeneration: Int? = nil) {
+        if let expectedGeneration, expectedGeneration != statusAnimationGeneration {
+            return
+        }
         switchAnimationTimer?.invalidate()
         switchAnimationTimer = nil
+        setResetStatus(nil)
     }
 
     private func refreshAccountPanelContentIfVisible() {

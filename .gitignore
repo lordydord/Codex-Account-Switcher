@@ -10,3 +10,5 @@ derivedData/
 *.sha256
 assets/v1.8-redesign-preview.jpeg
 mockups/
+output/
+.playwright-cli/

@@ -32,7 +32,7 @@ Work from the root of this repository.
 
 ## Behavior Summary
 
-- Current local update is v1.8.2 / build 182.
+- Current local update is v1.8.3 / build 183.
 - Menu bar supports detailed and compact 5-hour or weekly usage displays.
 - Active account is bright; inactive accounts are dimmed.
 - Dropdown shows 5-hour usage for all accounts.

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Codex Account Switcher is a native macOS menu bar companion for switching ChatGPT accounts, tracking Codex usage, and keeping work moving.">
+  <meta name="theme-color" content="#0d1110">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Codex Account Switcher for macOS">
+  <meta property="og:description" content="Switch safely, watch live limits, and keep work moving from the macOS menu bar.">
+  <meta property="og:image" content="https://lordydord.github.io/Codex-Account-Switcher/assets/site-preview.png">
+  <meta property="og:url" content="https://lordydord.github.io/Codex-Account-Switcher/">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Codex Account Switcher for macOS</title>
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="preload" as="image" href="assets/screenshots/panel.webp" type="image/webp">
+  <link rel="stylesheet" href="styles.css?v=1.8.3">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <nav class="nav shell" aria-label="Primary navigation">
+      <a class="wordmark" href="#top">
+        <span class="wordmark-mark" aria-hidden="true">C</span>
+        <span>Account Switcher</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#reliability">Reliability</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/lordydord/Codex-Account-Switcher">GitHub</a>
+      </div>
+      <a class="nav-download" href="https://github.com/lordydord/Codex-Account-Switcher/releases/latest">Download</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero shell" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow">Native macOS companion</p>
+        <h1>Your Codex accounts, in one glance.</h1>
+        <p class="hero-intro">Switch safely, watch live limits, and keep work moving from a native macOS menu bar companion.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://github.com/lordydord/Codex-Account-Switcher/releases/latest">Download v1.8.3</a>
+          <a class="button button-secondary" href="https://github.com/lordydord/Codex-Account-Switcher">View source</a>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="Codex Account Switcher application preview">
+        <div class="window-shadow" aria-hidden="true"></div>
+        <img src="assets/screenshots/panel.webp" width="860" height="1040" fetchpriority="high" alt="Codex Account Switcher panel showing four demo accounts and their remaining usage">
+      </div>
+    </section>
+
+    <section class="proof shell reveal" aria-label="Product principles">
+      <div><strong>Native AppKit</strong><span>Small, fast, and at home on macOS.</span></div>
+      <div><strong>Local by design</strong><span>No bundled accounts, tokens, or usage data.</span></div>
+      <div><strong>Verified switching</strong><span>Checks the target and rolls back on failure.</span></div>
+    </section>
+
+    <section class="overview section shell" id="features">
+      <div class="overview-heading reveal">
+        <h2>Know which account can keep going.</h2>
+        <p>Live five-hour and weekly limits make the best next account clear before a switch interrupts your work.</p>
+      </div>
+      <div class="overview-stage reveal">
+        <img class="menu-strip" src="assets/screenshots/menubar.webp" width="1800" height="164" loading="lazy" alt="Menu bar usage display with demo account initials">
+        <div class="panel-frame">
+          <img src="assets/screenshots/panel.webp" width="860" height="1040" loading="lazy" alt="Account panel with active and inactive demo accounts">
+        </div>
+        <div class="feature-notes" aria-label="Account overview features">
+          <article><strong>Active at a glance</strong><p>Colour and contrast keep the current account obvious.</p></article>
+          <article><strong>Limits that read quickly</strong><p>See both usage windows without opening ChatGPT settings.</p></article>
+          <article><strong>Four-account layout</strong><p>A compact grid keeps every saved account within reach.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="resets section shell">
+      <div class="resets-visual reveal">
+        <div class="phone-frame">
+          <img src="assets/screenshots/resets.webp" width="850" height="1135" loading="lazy" alt="Reset credits grouped across demo accounts with expiry colours">
+        </div>
+      </div>
+      <div class="resets-copy reveal">
+        <p class="eyebrow">Reset credits</p>
+        <h2>Use every credit at the right moment.</h2>
+        <p>See available reset credits across saved accounts, spot urgent expiry dates, and confirm before spending one.</p>
+        <dl class="detail-list">
+          <div><dt>Grouped</dt><dd>Credits stay organised by account.</dd></div>
+          <div><dt>Time-aware</dt><dd>Expiry urgency is easy to scan.</dd></div>
+          <div><dt>Guarded</dt><dd>Every redemption asks for confirmation.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="automation section shell">
+      <div class="automation-copy reveal">
+        <h2>Automatic when limits bite. Quiet when they do not.</h2>
+        <p>Set a threshold, choose a better account, and optionally continue the active task after the verified switch.</p>
+      </div>
+      <div class="settings-frame reveal">
+        <img src="assets/screenshots/settings.webp" width="740" height="1000" loading="lazy" alt="Switcher settings showing display, automation, and health controls">
+      </div>
+      <div class="automation-grid reveal">
+        <article class="auto-wide"><span>Switch safely</span><strong>Target checks, rollback, and an anti-bounce cooldown protect the current session.</strong></article>
+        <article><span>Continue work</span><strong>Optional resume prompts return focus to the active task.</strong></article>
+        <article><span>Follow ChatGPT</span><strong>Launch and close the companion alongside the desktop app.</strong></article>
+      </div>
+    </section>
+
+    <section class="reliability section shell" id="reliability">
+      <div class="reliability-heading reveal">
+        <p class="eyebrow">Built for the awkward cases</p>
+        <h2>Switching should fail predictably.</h2>
+        <p>Account changes are verified, network work is bounded, and private diagnostics stay on your Mac.</p>
+      </div>
+      <div class="reliability-list reveal">
+        <article><h3>Transactional switching</h3><p>The requested account must become active. If it does not, the switcher restores the previous account.</p></article>
+        <article><h3>Bounded background work</h3><p>Command timeouts and capped concurrent refreshes prevent a stalled dependency from freezing the menu bar.</p></article>
+        <article><h3>Privacy-safe diagnostics</h3><p>Copy useful health details without publishing credentials, account IDs, or local usage snapshots.</p></article>
+        <article><h3>Native lifecycle monitor</h3><p>Event-driven monitoring follows ChatGPT without a constant polling loop.</p></article>
+      </div>
+    </section>
+
+    <section class="install section shell" id="install">
+      <div class="install-copy reveal">
+        <h2>Install it. Add accounts. Get back to work.</h2>
+        <ol>
+          <li><strong>Download</strong><span>Get v1.8.3 from GitHub Releases.</span></li>
+          <li><strong>Open</strong><span>Move the app to Applications and approve the first launch.</span></li>
+          <li><strong>Connect</strong><span>Install codex-auth and add each account once.</span></li>
+        </ol>
+      </div>
+      <div class="install-panel reveal">
+        <p>Required account helper</p>
+        <div class="command-row">
+          <code id="install-command">npm install -g @loongphy/codex-auth</code>
+          <button type="button" data-copy="#install-command">Copy</button>
+        </div>
+        <a class="button button-primary" href="https://github.com/lordydord/Codex-Account-Switcher/releases/latest">View release downloads</a>
+        <small>Requires macOS 14 or later. The release is ad-hoc signed and includes a SHA-256 checksum.</small>
+      </div>
+    </section>
+
+    <section class="faq section shell" aria-labelledby="faq-title">
+      <div class="faq-heading reveal">
+        <h2 id="faq-title">Good to know.</h2>
+      </div>
+      <div class="faq-grid reveal">
+        <article><h3>Does it store my credentials?</h3><p>The public app contains no credentials. Saved Codex sessions remain in the local codex-auth account store.</p></article>
+        <article><h3>Does it work with ChatGPT Desktop?</h3><p>Yes. ChatGPT is the primary supported desktop app, with legacy Codex.app support retained.</p></article>
+        <article><h3>Can it spend reset credits automatically?</h3><p>No. Reset redemption always requires explicit confirmation and is verified after the request completes.</p></article>
+        <article><h3>Is it notarized?</h3><p>Not yet. Releases are ad-hoc signed, checksummed, and may require right-clicking Open on first launch.</p></article>
+      </div>
+    </section>
+
+    <section class="final-cta shell reveal">
+      <h2>Keep the active account obvious.</h2>
+      <a class="button button-primary" href="https://github.com/lordydord/Codex-Account-Switcher/releases/latest">Download for macOS</a>
+    </section>
+  </main>
+
+  <footer class="footer shell">
+    <div class="wordmark"><span class="wordmark-mark" aria-hidden="true">C</span><span>Account Switcher</span></div>
+    <p>Native Codex account control. Local by design.</p>
+    <div>
+      <a href="https://github.com/lordydord/Codex-Account-Switcher/blob/main/LICENSE">MIT License</a>
+      <a href="https://github.com/lordydord/Codex-Account-Switcher">GitHub</a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
