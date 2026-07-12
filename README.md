@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="assets/social-preview.png" alt="Codex Account Switcher product overview" width="100%">
+  <a href="https://lordydord.github.io/Codex-Account-Switcher/">
+    <img src="docs/assets/readme-hero.png" alt="Codex Account Switcher product website showing the macOS account panel" width="100%">
+  </a>
 </p>
 
 <p align="center">
