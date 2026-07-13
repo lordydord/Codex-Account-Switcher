@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.3.1 - 2026-07-13
+
+- Treat an absent, not-yet-started post-reset usage window as 100% available instead of retaining a stale 0% value.
+- Make manual refresh query the direct live usage endpoint for the active account.
+- Continue pending reset verification for several minutes while ChatGPT applies the new limits.
+- Close the status-level account panel and present reset-spending confirmation centrally so it cannot appear underneath the switcher.
+
 ## 1.8.3 - 2026-07-12
 
 - Keep switch, reset, and verification progress in a compact single-line menu bar state.

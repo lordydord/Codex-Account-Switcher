@@ -3235,12 +3235,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let completedResult = result
             let completedUsedSkipAPI = usedSkipAPI
             Task {
-                let resetResults: [String: ResetCreditsSnapshot]
-                if completedResult.status == 0 && shouldRefreshResets {
-                    resetResults = await self.fetchResetCredits(for: parsed)
-                } else {
-                    resetResults = [:]
-                }
+                async let resetTask = self.fetchResetCreditsForRefresh(
+                    accounts: parsed,
+                    shouldRefresh: completedResult.status == 0 && shouldRefreshResets
+                )
+                async let directUsageTask = self.fetchDirectUsageForRefresh(
+                    accounts: parsed,
+                    shouldRefresh: completedResult.status == 0 && force
+                )
+                let (resetResults, directUsage) = await (resetTask, directUsageTask)
                 await MainActor.run {
                 self.isRefreshing = false
                 if shouldRefreshResets {
@@ -3255,6 +3258,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     newAccounts = []
                     newError = completedResult.output.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
+                if let directUsage {
+                    self.directUsageOverrides[directUsage.email] = (
+                        usage: directUsage.usage,
+                        expiresAt: Date().addingTimeInterval(35)
+                    )
+                }
                 newAccounts = self.applyingDirectUsageOverrides(to: newAccounts)
 
                 let previousResetCredits = self.resetCreditsByEmail
@@ -3267,6 +3276,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 if completedResult.status == 0 {
                     self.lastUpdatedAt = Date()
                     self.lastUsageRefreshWasLocalOnly = !completedUsedSkipAPI && (completedResult.output.contains("mode=local-only") || !self.apiModeActive)
+                    if directUsage != nil {
+                        self.lastUsageRefreshWasLocalOnly = false
+                    }
                 }
                 if stateChanged || force || self.accountPanel?.isVisible == true {
                     self.accounts = newAccounts
@@ -3935,6 +3947,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Redeem Reset")
         alert.addButton(withTitle: "Cancel")
+
+        // The account panel deliberately sits at status-bar level, above a normal
+        // modal alert. Hide it before presenting the spending confirmation so the
+        // confirmation cannot be obscured underneath the menu-bar panel.
+        closeAccountPanel()
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.level = .modalPanel
+        alert.window.center()
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         redeemResetCredit(account: account, credit: credit)
@@ -4215,7 +4235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             label: label,
             previousCreditCount: previousCreditCount,
             receipt: receipt,
-            remainingDelays: [8, 22]
+            remainingDelays: [8, 22, 60, 120]
         )
     }
 
@@ -6451,6 +6471,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         .failure("API mode disabled")
     }
 
+    private func fetchResetCreditsForRefresh(
+        accounts: [CodexAccount],
+        shouldRefresh: Bool
+    ) async -> [String: ResetCreditsSnapshot] {
+        guard shouldRefresh else { return [:] }
+        return await fetchResetCredits(for: accounts)
+    }
+
+    private func fetchDirectUsageForRefresh(
+        accounts: [CodexAccount],
+        shouldRefresh: Bool
+    ) async -> (email: String, usage: DirectUsageSnapshot)? {
+        guard shouldRefresh, let active = accounts.first(where: { $0.isActive }) else { return nil }
+        guard case .success(let auth) = savedAuth(forEmail: active.email) else { return nil }
+        guard case .success(let usage) = await fetchDirectUsage(using: auth) else { return nil }
+        return (active.email, usage)
+    }
+
     private func fetchDirectUsage(using auth: SavedAccountAuth) async -> DirectUsageFetchResult {
         guard let url = URL(string: "https://chatgpt.com/backend-api/wham/usage") else {
             return .failure("usage endpoint URL is invalid")
@@ -6479,26 +6517,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func parseDirectUsageResponse(_ responseData: Data) -> DirectUsageFetchResult {
         guard
             let object = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-            let rateLimit = object["rate_limit"] as? [String: Any],
-            let primary = rateLimit["primary_window"] as? [String: Any],
-            let secondary = rateLimit["secondary_window"] as? [String: Any],
-            let primaryUsed = integerValue(primary["used_percent"]),
-            let secondaryUsed = integerValue(secondary["used_percent"])
+            let rateLimit = object["rate_limit"] as? [String: Any]
         else {
             return .failure("usage endpoint returned incomplete rate-limit data")
         }
 
-        let primaryReset = integerValue(primary["reset_at"]).map { Date(timeIntervalSince1970: TimeInterval($0)) }
-        let secondaryReset = integerValue(secondary["reset_at"]).map { Date(timeIntervalSince1970: TimeInterval($0)) }
-        return .success(DirectUsageSnapshot(
-            fiveHour: UsageLimitWindowSnapshot(
-                remainingPercent: max(0, min(100, 100 - primaryUsed)),
-                resetAt: primaryReset
-            ),
-            weekly: UsageLimitWindowSnapshot(
-                remainingPercent: max(0, min(100, 100 - secondaryUsed)),
-                resetAt: secondaryReset
+        typealias ParsedWindow = (snapshot: UsageLimitWindowSnapshot, duration: Int?)
+        func parsedWindow(_ raw: Any?) -> ParsedWindow? {
+            guard
+                let window = raw as? [String: Any],
+                let usedPercent = integerValue(window["used_percent"])
+            else {
+                return nil
+            }
+            let resetAt = integerValue(window["reset_at"]).map {
+                Date(timeIntervalSince1970: TimeInterval($0))
+            }
+            return (
+                UsageLimitWindowSnapshot(
+                    remainingPercent: max(0, min(100, 100 - usedPercent)),
+                    resetAt: resetAt
+                ),
+                integerValue(window["limit_window_seconds"])
             )
+        }
+
+        let primary = parsedWindow(rateLimit["primary_window"])
+        let secondary = parsedWindow(rateLimit["secondary_window"])
+        guard primary != nil || secondary != nil else {
+            return .failure("usage endpoint returned incomplete rate-limit data")
+        }
+
+        let fullUnusedWindow = UsageLimitWindowSnapshot(remainingPercent: 100, resetAt: nil)
+        let fiveHour: UsageLimitWindowSnapshot
+        let weekly: UsageLimitWindowSnapshot
+
+        if let primary, let secondary {
+            if let primaryDuration = primary.duration, let secondaryDuration = secondary.duration {
+                if primaryDuration <= secondaryDuration {
+                    fiveHour = primary.snapshot
+                    weekly = secondary.snapshot
+                } else {
+                    fiveHour = secondary.snapshot
+                    weekly = primary.snapshot
+                }
+            } else {
+                // Preserve the established backend ordering when duration metadata
+                // is unavailable: primary is the short window, secondary is weekly.
+                fiveHour = primary.snapshot
+                weekly = secondary.snapshot
+            }
+        } else if let only = primary ?? secondary {
+            // Directly after a reset ChatGPT may omit a window until that window is
+            // first used. An absent window is therefore full, not an error or stale 0%.
+            if let duration = only.duration, duration >= 86_400 {
+                fiveHour = fullUnusedWindow
+                weekly = only.snapshot
+            } else {
+                fiveHour = only.snapshot
+                weekly = fullUnusedWindow
+            }
+        } else {
+            return .failure("usage endpoint returned incomplete rate-limit data")
+        }
+
+        return .success(DirectUsageSnapshot(
+            fiveHour: fiveHour,
+            weekly: weekly
         ))
     }
 
@@ -6512,8 +6597,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func resetLogicSelfTest() -> String {
         let usageFixture: [String: Any] = [
             "rate_limit": [
-                "primary_window": ["used_percent": 1, "reset_at": 1_800_000_000],
-                "secondary_window": ["used_percent": 17, "reset_at": 1_800_604_800]
+                "primary_window": ["used_percent": 1, "limit_window_seconds": 18_000, "reset_at": 1_800_000_000],
+                "secondary_window": ["used_percent": 17, "limit_window_seconds": 604_800, "reset_at": 1_800_604_800]
             ]
         ]
         guard
@@ -6523,6 +6608,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             usage.weekly.remainingPercent == 83
         else {
             return "Reset logic self-test FAILED: usage conversion"
+        }
+
+        let postResetUsageFixture: [String: Any] = [
+            "rate_limit": [
+                "primary_window": ["used_percent": 0, "limit_window_seconds": 604_800, "reset_at": 1_800_604_800],
+                "secondary_window": NSNull()
+            ]
+        ]
+        guard
+            let postResetUsageData = try? JSONSerialization.data(withJSONObject: postResetUsageFixture),
+            case .success(let postResetUsage) = parseDirectUsageResponse(postResetUsageData),
+            postResetUsage.fiveHour.remainingPercent == 100,
+            postResetUsage.weekly.remainingPercent == 100
+        else {
+            return "Reset logic self-test FAILED: post-reset missing window"
         }
 
         let consumeFixture: [String: Any] = ["code": "reset", "windows_reset": 2]
