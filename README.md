@@ -16,7 +16,7 @@
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&logo=apple&logoColor=white">
   <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-f97316?style=flat-square&logo=swift&logoColor=white">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-1f2937?style=flat-square">
-  <img alt="Current release 1.8.3.1" src="https://img.shields.io/badge/release-v1.8.3.1-16a34a?style=flat-square">
+  <img alt="Current release 1.8.3.2" src="https://img.shields.io/badge/release-v1.8.3.2-16a34a?style=flat-square">
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-1f2937?style=flat-square">
 </p>
 
@@ -50,9 +50,9 @@ Codex Account Switcher is a native macOS menu bar companion for people who use m
   <img src="assets/screenshot-resets.png" alt="Reset credits grouped by privacy-safe demo account with expiry colours" width="390">
 </p>
 
-## Install v1.8.3.1
+## Install v1.8.3.2
 
-1. Download `Codex-Account-Switcher-v1.8.3.1.zip` from the [latest release](https://github.com/lordydord/Codex-Account-Switcher/releases/latest).
+1. Download `Codex-Account-Switcher-v1.8.3.2.zip` from the [latest release](https://github.com/lordydord/Codex-Account-Switcher/releases/latest).
 2. Extract the archive and move `Codex Account Switcher.app` to Applications.
 3. Right-click the app and choose **Open** on first launch if macOS asks.
 4. Install and configure [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth):
@@ -70,7 +70,6 @@ The release is ad-hoc signed and includes a SHA-256 checksum. It is not Apple-no
 
 - macOS 14 or later
 - ChatGPT Desktop in `/Applications/ChatGPT.app`
-- Legacy `/Applications/Codex.app` is also supported
 - `codex-auth` with at least one saved ChatGPT account
 - Xcode command line tools only when building from source
 
@@ -109,16 +108,18 @@ This repository does not contain ChatGPT credentials, auth tokens, account IDs, 
 
 The switcher works with local `codex-auth` sessions. It does not add analytics, advertising, or a separate cloud account.
 
-## Version 1.8.3.1
+## Version 1.8.3.2
 
-Version 1.8.3.1 fixes post-reset usage displays that could remain stuck at 0%, makes manual refresh read the live usage endpoint, keeps checking while ChatGPT applies a reset, and presents reset confirmation centrally instead of beneath the menu-bar panel.
+Version 1.8.3.2 refreshes live five-hour and weekly limits for every saved account, preserves the last reliable reading when one account cannot refresh, and replaces the outer Liquid Glass effect with a softer frosted popover background.
 
-See every published build on the [Releases page](https://github.com/lordydord/Codex-Account-Switcher/releases).
+Read the full [1.8.3.2 release notes](docs/release-notes/v1.8.3.2.md), or see every published build on the [Releases page](https://github.com/lordydord/Codex-Account-Switcher/releases).
 
 ## Project map
 
 ```text
 Sources/main.swift             AppKit application and account workflows
+Sources/Models.swift           Shared app models and visual theme
+Sources/PanelComponents.swift  Account panel views and controls
 Sources/AppInfrastructure.swift  Networking, commands, and shared infrastructure
 Sources/LifecycleMonitor.swift Native ChatGPT lifecycle companion
 Tests                         Infrastructure and reset-logic regression checks

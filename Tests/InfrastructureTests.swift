@@ -3,15 +3,18 @@ import Foundation
 @main
 struct InfrastructureTests {
     private static var failures: [String] = []
+    private static var assertionCount = 0
 
     static func main() throws {
         testResetRefreshPolicy()
+        testUsageRefreshPolicy()
+        testLastKnownGoodSnapshotPolicy()
         try testComputerUsePluginDiscovery()
         try testBackupPruning()
         testProcessRunner()
 
         if failures.isEmpty {
-            print("Infrastructure tests passed (12 assertions).")
+            print("Infrastructure tests passed (\(assertionCount) assertions).")
             return
         }
 
@@ -22,6 +25,7 @@ struct InfrastructureTests {
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
+        assertionCount += 1
         if !condition() { failures.append(message) }
     }
 
@@ -31,6 +35,34 @@ struct InfrastructureTests {
         expect(!ResetRefreshPolicy.shouldRefresh(lastRefresh: now.addingTimeInterval(-299), now: now, ttl: 300, force: false), "fresh reset snapshot should stay cached")
         expect(ResetRefreshPolicy.shouldRefresh(lastRefresh: now.addingTimeInterval(-300), now: now, ttl: 300, force: false), "expired reset snapshot should refresh")
         expect(ResetRefreshPolicy.shouldRefresh(lastRefresh: now, now: now, ttl: 300, force: true), "forced reset refresh should bypass cache")
+    }
+
+    private static func testUsageRefreshPolicy() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        expect(UsageRefreshPolicy.shouldRefresh(lastRefresh: nil, now: now, ttl: 30, force: false), "missing usage snapshot should refresh")
+        expect(!UsageRefreshPolicy.shouldRefresh(lastRefresh: now.addingTimeInterval(-29), now: now, ttl: 30, force: false), "fresh usage snapshot should stay cached")
+        expect(UsageRefreshPolicy.shouldRefresh(lastRefresh: now.addingTimeInterval(-30), now: now, ttl: 30, force: false), "expired usage snapshot should refresh")
+        expect(UsageRefreshPolicy.shouldRefresh(lastRefresh: now, now: now, ttl: 30, force: true), "forced usage refresh should bypass cache")
+    }
+
+    private static func testLastKnownGoodSnapshotPolicy() {
+        let current = ["one": 100, "two": 100, "removed": 42]
+        let merged = LastKnownGoodSnapshotPolicy.merged(
+            current: current,
+            successful: ["one": 99],
+            validKeys: Set(["one", "two", "three"])
+        )
+        expect(merged["one"] == 99, "new successful usage should replace the previous reading")
+        expect(merged["two"] == 100, "a failed or missing refresh should retain the last known good reading")
+        expect(merged["three"] == nil, "an account without a successful reading should not invent usage")
+        expect(merged["removed"] == nil, "removed accounts should be pruned from retained usage")
+
+        let unchanged = LastKnownGoodSnapshotPolicy.merged(
+            current: ["one": 100, "two": 100],
+            successful: [:],
+            validKeys: Set(["one", "two"])
+        )
+        expect(unchanged == ["one": 100, "two": 100], "a wholly failed refresh should not roll usage back")
     }
 
     private static func testComputerUsePluginDiscovery() throws {

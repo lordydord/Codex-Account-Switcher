@@ -99,6 +99,28 @@ enum ResetRefreshPolicy {
     }
 }
 
+enum UsageRefreshPolicy {
+    static func shouldRefresh(lastRefresh: Date?, now: Date = Date(), ttl: TimeInterval, force: Bool) -> Bool {
+        guard !force else { return true }
+        guard let lastRefresh else { return true }
+        return now.timeIntervalSince(lastRefresh) >= ttl
+    }
+}
+
+enum LastKnownGoodSnapshotPolicy {
+    static func merged<Key: Hashable, Value>(
+        current: [Key: Value],
+        successful: [Key: Value],
+        validKeys: Set<Key>
+    ) -> [Key: Value] {
+        var merged = current.filter { validKeys.contains($0.key) }
+        for (key, value) in successful where validKeys.contains(key) {
+            merged[key] = value
+        }
+        return merged
+    }
+}
+
 enum ComputerUsePluginLocator {
     static func latestApp(in versionsRoot: URL, fileManager: FileManager = .default) -> URL? {
         guard let versionDirectories = try? fileManager.contentsOfDirectory(

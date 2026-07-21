@@ -4,347 +4,6 @@ import Foundation
 import Security
 import UserNotifications
 
-struct CodexAccount: Equatable {
-    let selector: String
-    let email: String
-    let plan: String
-    let fiveHourUsage: String
-    let weeklyUsage: String
-    let fiveHourUsedPercent: Int?
-    let weeklyUsedPercent: Int?
-    let lastActivity: String
-    let isActive: Bool
-}
-
-struct HealthStatus {
-    let title: String
-    let value: String
-    let color: NSColor
-}
-
-struct SwitchHistoryEntry: Codable {
-    let date: Date
-    let fromLabel: String
-    let toLabel: String
-    let automatic: Bool
-    let reason: String
-    let result: String
-}
-
-struct ResetHistoryEntry: Codable {
-    let date: Date
-    let accountLabel: String
-    let result: String
-    let creditBefore: Int?
-    let creditAfter: Int?
-    let fiveHourRemaining: Int?
-    let weeklyRemaining: Int?
-    let detail: String
-}
-
-enum RouteBCapabilityState {
-    case ready
-    case testRequired
-    case blocked
-}
-
-struct RouteBCapability {
-    let label: String
-    let state: RouteBCapabilityState
-}
-
-struct RouteBProviderProfile {
-    let id: String
-    let name: String
-    let provider: String
-    let model: String
-    let summary: String
-    let capabilities: [RouteBCapability]
-}
-
-private let routeBProviderProfiles = [
-    RouteBProviderProfile(
-        id: "openrouter-text-helper",
-        name: "Text Helper",
-        provider: "OpenRouter",
-        model: "z-ai/glm-5.2",
-        summary: "Low-risk drafting, summaries, and read-only checks.",
-        capabilities: [
-            RouteBCapability(label: "Chat ready", state: .ready),
-            RouteBCapability(label: "MCP test required", state: .testRequired),
-            RouteBCapability(label: "Browser test required", state: .testRequired),
-            RouteBCapability(label: "Live ops blocked", state: .blocked)
-        ]
-    ),
-    RouteBProviderProfile(
-        id: "openrouter-visual-helper",
-        name: "Visual Helper",
-        provider: "OpenRouter",
-        model: "z-ai/glm-5v-turbo",
-        summary: "Image review and visual context; no account actions.",
-        capabilities: [
-            RouteBCapability(label: "Chat ready", state: .ready),
-            RouteBCapability(label: "Vision ready", state: .ready),
-            RouteBCapability(label: "MCP blocked", state: .blocked),
-            RouteBCapability(label: "Live ops blocked", state: .blocked)
-        ]
-    )
-]
-
-struct ApiUsageSnapshot: Equatable {
-    let usedTokens: Int
-    let limitTokens: Int
-    let warningPercent: Int
-    let lastUpdatedText: String
-    let lastError: String?
-
-    var usedPercent: Int {
-        guard limitTokens > 0 else { return 0 }
-        return max(0, min(100, Int((Double(usedTokens) / Double(limitTokens)) * 100.0)))
-    }
-
-    var remainingTokens: Int {
-        max(0, limitTokens - usedTokens)
-    }
-}
-
-struct ResetCredit: Equatable {
-    let id: String
-    let title: String
-    let resetType: String
-    let status: String
-    let grantedAt: Date?
-    let expiresAt: Date?
-}
-
-struct ResetCreditsSnapshot: Equatable {
-    let availableCount: Int?
-    let credits: [ResetCredit]
-    let lastUpdatedText: String
-    let lastError: String?
-
-    var availableCredits: [ResetCredit] {
-        credits.filter { $0.status.lowercased() == "available" }
-    }
-
-    var displayCount: Int? {
-        availableCount ?? (credits.isEmpty ? nil : availableCredits.count)
-    }
-}
-
-struct UsageLimitWindowSnapshot: Equatable {
-    let remainingPercent: Int
-    let resetAt: Date?
-}
-
-struct DirectUsageSnapshot: Equatable {
-    let fiveHour: UsageLimitWindowSnapshot
-    let weekly: UsageLimitWindowSnapshot
-}
-
-struct ResetConsumeReceipt {
-    let code: String
-    let windowsReset: Int
-    let message: String
-}
-
-struct ResetVerificationOutcome {
-    let resetSnapshot: ResetCreditsSnapshot?
-    let usageSnapshot: DirectUsageSnapshot?
-    let creditConfirmed: Bool
-    let usageConfirmed: Bool
-    let attempts: Int
-    let detail: String
-}
-
-enum UsageDisplayMode: String {
-    case fiveHour
-    case weekly
-}
-
-enum ToolbarDisplayStyle: String {
-    case detailed
-    case compact
-}
-
-enum AutoSwitchMode: String {
-    case off
-    case ask
-    case threshold
-    case zero
-}
-
-enum AutoResumeMode: String {
-    case off
-    case ask
-    case idle5
-    case idle10
-    case always
-}
-
-enum AccountPanelMode {
-    case usage
-    case settings
-    case api
-    case routeB
-    case resets
-}
-
-enum SettingsPanelAction: String {
-    case usageView
-    case settingsView
-    case routeBView
-    case resetCreditsView
-    case addAccount
-    case addDeviceAccount
-    case apiView
-    case setupApiMode
-    case switchApiMode
-    case editApiLimit
-    case refreshApiUsage
-    case testApiReminder
-    case editLabels
-    case removeAccount
-    case usageWeekly
-    case usageFiveHour
-    case styleDetailed
-    case styleCompact
-    case toggleLaunchAtLogin
-    case toggleUsageReminder
-    case editUsageReminder
-    case toggleAutoSwitch
-    case editAutoSwitch
-    case editAutoResume
-    case toggleConfirmSwitch
-    case toggleProtectCodex
-    case editRefresh
-    case forceRefresh
-    case checkUpdates
-    case cleanBackups
-    case diagnostics
-    case quit
-}
-
-private func usageStatusColor(for percent: Int?) -> NSColor {
-    guard let percent else { return .secondaryLabelColor }
-    if percent >= 50 { return .systemGreen }
-    if percent >= 20 { return .systemOrange }
-    return .systemRed
-}
-
-private extension NSAppearance {
-    var isDarkMode: Bool {
-        bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-    }
-}
-
-private struct PanelTheme {
-    let isDark: Bool
-
-    static func current(for appearance: NSAppearance?) -> PanelTheme {
-        PanelTheme(isDark: appearance?.isDarkMode ?? NSApp.effectiveAppearance.isDarkMode)
-    }
-
-    var primaryText: NSColor {
-        isDark ? NSColor(red: 0.93, green: 0.95, blue: 0.97, alpha: 1) : NSColor(red: 0.10, green: 0.12, blue: 0.15, alpha: 1)
-    }
-
-    var secondaryText: NSColor {
-        isDark ? NSColor(red: 0.58, green: 0.62, blue: 0.68, alpha: 1) : NSColor(red: 0.37, green: 0.41, blue: 0.46, alpha: 1)
-    }
-
-    var tertiaryText: NSColor {
-        isDark ? NSColor(red: 0.40, green: 0.44, blue: 0.50, alpha: 1) : NSColor(red: 0.49, green: 0.53, blue: 0.58, alpha: 1)
-    }
-
-    var valueText: NSColor {
-        isDark ? NSColor(red: 0.75, green: 0.79, blue: 0.84, alpha: 1) : NSColor(red: 0.24, green: 0.28, blue: 0.33, alpha: 1)
-    }
-
-    var inactiveAccent: NSColor {
-        isDark ? NSColor(red: 0.42, green: 0.46, blue: 0.52, alpha: 1) : NSColor(red: 0.47, green: 0.51, blue: 0.56, alpha: 1)
-    }
-
-    var activeCardFill: NSColor {
-        isDark ? NSColor(red: 0.045, green: 0.105, blue: 0.088, alpha: 0.94) : NSColor(red: 0.91, green: 0.97, blue: 0.935, alpha: 0.98)
-    }
-
-    var inactiveCardFill: NSColor {
-        isDark ? NSColor(red: 0.060, green: 0.073, blue: 0.093, alpha: 0.96) : NSColor(red: 0.955, green: 0.965, blue: 0.978, alpha: 0.98)
-    }
-
-    var inactiveCardHoverFill: NSColor {
-        isDark ? NSColor(red: 0.082, green: 0.101, blue: 0.128, alpha: 1) : NSColor(red: 0.985, green: 0.99, blue: 1.0, alpha: 1)
-    }
-
-    var inactiveCardBorder: NSColor {
-        isDark ? NSColor(red: 0.42, green: 0.48, blue: 0.56, alpha: 0.16) : NSColor(red: 0.18, green: 0.23, blue: 0.29, alpha: 0.12)
-    }
-
-    var bottomBarFill: NSColor {
-        isDark ? NSColor(red: 0.055, green: 0.068, blue: 0.087, alpha: 0.98) : NSColor(red: 0.93, green: 0.945, blue: 0.965, alpha: 0.98)
-    }
-
-    var divider: NSColor {
-        isDark ? NSColor(red: 0.48, green: 0.54, blue: 0.62, alpha: 0.14) : NSColor(red: 0.18, green: 0.22, blue: 0.27, alpha: 0.10)
-    }
-
-    var iconTint: NSColor {
-        isDark ? NSColor(red: 0.64, green: 0.69, blue: 0.75, alpha: 1) : NSColor(red: 0.34, green: 0.39, blue: 0.44, alpha: 1)
-    }
-
-    var ringTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.075) : NSColor.black.withAlphaComponent(0.075)
-    }
-
-    var progressTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.08)
-    }
-
-    var inactiveButtonFill: NSColor {
-        isDark ? NSColor(red: 0.12, green: 0.145, blue: 0.18, alpha: 1) : NSColor(red: 0.88, green: 0.905, blue: 0.935, alpha: 1)
-    }
-
-    var usageInactiveButtonFill: NSColor {
-        isDark ? NSColor(red: 0.14, green: 0.165, blue: 0.20, alpha: 1) : NSColor(red: 0.31, green: 0.35, blue: 0.40, alpha: 0.96)
-    }
-
-    var switchOffFill: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.18) : NSColor.black.withAlphaComponent(0.18)
-    }
-}
-
-enum ApiUsageFetchResult {
-    case success(Int)
-    case failure(String)
-}
-
-enum ResetCreditsFetchResult {
-    case success(ResetCreditsSnapshot)
-    case failure(String)
-}
-
-enum ResetCreditRedemptionResult {
-    case success(ResetConsumeReceipt)
-    case failure(String)
-}
-
-enum DirectUsageFetchResult {
-    case success(DirectUsageSnapshot)
-    case failure(String)
-}
-
-struct SavedAccountAuth {
-    let email: String
-    let accessToken: String
-    let accountID: String
-}
-
-enum SavedAccountAuthResult {
-    case success(SavedAccountAuth)
-    case failure(String)
-}
-
 final class AccountSwitcherPanelView: NSView {
     private let accounts: [CodexAccount]
     private let activeAccount: CodexAccount?
@@ -1224,7 +883,7 @@ final class AccountSwitcherPanelView: NSView {
         subtitle.lineBreakMode = .byTruncatingTail
         view.addSubview(subtitle)
 
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 377, y: 29, width: 32, height: 32), action: #selector(refreshPressed), toolTip: "Refresh active usage; inactive accounts update when switched")
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 377, y: 29, width: 32, height: 32), action: #selector(refreshPressed), toolTip: "Refresh usage for all saved accounts")
         view.addSubview(refreshButton)
 
         let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: 421, y: 28, width: 34, height: 34), action: #selector(settingsPressed(_:)), toolTip: "Open settings")
@@ -1353,7 +1012,7 @@ final class AccountSwitcherPanelView: NSView {
     }
 
     private func emptyCompactAccountSlot(frame: NSRect) -> NSView {
-        let card = RoundedPanelView(frame: frame, fillColor: theme.inactiveCardFill.withAlphaComponent(theme.isDark ? 0.42 : 0.58), borderColor: theme.inactiveCardBorder, cornerRadius: 16, hoverFillColor: theme.inactiveCardHoverFill, clickAction: { [weak self] in self?.showSettings() }, shadowOpacity: 0.05)
+        let card = RoundedPanelView(frame: frame, fillColor: theme.inactiveCardFill, borderColor: theme.inactiveCardBorder, cornerRadius: 16, hoverFillColor: theme.inactiveCardHoverFill, clickAction: { [weak self] in self?.showSettings() }, shadowOpacity: 0.05)
         card.addSubview(SymbolIconView(frame: NSRect(x: (frame.width - 28) / 2, y: (frame.height - 54) / 2, width: 28, height: 28), symbol: "plus", color: theme.iconTint.withAlphaComponent(0.62)))
         card.addSubview(label("Add another account", frame: NSRect(x: 14, y: (frame.height / 2) + 13, width: frame.width - 28, height: 18), size: 11, weight: .semibold, color: theme.secondaryText, alignment: .center))
         return card
@@ -1700,7 +1359,7 @@ final class AccountSwitcherPanelView: NSView {
         resetButton.toolTip = resetCreditsTooltip()
         bar.addSubview(resetButton)
 
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed), toolTip: "Refresh active usage; inactive accounts update when switched")
+        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed), toolTip: "Refresh usage for all saved accounts")
         bar.addSubview(refreshButton)
 
         let rightDivider = NSView(frame: NSRect(x: refreshX + iconSize + 10, y: 10, width: 1, height: frame.height - 20))
@@ -1954,762 +1613,6 @@ final class AccountSwitcherPanelView: NSView {
     }
 }
 
-final class DashboardBackgroundView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let rect = bounds
-        let isDark = effectiveAppearance.isDarkMode
-        let base = isDark
-            ? NSColor(red: 0.027, green: 0.034, blue: 0.045, alpha: 1)
-            : NSColor(red: 0.925, green: 0.94, blue: 0.958, alpha: 1)
-        base.setFill()
-        rect.fill()
-
-        let topGlow = NSGradient(
-            starting: isDark ? NSColor(red: 0.12, green: 0.19, blue: 0.18, alpha: 0.42) : NSColor(red: 0.70, green: 0.90, blue: 0.82, alpha: 0.42),
-            ending: base.withAlphaComponent(0)
-        )
-        topGlow?.draw(in: NSRect(x: -90, y: -150, width: rect.width + 180, height: 360), relativeCenterPosition: NSPoint(x: -0.10, y: 0.18))
-
-        let sideGlow = NSGradient(
-            starting: isDark ? NSColor(red: 0.14, green: 0.20, blue: 0.30, alpha: 0.28) : NSColor(red: 0.74, green: 0.82, blue: 0.94, alpha: 0.30),
-            ending: base.withAlphaComponent(0)
-        )
-        sideGlow?.draw(in: NSRect(x: rect.width * 0.36, y: rect.height * 0.42, width: rect.width * 0.88, height: rect.height * 0.72), relativeCenterPosition: NSPoint(x: 0.22, y: -0.10))
-
-        let gridColor = isDark ? NSColor.white.withAlphaComponent(0.024) : NSColor.black.withAlphaComponent(0.022)
-        gridColor.setStroke()
-        let grid = NSBezierPath()
-        grid.lineWidth = 0.5
-        var x: CGFloat = 22
-        while x < rect.width {
-            grid.move(to: NSPoint(x: x, y: 0))
-            grid.line(to: NSPoint(x: x, y: rect.height))
-            x += 44
-        }
-        var y: CGFloat = 22
-        while y < rect.height {
-            grid.move(to: NSPoint(x: 0, y: y))
-            grid.line(to: NSPoint(x: rect.width, y: y))
-            y += 44
-        }
-        grid.stroke()
-
-        (isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.09)).setStroke()
-        let border = rect.insetBy(dx: 1, dy: 1).roundedPath(radius: 24)
-        border.lineWidth = 1
-        border.stroke()
-    }
-}
-
-final class FlippedContainerView: NSView {
-    override var isFlipped: Bool { true }
-}
-
-final class RoundedPanelView: NSView {
-    private let fillColor: NSColor
-    private let hoverFillColor: NSColor?
-    private let borderColor: NSColor
-    private let cornerRadius: CGFloat
-    private let clickAction: (() -> Void)?
-    private var trackingArea: NSTrackingArea?
-
-    init(frame: NSRect, fillColor: NSColor, borderColor: NSColor, cornerRadius: CGFloat = 18, hoverFillColor: NSColor? = nil, clickAction: (() -> Void)? = nil, shadowOpacity: Float = 0.12, shadowRadius: CGFloat = 12) {
-        self.fillColor = fillColor
-        self.hoverFillColor = hoverFillColor
-        self.borderColor = borderColor
-        self.cornerRadius = cornerRadius
-        self.clickAction = clickAction
-        super.init(frame: frame)
-        wantsLayer = true
-        layer?.cornerRadius = cornerRadius
-        layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = borderColor.cgColor
-        layer?.shadowColor = NSColor(red: 0.01, green: 0.02, blue: 0.035, alpha: 1).cgColor
-        layer?.shadowOpacity = shadowOpacity
-        layer?.shadowRadius = shadowRadius
-        layer?.shadowOffset = NSSize(width: 0, height: -5)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        guard hoverFillColor != nil else { return }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        guard let hoverFillColor else { return }
-        layer?.backgroundColor = hoverFillColor.cgColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = fillColor.cgColor
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        guard clickAction != nil, let hitView = super.hitTest(point) else {
-            return super.hitTest(point)
-        }
-        return hitView is NSButton ? hitView : self
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        if let clickAction {
-            clickAction()
-        } else {
-            super.mouseDown(with: event)
-        }
-    }
-}
-
-final class CircleIconView: NSView {
-    private let color: NSColor
-    private let symbolColor: NSColor
-    private let symbol: String
-
-    init(frame: NSRect, color: NSColor, symbol: String, symbolColor: NSColor = NSColor.white.withAlphaComponent(0.78)) {
-        self.color = color
-        self.symbolColor = symbolColor
-        self.symbol = symbol
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        color.withAlphaComponent(0.24).setFill()
-        bounds.insetBy(dx: 1, dy: 1).roundedPath(radius: bounds.width / 2).fill()
-        if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
-            image.isTemplate = true
-            symbolColor.set()
-            image.draw(in: bounds.insetBy(dx: bounds.width * 0.28, dy: bounds.height * 0.28))
-        }
-    }
-}
-
-final class SymbolIconView: NSView {
-    init(frame: NSRect, symbol: String, color: NSColor) {
-        super.init(frame: frame)
-        wantsLayer = true
-        let imageView = NSImageView(frame: bounds)
-        imageView.autoresizingMask = [.width, .height]
-        imageView.imageScaling = .scaleProportionallyDown
-        imageView.contentTintColor = color
-        imageView.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        imageView.image?.isTemplate = true
-        addSubview(imageView)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
-final class PanelMarkView: NSView {
-    private let color: NSColor
-
-    init(frame: NSRect, color: NSColor) {
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let plate = bounds.insetBy(dx: 1, dy: 1)
-        color.withAlphaComponent(0.12).setFill()
-        plate.roundedPath(radius: 12).fill()
-        color.withAlphaComponent(0.34).setStroke()
-        let outline = plate.roundedPath(radius: 12)
-        outline.lineWidth = 1
-        outline.stroke()
-
-        let bars: [NSRect] = [
-            NSRect(x: 11, y: 11, width: 20, height: 3),
-            NSRect(x: 11, y: 19, width: 14, height: 3),
-            NSRect(x: 11, y: 27, width: 20, height: 3)
-        ]
-        color.withAlphaComponent(0.96).setFill()
-        for (index, bar) in bars.enumerated() {
-            let shifted = index == 1 ? bar.offsetBy(dx: 6, dy: 0) : bar
-            shifted.roundedPath(radius: 1.5).fill()
-        }
-    }
-}
-
-final class AccentRailView: NSView {
-    private let color: NSColor
-
-    init(frame: NSRect, color: NSColor) {
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        color.withAlphaComponent(0.92).setFill()
-        bounds.roundedPath(radius: bounds.width / 2).fill()
-    }
-}
-
-final class MetricValueView: NSView {
-    private let percent: Int?
-    private let color: NSColor
-    private let isActive: Bool
-
-    init(frame: NSRect, percent: Int?, color: NSColor, isActive: Bool) {
-        self.percent = percent
-        self.color = color
-        self.isActive = isActive
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
-        let text = NSMutableAttributedString(
-            string: value,
-            attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 32, weight: isActive ? .bold : .semibold),
-                .foregroundColor: color,
-                .kern: -1.3
-            ]
-        )
-        text.append(NSAttributedString(
-            string: "\u{2009}%",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 13, weight: .bold),
-                .foregroundColor: color.withAlphaComponent(0.90),
-                .baselineOffset: 3.0,
-                .kern: 0.2
-            ]
-        ))
-        text.draw(at: NSPoint(x: 0, y: 3))
-    }
-}
-
-final class DotView: NSView {
-    private let color: NSColor
-
-    init(frame: NSRect, color: NSColor) {
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        color.setFill()
-        NSBezierPath(ovalIn: bounds).fill()
-    }
-}
-
-final class ProgressLineView: NSView {
-    private let color: NSColor
-    private let trackColor: NSColor
-    private let percent: CGFloat
-
-    init(frame: NSRect, color: NSColor, trackColor: NSColor = NSColor.white.withAlphaComponent(0.11), percent: CGFloat) {
-        self.color = color
-        self.trackColor = trackColor
-        self.percent = max(0, min(1, percent))
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let track = bounds.insetBy(dx: 0, dy: 2)
-        trackColor.setFill()
-        track.roundedPath(radius: track.height / 2).fill()
-        let fill = NSRect(x: track.minX, y: track.minY, width: track.width * percent, height: track.height)
-        color.withAlphaComponent(min(color.alphaComponent, 0.92)).setFill()
-        fill.roundedPath(radius: track.height / 2).fill()
-    }
-}
-
-final class ResetTimeBadgeView: NSView {
-    private let text: String
-    private let color: NSColor
-    private let isActive: Bool
-
-    init(frame: NSRect, text: String, color: NSColor, isActive: Bool) {
-        self.text = text
-        self.color = color
-        self.isActive = isActive
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: color.withAlphaComponent(isActive ? 0.95 : 0.58)
-        ]
-        let attributed = NSAttributedString(string: text, attributes: attributes)
-        let size = attributed.size()
-        attributed.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 0.5))
-    }
-}
-
-final class PercentCenterLabelView: NSView {
-    private let percent: Int?
-    private let color: NSColor
-
-    init(frame: NSRect, percent: Int?, color: NSColor) {
-        self.percent = percent
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
-        let numberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 29, weight: .semibold),
-            .foregroundColor: color
-        ]
-        let percentAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 15, weight: .semibold),
-            .foregroundColor: color.withAlphaComponent(0.92),
-            .baselineOffset: -0.5
-        ]
-
-        let text = NSMutableAttributedString(string: value, attributes: numberAttributes)
-        text.append(NSAttributedString(string: "%", attributes: percentAttributes))
-        let size = text.size()
-        let point = NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 1)
-        text.draw(at: point)
-    }
-}
-
-final class CenteredTextView: NSView {
-    private let text: String
-    private let size: CGFloat
-    private let weight: NSFont.Weight
-    private let color: NSColor
-    private let alignment: NSTextAlignment
-
-    init(frame: NSRect, text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) {
-        self.text = text
-        self.size = size
-        self.weight = weight
-        self.color = color
-        self.alignment = alignment
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: size, weight: weight),
-            .foregroundColor: color
-        ]
-        let attributed = NSAttributedString(string: text, attributes: attributes)
-        let textSize = attributed.size()
-        let x: CGFloat
-        switch alignment {
-        case .right:
-            x = max(0, bounds.width - textSize.width)
-        case .center:
-            x = max(0, (bounds.width - textSize.width) / 2)
-        default:
-            x = 0
-        }
-        attributed.draw(at: NSPoint(x: x, y: (bounds.height - textSize.height) / 2))
-    }
-}
-
-final class MiniSwitchButton: NSButton {
-    private let offColor: NSColor
-
-    init(frame: NSRect, isOn: Bool, offColor: NSColor = NSColor.white.withAlphaComponent(0.18)) {
-        self.offColor = offColor
-        super.init(frame: frame)
-        title = ""
-        isBordered = false
-        bezelStyle = .regularSquare
-        wantsLayer = true
-        state = isOn ? .on : .off
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let on = state == .on
-        let track = bounds.insetBy(dx: 1, dy: 3)
-        (on ? NSColor.systemGreen : offColor).setFill()
-        track.roundedPath(radius: track.height / 2).fill()
-
-        let knobSize = track.height - 4
-        let knobX = on ? track.maxX - knobSize - 2 : track.minX + 2
-        NSColor.white.withAlphaComponent(0.94).setFill()
-        NSBezierPath(ovalIn: NSRect(x: knobX, y: track.minY + 2, width: knobSize, height: knobSize)).fill()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        state = state == .on ? .off : .on
-        needsDisplay = true
-        sendAction(action, to: target)
-    }
-}
-
-final class UsageRingView: NSView {
-    private let color: NSColor
-    private let trackColor: NSColor
-    private let percent: CGFloat
-    private let isActive: Bool
-    private var isLowUsage: Bool {
-        percent > 0 && percent <= 0.10
-    }
-
-    init(frame: NSRect, color: NSColor, trackColor: NSColor = NSColor.white.withAlphaComponent(0.10), percent: CGFloat, isActive: Bool) {
-        self.color = color
-        self.trackColor = trackColor
-        self.percent = max(0, min(1, percent))
-        self.isActive = isActive
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let rect = bounds.insetBy(dx: 10, dy: 10)
-        let lineWidth: CGFloat = isActive ? 4 : 3
-        let center = NSPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        let track = NSBezierPath()
-        track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-        track.lineWidth = lineWidth
-        trackColor.withAlphaComponent(isLowUsage ? min(trackColor.alphaComponent + 0.08, 1) : trackColor.alphaComponent).setStroke()
-        track.stroke()
-
-        if isLowUsage {
-            let warningTrack = NSBezierPath()
-            warningTrack.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-            warningTrack.lineWidth = lineWidth
-            color.withAlphaComponent(0.22).setStroke()
-            warningTrack.stroke()
-        }
-
-        guard percent > 0 else { return }
-
-        let fill = NSBezierPath()
-        let visiblePercent = isLowUsage ? max(percent, 0.08) : percent
-        fill.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - (360 * visiblePercent), clockwise: true)
-        fill.lineWidth = lineWidth
-        fill.lineCapStyle = .round
-        color.withAlphaComponent(isActive ? 0.94 : min(color.alphaComponent, 0.54)).setStroke()
-        fill.stroke()
-    }
-}
-
-final class PillButton: NSButton {
-    private let pillColor: NSColor
-    private let showsDot: Bool
-    private let allowsHover: Bool
-    private var trackingArea: NSTrackingArea?
-
-    init(frame: NSRect, title: String, color: NSColor, showsDot: Bool = false, allowsHover: Bool = true) {
-        self.pillColor = color
-        self.showsDot = showsDot
-        self.allowsHover = allowsHover
-        super.init(frame: frame)
-        self.title = title
-        bezelStyle = .rounded
-        isBordered = false
-        font = .systemFont(ofSize: frame.height <= 24 ? 9.5 : 11.5, weight: .bold)
-        contentTintColor = .white
-        focusRingType = .exterior
-        wantsLayer = true
-        layer?.cornerRadius = min(9, frame.height * 0.38)
-        layer?.backgroundColor = pillColor.cgColor
-        layer?.borderWidth = showsDot ? 1 : 0
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        guard allowsHover else { return }
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        guard allowsHover, isEnabled else { return }
-        layer?.backgroundColor = pillColor.blended(withFraction: 0.16, of: .white)?.cgColor ?? pillColor.cgColor
-        layer?.shadowColor = pillColor.cgColor
-        layer?.shadowOpacity = 0.22
-        layer?.shadowRadius = 8
-        layer?.shadowOffset = NSSize(width: 0, height: -2)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        guard allowsHover else { return }
-        layer?.backgroundColor = pillColor.cgColor
-        layer?.shadowOpacity = 0
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        if showsDot {
-            NSColor.white.withAlphaComponent(0.72).setFill()
-            NSBezierPath(ovalIn: NSRect(x: 15, y: (bounds.height - 6) / 2, width: 6, height: 6)).fill()
-        }
-        super.draw(dirtyRect)
-    }
-}
-
-final class AccountMoreButton: NSButton {
-    private let tintColor: NSColor
-    private let badgeLabel: String
-    private var trackingArea: NSTrackingArea?
-
-    init(frame: NSRect, tintColor: NSColor, label: String) {
-        self.tintColor = tintColor
-        self.badgeLabel = String(label.prefix(4)).uppercased()
-        super.init(frame: frame)
-        title = ""
-        bezelStyle = .regularSquare
-        isBordered = false
-        focusRingType = .exterior
-        wantsLayer = true
-        layer?.cornerRadius = min(10, frame.height * 0.30)
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.08).cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
-        toolTip = "Edit account label"
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.13).cgColor
-        layer?.borderColor = tintColor.withAlphaComponent(0.52).cgColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.08).cgColor
-        layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        let fontSize: CGFloat
-        switch badgeLabel.count {
-        case 0, 1:
-            fontSize = 16
-        case 2:
-            fontSize = 14
-        case 3:
-            fontSize = 12.5
-        default:
-            fontSize = 11
-        }
-        let labelAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
-            .foregroundColor: tintColor.withAlphaComponent(0.96)
-        ]
-        let attributed = NSAttributedString(string: badgeLabel, attributes: labelAttributes)
-        let labelSize = attributed.size()
-        attributed.draw(at: NSPoint(x: (bounds.width - labelSize.width) / 2, y: (bounds.height - labelSize.height) / 2))
-    }
-}
-
-final class SettingsActionButton: NSButton {
-    private let fillColor: NSColor
-    private let textColor: NSColor
-    private var trackingArea: NSTrackingArea?
-
-    init(frame: NSRect, title: String, color: NSColor, textColor: NSColor) {
-        self.fillColor = color
-        self.textColor = textColor
-        super.init(frame: frame)
-        self.title = title
-        bezelStyle = .rounded
-        isBordered = false
-        font = .systemFont(ofSize: min(12, max(10, frame.height * 0.42)), weight: .semibold)
-        contentTintColor = textColor
-        focusRingType = .exterior
-        wantsLayer = true
-        layer?.cornerRadius = min(9, frame.height * 0.34)
-        layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = textColor.withAlphaComponent(0.08).cgColor
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        guard isEnabled else { return }
-        layer?.backgroundColor = fillColor.blended(withFraction: 0.10, of: .white)?.cgColor ?? fillColor.cgColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = fillColor.cgColor
-    }
-}
-
-private extension NSRect {
-    func roundedPath(radius: CGFloat) -> NSBezierPath {
-        NSBezierPath(roundedRect: self, xRadius: radius, yRadius: radius)
-    }
-}
-
-private extension DateFormatter {
-    static let diagnosticStamp: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let resetCreditISO: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    static let resetCreditDisplay: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE d MMM, HH:mm"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let directFiveHourUsage: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let directWeeklyUsage: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE HH:mm"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let apiDayKey: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let apiBackupStamp: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-}
-
 final class AccountFloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -2753,6 +1656,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let lastSwitchDateDefaultsKey = "lastSuccessfulSwitchDate"
     private let switchCooldown: TimeInterval = 90
     private let resetCreditsRefreshInterval: TimeInterval = 300
+    private let directUsageRefreshInterval: TimeInterval = 30
     private var refreshTimer: Timer?
     private var currentStatusTitleKey = ""
     private var currentStatusItemLength: CGFloat = 0
@@ -2761,14 +1665,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var lastUpdatedAt: Date?
     private var lastRefreshStartedAt: Date?
     private var lastResetCreditsRefreshAt: Date?
-    private var lastUsageRefreshWasLocalOnly = false
+    private var lastDirectUsageRefreshAt: Date?
     private var isRefreshing = false
     private var isRefreshingResetCredits = false
     private var pendingForceRefresh = false
     private var isSwitching = false
     private var isRedeemingReset = false
     private var resetStatusText: String?
-    private var directUsageOverrides: [String: (usage: DirectUsageSnapshot, expiresAt: Date)] = [:]
+    private var directUsageSnapshotsByEmail: [String: DirectUsageSnapshot] = [:]
     private var armedSwitchEmail: String?
     private var armedSwitchClearWorkItem: DispatchWorkItem?
     private var switchAnimationTimer: Timer?
@@ -3221,6 +2125,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if shouldRefreshResets {
             isRefreshingResetCredits = true
         }
+        let shouldRefreshDirectUsage = UsageRefreshPolicy.shouldRefresh(
+            lastRefresh: lastDirectUsageRefreshAt,
+            ttl: directUsageRefreshInterval,
+            force: force
+        )
         if force {
             rebuildMenu()
         }
@@ -3233,7 +2142,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             let parsed = result.status == 0 ? self.parseAccounts(result.output, usageIsLive: !usedSkipAPI) : []
             let completedResult = result
-            let completedUsedSkipAPI = usedSkipAPI
             Task {
                 async let resetTask = self.fetchResetCreditsForRefresh(
                     accounts: parsed,
@@ -3241,9 +2149,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 )
                 async let directUsageTask = self.fetchDirectUsageForRefresh(
                     accounts: parsed,
-                    shouldRefresh: completedResult.status == 0 && force
+                    shouldRefresh: completedResult.status == 0 && shouldRefreshDirectUsage
                 )
-                let (resetResults, directUsage) = await (resetTask, directUsageTask)
+                let (resetResults, directUsageResults) = await (resetTask, directUsageTask)
                 await MainActor.run {
                 self.isRefreshing = false
                 if shouldRefreshResets {
@@ -3258,13 +2166,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     newAccounts = []
                     newError = completedResult.output.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
-                if let directUsage {
-                    self.directUsageOverrides[directUsage.email] = (
-                        usage: directUsage.usage,
-                        expiresAt: Date().addingTimeInterval(35)
+                if completedResult.status == 0 {
+                    let validEmails = Set(newAccounts.map(\.email))
+                    self.directUsageSnapshotsByEmail = LastKnownGoodSnapshotPolicy.merged(
+                        current: self.directUsageSnapshotsByEmail,
+                        successful: directUsageResults,
+                        validKeys: validEmails
                     )
+                    if shouldRefreshDirectUsage {
+                        self.lastDirectUsageRefreshAt = Date()
+                    }
                 }
-                newAccounts = self.applyingDirectUsageOverrides(to: newAccounts)
+                newAccounts = self.applyingDirectUsageSnapshots(to: newAccounts)
 
                 let previousResetCredits = self.resetCreditsByEmail
                 if completedResult.status == 0 && shouldRefreshResets {
@@ -3275,10 +2188,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 let stateChanged = newAccounts != self.accounts || newError != self.lastError || self.resetCreditsByEmail != previousResetCredits
                 if completedResult.status == 0 {
                     self.lastUpdatedAt = Date()
-                    self.lastUsageRefreshWasLocalOnly = !completedUsedSkipAPI && (completedResult.output.contains("mode=local-only") || !self.apiModeActive)
-                    if directUsage != nil {
-                        self.lastUsageRefreshWasLocalOnly = false
-                    }
                 }
                 if stateChanged || force || self.accountPanel?.isVisible == true {
                     self.accounts = newAccounts
@@ -3388,7 +2297,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         let refresh = NSMenuItem(title: "Force Usage Refresh", action: #selector(refreshNow), keyEquivalent: "")
         refresh.target = self
-        refresh.toolTip = "Refreshes the active account now; inactive account usage updates after switching."
+        refresh.toolTip = "Refreshes live usage for all saved accounts."
         refresh.isEnabled = !isSwitching
         menu.addItem(refresh)
 
@@ -3444,6 +2353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
+        refreshAccounts(force: true)
     }
 
     private func showSettingsPanel() {
@@ -4141,7 +3051,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func applyDirectUsage(_ usage: DirectUsageSnapshot, toEmail email: String) {
-        directUsageOverrides[email] = (usage, Date().addingTimeInterval(35))
+        directUsageSnapshotsByEmail[email] = usage
         accounts = accounts.map { account in
             guard account.email == email else { return account }
             return CodexAccount(
@@ -4156,22 +3066,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 isActive: account.isActive
             )
         }
-        lastUsageRefreshWasLocalOnly = false
     }
 
-    private func applyingDirectUsageOverrides(to source: [CodexAccount]) -> [CodexAccount] {
-        let now = Date()
-        directUsageOverrides = directUsageOverrides.filter { $0.value.expiresAt > now }
+    private func applyingDirectUsageSnapshots(to source: [CodexAccount]) -> [CodexAccount] {
         return source.map { account in
-            guard let override = directUsageOverrides[account.email] else { return account }
+            guard let snapshot = directUsageSnapshotsByEmail[account.email] else { return account }
             return CodexAccount(
                 selector: account.selector,
                 email: account.email,
                 plan: account.plan,
-                fiveHourUsage: directUsageText(override.usage.fiveHour, weekly: false),
-                weeklyUsage: directUsageText(override.usage.weekly, weekly: true),
-                fiveHourUsedPercent: override.usage.fiveHour.remainingPercent,
-                weeklyUsedPercent: override.usage.weekly.remainingPercent,
+                fiveHourUsage: directUsageText(snapshot.fiveHour, weekly: false),
+                weeklyUsage: directUsageText(snapshot.weekly, weekly: true),
+                fiveHourUsedPercent: snapshot.fiveHour.remainingPercent,
+                weeklyUsedPercent: snapshot.weekly.remainingPercent,
                 lastActivity: account.lastActivity,
                 isActive: account.isActive
             )
@@ -4503,13 +3410,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return isCodexDesktopApplication(app)
     }
 
-    // ChatGPT Work now contains the Codex desktop surface. Keep the legacy
-    // Codex.app fallback so standalone installations remain supported.
+    // ChatGPT now contains the Codex desktop surface on this installation.
     private var codexDesktopAppPath: String {
-        if FileManager.default.fileExists(atPath: "/Applications/ChatGPT.app") {
-            return "/Applications/ChatGPT.app"
-        }
-        return "/Applications/Codex.app"
+        return "/Applications/ChatGPT.app"
     }
 
     private var codexDesktopAppName: String {
@@ -4653,14 +3556,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func accountUsageTooltip(for account: CodexAccount) -> String {
         var parts = ["Plan \(account.plan)", "5h \(account.fiveHourUsage)", "weekly \(account.weeklyUsage)"]
-        if inactiveLocalUsage(account) {
-            parts.append("inactive usage updates after switching")
+        if usageRefreshPending(account) {
+            parts.append("showing saved usage; live refresh pending")
         }
         return parts.joined(separator: ", ")
     }
 
-    private func inactiveLocalUsage(_ account: CodexAccount) -> Bool {
-        lastUsageRefreshWasLocalOnly && !account.isActive
+    private func usageRefreshPending(_ account: CodexAccount) -> Bool {
+        directUsageSnapshotsByEmail[account.email] == nil
     }
 
     private func attributedColumns(_ text: String, tabs: [CGFloat], font: NSFont, color: NSColor) -> NSAttributedString {
@@ -6482,11 +5385,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func fetchDirectUsageForRefresh(
         accounts: [CodexAccount],
         shouldRefresh: Bool
-    ) async -> (email: String, usage: DirectUsageSnapshot)? {
-        guard shouldRefresh, let active = accounts.first(where: { $0.isActive }) else { return nil }
-        guard case .success(let auth) = savedAuth(forEmail: active.email) else { return nil }
-        guard case .success(let usage) = await fetchDirectUsage(using: auth) else { return nil }
-        return (active.email, usage)
+    ) async -> [String: DirectUsageSnapshot] {
+        guard shouldRefresh, !accounts.isEmpty else { return [:] }
+        let refreshed = await withTaskGroup(of: (String, DirectUsageSnapshot)?.self) { group in
+            for account in accounts {
+                group.addTask {
+                    guard case .success(let auth) = self.savedAuth(forEmail: account.email) else { return nil }
+                    guard case .success(let usage) = await self.fetchDirectUsage(using: auth) else { return nil }
+                    return (account.email, usage)
+                }
+            }
+            var resolved: [(String, DirectUsageSnapshot)] = []
+            for await result in group {
+                if let result { resolved.append(result) }
+            }
+            return resolved
+        }
+        return Dictionary(uniqueKeysWithValues: refreshed)
     }
 
     private func fetchDirectUsage(using auth: SavedAccountAuth) async -> DirectUsageFetchResult {
