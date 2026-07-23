@@ -3311,9 +3311,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let percent = toolbarUsagePercent(for: account)
         switch toolbarDisplayStyle {
         case .detailed:
-            return "\(label)\(remainingPercentText(fromUsed: percent))"
+            return ToolbarStatusFormatter.text(
+                label: label,
+                usage: remainingPercentText(fromUsed: percent)
+            )
         case .compact:
-            return "\(label)\(remainingPercentNumberText(fromUsed: percent))"
+            return ToolbarStatusFormatter.text(
+                label: label,
+                usage: remainingPercentNumberText(fromUsed: percent)
+            )
         }
     }
 
