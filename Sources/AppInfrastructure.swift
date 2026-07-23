@@ -121,6 +121,12 @@ enum LastKnownGoodSnapshotPolicy {
     }
 }
 
+enum ToolbarStatusFormatter {
+    static func text(label: String, usage: String) -> String {
+        "\(label)\(label.count > 1 ? " " : "")\(usage)"
+    }
+}
+
 enum ComputerUsePluginLocator {
     static func latestApp(in versionsRoot: URL, fileManager: FileManager = .default) -> URL? {
         guard let versionDirectories = try? fileManager.contentsOfDirectory(

@@ -9,6 +9,7 @@ struct InfrastructureTests {
         testResetRefreshPolicy()
         testUsageRefreshPolicy()
         testLastKnownGoodSnapshotPolicy()
+        testToolbarStatusFormatting()
         try testComputerUsePluginDiscovery()
         try testBackupPruning()
         testProcessRunner()
@@ -63,6 +64,12 @@ struct InfrastructureTests {
             validKeys: Set(["one", "two"])
         )
         expect(unchanged == ["one": 100, "two": 100], "a wholly failed refresh should not roll usage back")
+    }
+
+    private static func testToolbarStatusFormatting() {
+        expect(ToolbarStatusFormatter.text(label: "A", usage: "89%") == "A89%", "single-character labels should keep the compact menu-bar format")
+        expect(ToolbarStatusFormatter.text(label: "1287", usage: "100%") == "1287 100%", "multi-character labels should be separated from usage")
+        expect(ToolbarStatusFormatter.text(label: "1287", usage: "100") == "1287 100", "compact usage should also be separated from multi-character labels")
     }
 
     private static func testComputerUsePluginDiscovery() throws {
