@@ -16,7 +16,7 @@
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&logo=apple&logoColor=white">
   <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-f97316?style=flat-square&logo=swift&logoColor=white">
   <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-1f2937?style=flat-square">
-  <img alt="Current release 1.8.3.2" src="https://img.shields.io/badge/release-v1.8.3.2-16a34a?style=flat-square">
+  <img alt="Current release 1.8.5" src="https://img.shields.io/badge/release-v1.8.5-16a34a?style=flat-square">
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-1f2937?style=flat-square">
 </p>
 
@@ -27,12 +27,13 @@ Codex Account Switcher is a native macOS menu bar companion for people who use m
 ## The useful parts, immediately
 
 - **Live account limits** for five-hour and weekly usage windows.
-- **Fast account switching** from a compact four-account panel.
+- **Fast account switching** from a compact numbered Native Glass list that scales from one account to many.
+- **Weekly capacity at a glance** with semantic gradients and inline switch confirmation.
 - **Verified changes** with target checks and automatic rollback on failure.
 - **Reset-credit tracking** across saved accounts, grouped by expiry urgency.
 - **Optional auto-switching** when the active account reaches a chosen threshold.
 - **Optional task continuation** after a successful automatic switch.
-- **ChatGPT lifecycle following** so the companion opens and closes with the desktop app.
+- **Desktop companion auto-launch** when Codex or ChatGPT opens. The switcher stays running when the desktop app closes, including during account switching and plugin repair.
 - **Local diagnostics** that omit credentials, account IDs, and private usage snapshots.
 
 <p align="center">
@@ -50,9 +51,9 @@ Codex Account Switcher is a native macOS menu bar companion for people who use m
   <img src="assets/screenshot-resets.png" alt="Reset credits grouped by privacy-safe demo account with expiry colours" width="390">
 </p>
 
-## Install v1.8.3.2
+## Install v1.8.5
 
-1. Download `Codex-Account-Switcher-v1.8.3.2.zip` from the [latest release](https://github.com/lordydord/Codex-Account-Switcher/releases/latest).
+1. Download `Codex-Account-Switcher-v1.8.5.zip` from the [latest release](https://github.com/lordydord/Codex-Account-Switcher/releases/latest).
 2. Extract the archive and move `Codex Account Switcher.app` to Applications.
 3. Right-click the app and choose **Open** on first launch if macOS asks.
 4. Install and configure [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth):
@@ -108,11 +109,11 @@ This repository does not contain ChatGPT credentials, auth tokens, account IDs, 
 
 The switcher works with local `codex-auth` sessions. It does not add analytics, advertising, or a separate cloud account.
 
-## Version 1.8.3.2
+## Version 1.8.5
 
-Version 1.8.3.2 refreshes live five-hour and weekly limits for every saved account, preserves the last reliable reading when one account cannot refresh, and replaces the outer Liquid Glass effect with a softer frosted popover background.
+Version 1.8.5 forecasts how long the pooled five-hour quota lasts: it samples the remaining pool into a local history, draws a CodexBar-style utilization chart in the panel, and tells you whether the pool will survive until the weekly reset.
 
-Read the full [1.8.3.2 release notes](docs/release-notes/v1.8.3.2.md), or see every published build on the [Releases page](https://github.com/lordydord/Codex-Account-Switcher/releases).
+Read the full [1.8.5 release notes](docs/release-notes/v1.8.5.md), or see every published build on the [Releases page](https://github.com/lordydord/Codex-Account-Switcher/releases).
 
 ## Project map
 
@@ -120,9 +121,11 @@ Read the full [1.8.3.2 release notes](docs/release-notes/v1.8.3.2.md), or see ev
 Sources/main.swift             AppKit application and account workflows
 Sources/Models.swift           Shared app models and visual theme
 Sources/PanelComponents.swift  Account panel views and controls
+Sources/AccountRowView.swift   Adaptive SwiftUI account-row content
 Sources/AppInfrastructure.swift  Networking, commands, and shared infrastructure
 Sources/LifecycleMonitor.swift Native ChatGPT lifecycle companion
 Tests                         Infrastructure and reset-logic regression checks
+docs/design-system.md         Canonical UI tokens, components, and redesign rules
 docs                          GitHub Pages product site
 assets                        Privacy-safe app screenshots and repository artwork
 ```
@@ -130,3 +133,11 @@ assets                        Privacy-safe app screenshots and repository artwor
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+### Start limits (MVP)
+
+The account panel's **Start limits** button sends one short `gpt-5.6-luna` request with `low` reasoning effort per saved account, in batches of four. OMP is not required. Each row shows waiting, sending, refreshing token, completed, or failed; usage refreshes after the batch. Results remain inline for 12 seconds after completion, then the reset date returns. No result dialog is shown. A new run cancels the previous status-clear timer. Closing and reopening the panel retains the current run. The button is disabled while running.
+
+“Request completed” confirms a completed inference response; the server controls whether a new five-hour window starts. An already running window is not reset. Requests consume a small amount of usage. Network failures are not automatically replayed because the server may already have accepted the request. The Codex endpoint does not accept `max_output_tokens`; the prompt requests only “OK”. No response text or tokens are persisted.
+
+Business/Team accounts with a weekly-only API limit show the weekly remaining percentage in the menu bar and `--` for the unavailable five-hour limit. Accounts with both windows keep the five-hour menu-bar percentage.

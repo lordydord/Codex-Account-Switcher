@@ -1,6 +1,15 @@
 import AppKit
 import Foundation
 
+extension NSFont {
+    /// Rounded system font (AppKit has no design: parameter on systemFont).
+    static func roundedSystemFont(ofSize size: CGFloat, weight: NSFont.Weight) -> NSFont {
+        let base = systemFont(ofSize: size, weight: weight)
+        guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
+        return NSFont(descriptor: descriptor, size: size) ?? base
+    }
+}
+
 final class DashboardBackgroundView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -18,65 +27,147 @@ final class DashboardBackgroundView: NSView {
     }
 
     private func installFrostedBackdrop() {
-        let material = NSVisualEffectView(frame: bounds)
-        material.material = .popover
-        material.blendingMode = .behindWindow
-        material.state = .active
-        material.wantsLayer = true
-        material.layer?.cornerRadius = 22
-        material.layer?.masksToBounds = true
-        material.autoresizingMask = [.width, .height]
-        addSubview(material)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let rect = bounds
-        let isDark = effectiveAppearance.isDarkMode
-        let base = isDark
-            ? NSColor(red: 0.027, green: 0.034, blue: 0.045, alpha: 0.16)
-            : NSColor(red: 0.925, green: 0.94, blue: 0.958, alpha: 0.20)
-        base.setFill()
-        rect.fill()
-
-        let topGlow = NSGradient(
-            starting: isDark ? NSColor(red: 0.12, green: 0.19, blue: 0.18, alpha: 0.42) : NSColor(red: 0.70, green: 0.90, blue: 0.82, alpha: 0.42),
-            ending: base.withAlphaComponent(0)
-        )
-        topGlow?.draw(in: NSRect(x: -90, y: -150, width: rect.width + 180, height: 360), relativeCenterPosition: NSPoint(x: -0.10, y: 0.18))
-
-        let sideGlow = NSGradient(
-            starting: isDark ? NSColor(red: 0.14, green: 0.20, blue: 0.30, alpha: 0.28) : NSColor(red: 0.74, green: 0.82, blue: 0.94, alpha: 0.30),
-            ending: base.withAlphaComponent(0)
-        )
-        sideGlow?.draw(in: NSRect(x: rect.width * 0.36, y: rect.height * 0.42, width: rect.width * 0.88, height: rect.height * 0.72), relativeCenterPosition: NSPoint(x: 0.22, y: -0.10))
-
-        let gridColor = isDark ? NSColor.white.withAlphaComponent(0.024) : NSColor.black.withAlphaComponent(0.022)
-        gridColor.setStroke()
-        let grid = NSBezierPath()
-        grid.lineWidth = 0.5
-        var x: CGFloat = 22
-        while x < rect.width {
-            grid.move(to: NSPoint(x: x, y: 0))
-            grid.line(to: NSPoint(x: x, y: rect.height))
-            x += 44
+        if #available(macOS 26.0, *) {
+            // Native Liquid Glass backing — the same engine system menus use on 26.
+            let glass = NSGlassEffectView(frame: bounds)
+            glass.cornerRadius = 22
+            glass.style = .regular
+            glass.autoresizingMask = [.width, .height]
+            addSubview(glass)
+        } else {
+            let material = NSVisualEffectView(frame: bounds)
+            // `.menu` matches the material native status-bar menus use (`.popover`
+            // renders with a cooler tint on dark mode).
+            material.material = .menu
+            material.blendingMode = .behindWindow
+            material.state = .active
+            material.wantsLayer = true
+            material.layer?.cornerRadius = 22
+            material.layer?.masksToBounds = true
+            material.autoresizingMask = [.width, .height]
+            addSubview(material)
         }
-        var y: CGFloat = 22
-        while y < rect.height {
-            grid.move(to: NSPoint(x: 0, y: y))
-            grid.line(to: NSPoint(x: rect.width, y: y))
-            y += 44
-        }
-        grid.stroke()
-
-        (isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.09)).setStroke()
-        let border = rect.insetBy(dx: 1, dy: 1).roundedPath(radius: 24)
-        border.lineWidth = 1
-        border.stroke()
     }
 }
 
 final class FlippedContainerView: NSView {
     override var isFlipped: Bool { true }
+}
+
+final class AccountListTableView: NSTableView, NSTableViewDataSource, NSTableViewDelegate {
+    typealias RowViewProvider = (CodexAccount, NSRect) -> NSView
+
+    private let accounts: [CodexAccount]
+    private let isInteractionEnabled: Bool
+    private let armedEmail: String?
+    private let deleteTitle: String
+    private let rowHeightProvider: (CodexAccount) -> CGFloat
+    private let rowViewProvider: RowViewProvider
+    private let onSelect: (CodexAccount) -> Void
+    private let onDelete: (CodexAccount) -> Void
+
+    init(
+        frame: NSRect,
+        accounts: [CodexAccount],
+        isInteractionEnabled: Bool,
+        armedEmail: String?,
+        deleteTitle: String,
+        rowSpacing: CGFloat,
+        rowHeightProvider: @escaping (CodexAccount) -> CGFloat,
+        rowViewProvider: @escaping RowViewProvider,
+        onSelect: @escaping (CodexAccount) -> Void,
+        onDelete: @escaping (CodexAccount) -> Void
+    ) {
+        self.accounts = accounts
+        self.isInteractionEnabled = isInteractionEnabled
+        self.armedEmail = armedEmail
+        self.deleteTitle = deleteTitle
+        self.rowHeightProvider = rowHeightProvider
+        self.rowViewProvider = rowViewProvider
+        self.onSelect = onSelect
+        self.onDelete = onDelete
+        super.init(frame: frame)
+
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("account"))
+        column.width = frame.width
+        addTableColumn(column)
+        headerView = nil
+        dataSource = self
+        delegate = self
+        style = .plain
+        intercellSpacing = NSSize(width: 0, height: rowSpacing)
+        backgroundColor = .clear
+        selectionHighlightStyle = .none
+        allowsMultipleSelection = false
+        allowsEmptySelection = true
+        columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        focusRingType = .none
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        accounts.count
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        guard accounts.indices.contains(row) else { return 0 }
+        return rowHeightProvider(accounts[row])
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard accounts.indices.contains(row) else { return nil }
+        let account = accounts[row]
+        let contentWidth = tableColumn
+            .flatMap { tableColumns.firstIndex(of: $0) }
+            .map { frameOfCell(atColumn: $0, row: row).width }
+            ?? bounds.width
+        return rowViewProvider(
+            account,
+            NSRect(x: 0, y: 0, width: contentWidth, height: rowHeightProvider(account))
+        )
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        guard isInteractionEnabled, armedEmail == nil, accounts.indices.contains(row) else { return false }
+        return !accounts[row].isActive
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        let row = selectedRow
+        guard accounts.indices.contains(row) else { return }
+        let account = accounts[row]
+        deselectAll(nil)
+        onSelect(account)
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        rowActionsForRow row: Int,
+        edge: NSTableView.RowActionEdge
+    ) -> [NSTableViewRowAction] {
+        guard edge == .trailing,
+              isInteractionEnabled,
+              armedEmail == nil,
+              accounts.indices.contains(row),
+              !accounts[row].isActive else {
+            return []
+        }
+        return [NSTableViewRowAction(style: .destructive, title: deleteTitle) { [weak self] _, row in
+            self?.deleteAccount(at: row)
+        }]
+    }
+
+    func deleteAccount(at row: Int) {
+        guard isInteractionEnabled,
+              accounts.indices.contains(row),
+              !accounts[row].isActive else {
+            return
+        }
+        onDelete(accounts[row])
+    }
 }
 
 final class RoundedPanelView: NSView {
@@ -86,6 +177,7 @@ final class RoundedPanelView: NSView {
     private let cornerRadius: CGFloat
     private let clickAction: (() -> Void)?
     private var trackingArea: NSTrackingArea?
+    private var isHovering = false
 
     init(frame: NSRect, fillColor: NSColor, borderColor: NSColor, cornerRadius: CGFloat = 18, hoverFillColor: NSColor? = nil, clickAction: (() -> Void)? = nil, shadowOpacity: Float = 0.12, shadowRadius: CGFloat = 12) {
         self.fillColor = fillColor
@@ -124,10 +216,12 @@ final class RoundedPanelView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         guard let hoverFillColor else { return }
+        isHovering = true
         layer?.backgroundColor = hoverFillColor.cgColor
     }
 
     override func mouseExited(with event: NSEvent) {
+        isHovering = false
         layer?.backgroundColor = fillColor.cgColor
     }
 
@@ -140,7 +234,14 @@ final class RoundedPanelView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         if let clickAction {
+            let base = hoverFillColor ?? fillColor
+            let pressed = base.blended(withFraction: 0.12, of: .white) ?? base
+            layer?.backgroundColor = pressed.cgColor
             clickAction()
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.layer?.backgroundColor = (self.isHovering ? self.hoverFillColor : nil)?.cgColor ?? self.fillColor.cgColor
+            }
         } else {
             super.mouseDown(with: event)
         }
@@ -228,25 +329,6 @@ final class PanelMarkView: NSView {
     }
 }
 
-final class AccentRailView: NSView {
-    private let color: NSColor
-
-    init(frame: NSRect, color: NSColor) {
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        color.withAlphaComponent(0.92).setFill()
-        bounds.roundedPath(radius: bounds.width / 2).fill()
-    }
-}
-
 final class MetricValueView: NSView {
     private let percent: Int?
     private let color: NSColor
@@ -268,10 +350,12 @@ final class MetricValueView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
+        let valueFont: NSFont = NSFont.roundedSystemFont(ofSize: 32, weight: isActive ? .bold : .semibold)
+        let percentFont: NSFont = NSFont.roundedSystemFont(ofSize: 13, weight: .bold)
         let text = NSMutableAttributedString(
             string: value,
             attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 32, weight: isActive ? .bold : .semibold),
+                .font: valueFont,
                 .foregroundColor: color,
                 .kern: -1.3
             ]
@@ -279,7 +363,7 @@ final class MetricValueView: NSView {
         text.append(NSAttributedString(
             string: "\u{2009}%",
             attributes: [
-                .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+                .font: percentFont,
                 .foregroundColor: color.withAlphaComponent(0.90),
                 .baselineOffset: 3.0,
                 .kern: 0.2
@@ -309,12 +393,29 @@ final class DotView: NSView {
 }
 
 final class ProgressLineView: NSView {
-    private let color: NSColor
+    private let startColor: NSColor
+    private let endColor: NSColor
     private let trackColor: NSColor
     private let percent: CGFloat
 
-    init(frame: NSRect, color: NSColor, trackColor: NSColor = NSColor.white.withAlphaComponent(0.11), percent: CGFloat) {
-        self.color = color
+    init(frame: NSRect, color: NSColor, trackColor: NSColor = NSColor.white.withAlphaComponent(0.11), percent: CGFloat, isMeter: Bool = false) {
+        self.startColor = color
+        self.endColor = isMeter && color == .meterBlue ? .meterBlueDeep : color
+        self.trackColor = trackColor
+        self.percent = max(0, min(1, percent))
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    init(
+        frame: NSRect,
+        startColor: NSColor,
+        endColor: NSColor,
+        trackColor: NSColor = NSColor.white.withAlphaComponent(0.11),
+        percent: CGFloat
+    ) {
+        self.startColor = startColor
+        self.endColor = endColor
         self.trackColor = trackColor
         self.percent = max(0, min(1, percent))
         super.init(frame: frame)
@@ -330,8 +431,282 @@ final class ProgressLineView: NSView {
         trackColor.setFill()
         track.roundedPath(radius: track.height / 2).fill()
         let fill = NSRect(x: track.minX, y: track.minY, width: track.width * percent, height: track.height)
-        color.withAlphaComponent(min(color.alphaComponent, 0.92)).setFill()
-        fill.roundedPath(radius: track.height / 2).fill()
+        guard fill.width > 0 else { return }
+        let clip = fill.roundedPath(radius: track.height / 2)
+        let gradient = NSGradient(starting: startColor, ending: endColor)
+        NSGraphicsContext.saveGraphicsState()
+        clip.addClip()
+        gradient?.draw(in: fill, angle: 0)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
+final class PoolVerdictCardView: NSView {
+    private let presentation: PoolVerdictPresentation
+    private let theme: PanelTheme
+
+    init(frame: NSRect, presentation: PoolVerdictPresentation, theme: PanelTheme) {
+        self.presentation = presentation
+        self.theme = theme
+        let style = Self.style(for: presentation.kind, theme: theme)
+        super.init(frame: frame)
+
+        wantsLayer = true
+        layer?.cornerRadius = 18
+        layer?.backgroundColor = style.fill.cgColor
+        layer?.borderWidth = 1
+        layer?.borderColor = style.border.cgColor
+
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(presentation.accessibilityLabel)
+
+        let showsForecast = presentation.kind != .collecting
+            && presentation.capacityFraction != nil
+            && presentation.coverageLabel != nil
+            && presentation.coverageValue != nil
+            && presentation.accountValue != nil
+            && presentation.accountLabel != nil
+        let headerOffset: CGFloat = showsForecast ? 0 : 24
+        let symbolView = PoolVerdictSymbolView(
+            frame: NSRect(x: 14, y: 12 + headerOffset, width: 32, height: 32),
+            color: style.accent,
+            symbol: style.symbol,
+            accessibilityLabel: presentation.accessibilityLabel
+        )
+        addSubview(symbolView)
+
+        let summaryWidth: CGFloat = showsForecast ? ForecastCardLayout.summaryWidth : 0
+        let summaryGap: CGFloat = showsForecast ? 10 : 0
+        let textTrailingInset: CGFloat = 14 + summaryWidth + summaryGap
+        addSubview(Self.label(
+            frame: NSRect(x: 56, y: 10 + headerOffset, width: bounds.width - 56 - textTrailingInset, height: 19),
+            text: presentation.title,
+            font: .systemFont(ofSize: 15, weight: .semibold),
+            color: theme.primaryText
+        ))
+        addSubview(Self.label(
+            frame: NSRect(x: 56, y: 31 + headerOffset, width: bounds.width - 56 - textTrailingInset, height: 16),
+            text: presentation.subtitle,
+            font: .systemFont(ofSize: 11),
+            color: theme.secondaryText
+        ))
+
+        if let coverageLabel = presentation.coverageLabel,
+           let coverageValue = presentation.coverageValue {
+            let summaryX = bounds.width - 14 - summaryWidth
+            addSubview(Self.label(
+                frame: NSRect(x: summaryX, y: 10, width: summaryWidth, height: 13),
+                text: coverageLabel,
+                font: .systemFont(ofSize: 9.5, weight: .semibold),
+                color: theme.secondaryText,
+                alignment: .right
+            ))
+            let summaryValueLabel = Self.label(
+                frame: NSRect(x: summaryX, y: 23, width: summaryWidth, height: 19),
+                text: coverageValue,
+                font: .monospacedDigitSystemFont(ofSize: 15, weight: .bold),
+                color: style.accent,
+                alignment: .right
+            )
+            summaryValueLabel.setAccessibilityLabel("\(coverageLabel) \(coverageValue)")
+            addSubview(summaryValueLabel)
+        }
+
+        guard showsForecast,
+              let capacityFraction = presentation.capacityFraction,
+              let accountValue = presentation.accountValue,
+              let accountLabel = presentation.accountLabel else { return }
+
+        let accountX = bounds.width - 14 - ForecastCardLayout.accountWidth
+        let trackX = ForecastCardLayout.horizontalInset
+        let trackWidth = accountX - ForecastCardLayout.lowerGap - trackX
+        addSubview(Self.label(
+            frame: NSRect(x: trackX, y: 51, width: trackWidth, height: 12),
+            text: LocalizedText.value(.verdictCapacityWithResets, language: presentation.language),
+            font: .systemFont(ofSize: 9.5, weight: .medium),
+            color: theme.secondaryText
+        ))
+        let trackView = PoolCapacityTrackView(
+            frame: NSRect(
+                x: trackX,
+                y: ForecastCardLayout.trackY,
+                width: trackWidth,
+                height: ForecastCardLayout.trackHeight
+            ),
+            fraction: capacityFraction,
+            accent: style.accent,
+            track: theme.progressTrack
+        )
+        trackView.setAccessibilityIdentifier("pool-capacity-track")
+        trackView.setAccessibilityElement(true)
+        trackView.setAccessibilityRole(.progressIndicator)
+        trackView.setAccessibilityValue("\(Int((capacityFraction * 100).rounded()))%")
+        addSubview(trackView)
+
+        addResetIndicators(
+            presentation.resetIndicators,
+            x: trackX,
+            y: 83,
+            width: trackWidth,
+            accent: style.accent
+        )
+
+        addSubview(Self.label(
+            frame: NSRect(x: accountX, y: 53, width: ForecastCardLayout.accountWidth, height: 20),
+            text: accountValue,
+            font: .monospacedDigitSystemFont(ofSize: 14, weight: .bold),
+            color: theme.primaryText,
+            alignment: .right
+        ))
+        addSubview(Self.label(
+            frame: NSRect(x: accountX, y: 75, width: ForecastCardLayout.accountWidth, height: 14),
+            text: accountLabel,
+            font: .systemFont(ofSize: 9.5, weight: .medium),
+            color: theme.secondaryText,
+            alignment: .right
+        ))
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    private func addResetIndicators(
+        _ indicators: [String],
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        accent: NSColor
+    ) {
+        guard !indicators.isEmpty else { return }
+        let gap: CGFloat = 4
+        let pillWidth = (width - gap * CGFloat(indicators.count - 1)) / CGFloat(indicators.count)
+        for (index, text) in indicators.enumerated() {
+            let pill = NSView(frame: NSRect(
+                x: x + CGFloat(index) * (pillWidth + gap),
+                y: y,
+                width: pillWidth,
+                height: 17
+            ))
+            pill.wantsLayer = true
+            pill.layer?.cornerRadius = 5
+            pill.layer?.backgroundColor = (index == 0
+                ? accent.withAlphaComponent(0.14)
+                : theme.bottomBarFill).cgColor
+            pill.addSubview(Self.label(
+                frame: NSRect(x: 5, y: 2, width: pillWidth - 10, height: 13),
+                text: text,
+                font: .monospacedDigitSystemFont(ofSize: 9, weight: .medium),
+                color: index == 0 ? accent : theme.secondaryText,
+                alignment: .center
+            ))
+            addSubview(pill)
+        }
+    }
+
+    private static func style(for kind: PoolVerdictKind, theme: PanelTheme) -> (accent: NSColor, fill: NSColor, border: NSColor, symbol: String) {
+        switch kind {
+        case .enough:
+            return (.nativeMint, .nativeMint.withAlphaComponent(theme.isDark ? 0.10 : 0.08), .nativeMint.withAlphaComponent(0.38), "checkmark")
+        case .notEnough:
+            return (.nativeRed, .nativeCoral.withAlphaComponent(theme.isDark ? 0.10 : 0.08), .nativeRed.withAlphaComponent(0.38), "xmark")
+        case .collecting:
+            return (theme.secondaryText, theme.bottomBarFill, theme.inactiveCardBorder, "clock.arrow.circlepath")
+        }
+    }
+
+    private static func label(
+        frame: NSRect,
+        text: String,
+        font: NSFont,
+        color: NSColor,
+        alignment: NSTextAlignment = .left
+    ) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.frame = frame
+        label.font = font
+        label.textColor = color
+        label.alignment = alignment
+        label.lineBreakMode = .byTruncatingTail
+        label.usesSingleLineMode = true
+        return label
+    }
+}
+
+private enum ForecastCardLayout {
+    static let horizontalInset: CGFloat = 18
+    static let summaryWidth: CGFloat = 124
+    static let accountWidth: CGFloat = 106
+    static let lowerGap: CGFloat = 12
+    static let trackY: CGFloat = 67
+    static let trackHeight: CGFloat = 8
+}
+
+private final class PoolCapacityTrackView: NSView {
+    private let fraction: CGFloat
+    private let accent: NSColor
+    private let track: NSColor
+
+    init(frame: NSRect, fraction: Double, accent: NSColor, track: NSColor) {
+        self.fraction = CGFloat(max(0, min(1, fraction)))
+        self.accent = accent
+        self.track = track
+        super.init(frame: frame)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        track.setFill()
+        bounds.roundedPath(radius: bounds.height / 2).fill()
+        if fraction > 0 {
+            accent.setFill()
+            NSRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+                .roundedPath(radius: bounds.height / 2)
+                .fill()
+        }
+        accent.setFill()
+        NSRect(x: bounds.maxX - 2, y: 0, width: 2, height: bounds.height)
+            .roundedPath(radius: 1)
+            .fill()
+    }
+}
+
+private final class PoolVerdictSymbolView: NSView {
+    private let color: NSColor
+    private let symbol: String
+
+    init(frame: NSRect, color: NSColor, symbol: String, accessibilityLabel: String) {
+        self.color = color
+        self.symbol = symbol
+        super.init(frame: frame)
+        wantsLayer = true
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        setAccessibilityLabel(accessibilityLabel)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        color.setFill()
+        NSBezierPath(ovalIn: bounds).fill()
+        guard let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) else { return }
+        image.isTemplate = true
+        NSColor.black.withAlphaComponent(0.72).set()
+        image.draw(in: bounds.insetBy(dx: 8, dy: 8))
     }
 }
 
@@ -384,12 +759,14 @@ final class PercentCenterLabelView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
+        let numberFont: NSFont = NSFont.roundedSystemFont(ofSize: 29, weight: .semibold)
+        let percentFont: NSFont = NSFont.roundedSystemFont(ofSize: 15, weight: .semibold)
         let numberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 29, weight: .semibold),
+            .font: numberFont,
             .foregroundColor: color
         ]
         let percentAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 15, weight: .semibold),
+            .font: percentFont,
             .foregroundColor: color.withAlphaComponent(0.92),
             .baselineOffset: -0.5
         ]
@@ -507,7 +884,7 @@ final class UsageRingView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let rect = bounds.insetBy(dx: 10, dy: 10)
-        let lineWidth: CGFloat = isActive ? 4 : 3
+        let lineWidth: CGFloat = isActive ? 5 : 3.5
         let center = NSPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
         let track = NSBezierPath()
@@ -679,6 +1056,8 @@ final class SettingsActionButton: NSButton {
         self.title = title
         bezelStyle = .rounded
         isBordered = false
+        cell?.lineBreakMode = .byTruncatingTail
+        cell?.usesSingleLineMode = true
         font = .systemFont(ofSize: min(12, max(10, frame.height * 0.42)), weight: .semibold)
         contentTintColor = textColor
         focusRingType = .exterior
@@ -758,19 +1137,4 @@ extension DateFormatter {
         return formatter
     }()
 
-    static let apiDayKey: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let apiBackupStamp: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
 }

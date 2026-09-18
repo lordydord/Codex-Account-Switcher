@@ -13,10 +13,8 @@ for key in ProcessInfo.processInfo.environment.keys {
 private let switcherBundleID = "com.mohamedfuad.codexaccountswitcher"
 private let targetBundleIDs: Set<String> = ["com.openai.codex", "com.openai.chat"]
 private let switcherURL = URL(fileURLWithPath: "/Applications/Codex Account Switcher.app")
-private let grace: TimeInterval = 5
 
 final class LifecycleMonitor {
-    private var quitWorkItem: DispatchWorkItem?
     private let workspace = NSWorkspace.shared
 
     init() {
@@ -36,25 +34,14 @@ final class LifecycleMonitor {
         let switcher = running.first { $0.bundleIdentifier == switcherBundleID }
 
         if targetRunning {
-            quitWorkItem?.cancel()
-            quitWorkItem = nil
             if switcher == nil, FileManager.default.fileExists(atPath: switcherURL.path) {
                 workspace.openApplication(at: switcherURL, configuration: .init())
             }
             return
         }
 
-        guard switcher != nil, quitWorkItem == nil else { return }
-        let item = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.quitWorkItem = nil
-            let stillRunning = self.workspace.runningApplications.contains { targetBundleIDs.contains($0.bundleIdentifier ?? "") }
-            if !stillRunning {
-                self.workspace.runningApplications.first { $0.bundleIdentifier == switcherBundleID }?.terminate()
-            }
-        }
-        quitWorkItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + grace, execute: item)
+        // Codex also stops temporarily during account switching and plugin repair.
+        // Keep the switcher alive so it can finish those operations and reopen Codex.
     }
 }
 

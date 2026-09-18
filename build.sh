@@ -34,13 +34,18 @@ CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc "$LIFECYCLE_MONITOR_SOURCE" \
   -o "$RESOURCES_DIR/CodexLifecycleMonitor"
 
 CLANG_MODULE_CACHE_PATH="$MODULE_CACHE_DIR" swiftc \
+  "$ROOT_DIR/Sources/Localization.swift" \
   "$ROOT_DIR/Sources/AppInfrastructure.swift" \
   "$ROOT_DIR/Sources/Models.swift" \
   "$ROOT_DIR/Sources/PanelComponents.swift" \
+  "$ROOT_DIR/Sources/AccountRowView.swift" \
+  "$ROOT_DIR/Sources/SettingsView.swift" \
   "$ROOT_DIR/Sources/main.swift" \
   -target arm64-apple-macosx14.0 \
   -module-cache-path "$MODULE_CACHE_DIR" \
   -framework AppKit \
+  -framework SwiftUI \
+  -framework Charts \
   -framework UserNotifications \
   -o "$BIN_PATH"
 
@@ -68,9 +73,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.8.3.2</string>
+  <string>1.8.5</string>
   <key>CFBundleVersion</key>
-  <string>1832</string>
+  <string>185</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
