@@ -11,7 +11,8 @@ Rules for future work:
 - The app depends on `codex-auth`; do not vendor or copy private `~/.codex/accounts` data into the repository.
 - Build verification is `./build.sh`.
 - Install verification is `./install.sh`, then confirm the app runs from `/Applications/Codex Account Switcher.app`.
-- Current local app update is v1.8.3.2 / build 1832 with all-account live usage refresh, last-known-good usage retention, a frosted popover background, post-reset missing-window handling, centrally presented reset confirmation, extended reset verification, compact generation-safe switch/reset status animations, cached concurrent reset-credit refreshes, bounded async networking, command timeouts, dynamic Computer Use discovery, automated infrastructure tests, backup pruning, verified reset-credit redemption, the graphite control-deck redesign, transactional verified switching, rollback, best-account scoring, a native lifecycle monitor, privacy-safe diagnostics, clipboard restoration, local ad-hoc signing, API-mode rollback, and the non-executing Route B prototype.
+- Current app release is v3.0 / build 3000: a full macOS 27 Liquid Glass redesign (AccountPanelView.swift, glass components in PanelComponents.swift, PanelTheme in Models.swift), a performance pass (cached codex-auth path, signature-gated panel rebuilds, event-driven relaunch and process waits, ephemeral URLSession), and removal of the retired API mode and hidden legacy menu. It keeps transactional verified switching, rollback, best-account scoring, verified reset-credit redemption, the lifecycle monitor, privacy-safe diagnostics and the non-executing Route B prototype.
+- The GitHub Pages site in docs/ and the README artwork are generated from demo-mode captures (CODEX_ACCOUNT_SWITCHER_DEMO=1, CODEX_ACCOUNT_SWITCHER_DEMO_SCENARIO=two|four, CODEX_ACCOUNT_SWITCHER_APPEARANCE=dark|light).
 
 Potential v2.5 idea:
 

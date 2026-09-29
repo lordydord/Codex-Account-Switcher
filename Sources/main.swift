@@ -4,1615 +4,6 @@ import Foundation
 import Security
 import UserNotifications
 
-final class AccountSwitcherPanelView: NSView {
-    private let accounts: [CodexAccount]
-    private let activeAccount: CodexAccount?
-    private let mode: AccountPanelMode
-    private let lastUpdatedText: String
-    private let lastError: String?
-    private let isSwitching: Bool
-    private let launchAtLoginEnabled: Bool
-    private let remindersEnabled: Bool
-    private let reminderThreshold: Int
-    private let autoSwitchEnabled: Bool
-    private let autoSwitchThreshold: Int
-    private let autoSwitchMode: AutoSwitchMode
-    private let autoResumeMode: AutoResumeMode
-    private let confirmBeforeSwitching: Bool
-    private let armedSwitchEmail: String?
-    private let protectFrontmostCodex: Bool
-    private let apiModeActive: Bool
-    private let apiKeyConfigured: Bool
-    private let usageKeyConfigured: Bool
-    private let apiUsage: ApiUsageSnapshot
-    private let resetCreditsByEmail: [String: ResetCreditsSnapshot]
-    private let healthStatuses: [HealthStatus]
-    private let routeBProfiles: [RouteBProviderProfile]
-    private let selectedRouteBProfileID: String?
-    private let usageMode: UsageDisplayMode
-    private let toolbarDisplayStyle: ToolbarDisplayStyle
-    private let activeRefreshInterval: Int
-    private let idleRefreshInterval: Int
-    private let labelForAccount: (CodexAccount) -> String
-    private let compactEmail: (String) -> String
-    private let switchAccount: (String) -> Void
-    private let refresh: () -> Void
-    private let showSettings: () -> Void
-    private let checkUpdates: () -> Void
-    private let editAccountLabel: (String) -> Void
-    private let showResetCredits: () -> Void
-    private let redeemResetCredit: (String, String) -> Void
-    private let selectRouteBProfile: (String) -> Void
-    private let performSettingsAction: (SettingsPanelAction) -> Void
-    private let close: () -> Void
-    private let toggleLaunchAtLogin: () -> Void
-    private var theme: PanelTheme { PanelTheme.current(for: effectiveAppearance) }
-    private let outerInset: CGFloat = 18
-    private let usageInset: CGFloat = 14
-    private let cardGap: CGFloat = 12
-    private let bottomBarTopGap: CGFloat = 10
-    private let bottomBarHeight: CGFloat = 44
-    private let usageHeaderHeight: CGFloat = 66
-    private let usageHeaderGap: CGFloat = 10
-    private var usesCompactGrid: Bool {
-        mode == .usage && accounts.count >= 3
-    }
-    private var accountCardHeight: CGFloat {
-        bounds.height - (usageInset * 2) - usageHeaderHeight - usageHeaderGap - bottomBarTopGap - bottomBarHeight
-    }
-
-    init(
-        accounts: [CodexAccount],
-        activeAccount: CodexAccount?,
-        mode: AccountPanelMode,
-        lastUpdatedText: String,
-        lastError: String?,
-        isSwitching: Bool,
-        launchAtLoginEnabled: Bool,
-        remindersEnabled: Bool,
-        reminderThreshold: Int,
-        autoSwitchEnabled: Bool,
-        autoSwitchThreshold: Int,
-        autoSwitchMode: AutoSwitchMode,
-        autoResumeMode: AutoResumeMode,
-        confirmBeforeSwitching: Bool,
-        armedSwitchEmail: String?,
-        protectFrontmostCodex: Bool,
-        apiModeActive: Bool,
-        apiKeyConfigured: Bool,
-        usageKeyConfigured: Bool,
-        apiUsage: ApiUsageSnapshot,
-        resetCreditsByEmail: [String: ResetCreditsSnapshot],
-        healthStatuses: [HealthStatus],
-        routeBProfiles: [RouteBProviderProfile],
-        selectedRouteBProfileID: String?,
-        usageMode: UsageDisplayMode,
-        toolbarDisplayStyle: ToolbarDisplayStyle,
-        activeRefreshInterval: Int,
-        idleRefreshInterval: Int,
-        labelForAccount: @escaping (CodexAccount) -> String,
-        compactEmail: @escaping (String) -> String,
-        switchAccount: @escaping (String) -> Void,
-        refresh: @escaping () -> Void,
-        showSettings: @escaping () -> Void,
-        checkUpdates: @escaping () -> Void,
-        editAccountLabel: @escaping (String) -> Void,
-        showResetCredits: @escaping () -> Void,
-        redeemResetCredit: @escaping (String, String) -> Void,
-        selectRouteBProfile: @escaping (String) -> Void,
-        performSettingsAction: @escaping (SettingsPanelAction) -> Void,
-        close: @escaping () -> Void,
-        toggleLaunchAtLogin: @escaping () -> Void
-    ) {
-        self.accounts = accounts
-        self.activeAccount = activeAccount
-        self.mode = mode
-        self.lastUpdatedText = lastUpdatedText
-        self.lastError = lastError
-        self.isSwitching = isSwitching
-        self.launchAtLoginEnabled = launchAtLoginEnabled
-        self.remindersEnabled = remindersEnabled
-        self.reminderThreshold = reminderThreshold
-        self.autoSwitchEnabled = autoSwitchEnabled
-        self.autoSwitchThreshold = autoSwitchThreshold
-        self.autoSwitchMode = autoSwitchMode
-        self.autoResumeMode = autoResumeMode
-        self.confirmBeforeSwitching = confirmBeforeSwitching
-        self.armedSwitchEmail = armedSwitchEmail
-        self.protectFrontmostCodex = protectFrontmostCodex
-        self.apiModeActive = apiModeActive
-        self.apiKeyConfigured = apiKeyConfigured
-        self.usageKeyConfigured = usageKeyConfigured
-        self.apiUsage = apiUsage
-        self.resetCreditsByEmail = resetCreditsByEmail
-        self.healthStatuses = healthStatuses
-        self.routeBProfiles = routeBProfiles
-        self.selectedRouteBProfileID = selectedRouteBProfileID
-        self.usageMode = usageMode
-        self.toolbarDisplayStyle = toolbarDisplayStyle
-        self.activeRefreshInterval = activeRefreshInterval
-        self.idleRefreshInterval = idleRefreshInterval
-        self.labelForAccount = labelForAccount
-        self.compactEmail = compactEmail
-        self.switchAccount = switchAccount
-        self.refresh = refresh
-        self.showSettings = showSettings
-        self.checkUpdates = checkUpdates
-        self.editAccountLabel = editAccountLabel
-        self.showResetCredits = showResetCredits
-        self.redeemResetCredit = redeemResetCredit
-        self.selectRouteBProfile = selectRouteBProfile
-        self.performSettingsAction = performSettingsAction
-        self.close = close
-        self.toggleLaunchAtLogin = toggleLaunchAtLogin
-        let panelSize = AccountSwitcherPanelView.preferredSize(mode: mode, accountCount: accounts.count)
-        super.init(frame: NSRect(origin: .zero, size: panelSize))
-        wantsLayer = true
-        layer?.cornerRadius = 22
-        layer?.masksToBounds = true
-        build()
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    static func preferredSize(mode: AccountPanelMode, accountCount: Int) -> NSSize {
-        if mode == .usage && accountCount >= 3 {
-            return NSSize(width: 448, height: 560)
-        }
-        if mode == .usage {
-            return NSSize(width: 424, height: 500)
-        }
-        if mode == .settings {
-            return NSSize(width: 432, height: 650)
-        }
-        if mode == .routeB {
-            return NSSize(width: 468, height: 600)
-        }
-        if mode == .resets && accountCount >= 3 {
-            return NSSize(width: 468, height: 640)
-        }
-        return NSSize(width: 432, height: 520)
-    }
-
-    private func build() {
-        let background = DashboardBackgroundView(frame: bounds)
-        background.autoresizingMask = [.width, .height]
-        addSubview(background)
-
-        switch mode {
-        case .usage:
-            buildUsageContent()
-        case .settings:
-            buildSettingsContent()
-        case .api:
-            buildApiContent()
-        case .routeB:
-            buildRouteBContent()
-        case .resets:
-            buildResetCreditsContent()
-        }
-    }
-
-    private func buildUsageContent() {
-        addSubview(usageHeader(frame: NSRect(x: usageInset, y: usageInset, width: bounds.width - (usageInset * 2), height: usageHeaderHeight)))
-        let cardsY = usageInset + usageHeaderHeight + usageHeaderGap
-
-        if accounts.isEmpty {
-            let empty = emptyStateCard()
-            empty.frame.origin.y = cardsY
-            addSubview(empty)
-        } else if accounts.count >= 3 {
-            buildCompactGridUsageContent()
-        } else {
-            let orderedAccounts = accounts.sorted { left, right in
-                let leftPriority = panelSortPriority(for: left)
-                let rightPriority = panelSortPriority(for: right)
-                if leftPriority != rightPriority {
-                    return leftPriority < rightPriority
-                }
-                return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
-            }
-            let columns = min(orderedAccounts.count, 2)
-            let contentWidth = bounds.width - (usageInset * 2)
-            let cardWidth = columns == 1 ? contentWidth : (contentWidth - cardGap) / 2
-            for (index, account) in orderedAccounts.prefix(2).enumerated() {
-                let x = columns == 1 ? usageInset : usageInset + CGFloat(index) * (cardWidth + cardGap)
-                addSubview(accountCard(account, frame: NSRect(x: x, y: cardsY, width: cardWidth, height: accountCardHeight)))
-            }
-        }
-
-        addSubview(bottomBar(frame: NSRect(x: usageInset, y: bounds.height - usageInset - bottomBarHeight, width: bounds.width - (usageInset * 2), height: bottomBarHeight)))
-    }
-
-    private func buildCompactGridUsageContent() {
-        let orderedAccounts = accounts.sorted { left, right in
-            let leftPriority = panelSortPriority(for: left)
-            let rightPriority = panelSortPriority(for: right)
-            if leftPriority != rightPriority {
-                return leftPriority < rightPriority
-            }
-            return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
-        }
-
-        let contentWidth = bounds.width - (usageInset * 2)
-        let cardWidth = (contentWidth - cardGap) / 2
-        let cardsY = usageInset + usageHeaderHeight + usageHeaderGap
-        let cardAreaHeight = bounds.height - cardsY - usageInset - bottomBarTopGap - bottomBarHeight
-        let cardHeight = (cardAreaHeight - cardGap) / 2
-
-        for index in 0..<4 {
-            let column = index % 2
-            let row = index / 2
-            let x = usageInset + CGFloat(column) * (cardWidth + cardGap)
-            let y = cardsY + CGFloat(row) * (cardHeight + cardGap)
-            let frame = NSRect(x: x, y: y, width: cardWidth, height: cardHeight)
-            if index < orderedAccounts.count {
-                addSubview(compactAccountCard(orderedAccounts[index], frame: frame))
-            } else {
-                addSubview(emptyCompactAccountSlot(frame: frame))
-            }
-        }
-    }
-
-    private func buildSettingsContent() {
-        let contentWidth = bounds.width - (outerInset * 2)
-        addSubview(settingsHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 54)))
-
-        let displaySection = settingsSection(frame: NSRect(x: outerInset, y: 84, width: contentWidth, height: 104), title: "Display")
-        displaySection.addSubview(segmentedRow(label: "Menu bar", frame: NSRect(x: 16, y: 38, width: contentWidth - 32, height: 24), options: [
-            ("Weekly", usageMode == .weekly, SettingsPanelAction.usageWeekly),
-            ("5H", usageMode == .fiveHour, SettingsPanelAction.usageFiveHour)
-        ]))
-        displaySection.addSubview(segmentedRow(label: "Density", frame: NSRect(x: 16, y: 70, width: contentWidth - 32, height: 24), options: [
-            ("Large", toolbarDisplayStyle == .detailed, SettingsPanelAction.styleDetailed),
-            ("Small", toolbarDisplayStyle == .compact, SettingsPanelAction.styleCompact)
-        ]))
-        addSubview(displaySection)
-
-        let automationSection = settingsSection(frame: NSRect(x: outerInset, y: 200, width: contentWidth, height: 220), title: "Automation")
-        automationSection.addSubview(settingToggleRow(title: "Follow Codex / ChatGPT", detail: "Show only while either app is open", isOn: launchAtLoginEnabled, action: .toggleLaunchAtLogin, frame: NSRect(x: 16, y: 34, width: contentWidth - 32, height: 34)))
-        automationSection.addSubview(settingToggleRow(title: "Usage reminder", detail: "Alert at \(reminderThreshold)%", isOn: remindersEnabled, action: .toggleUsageReminder, frame: NSRect(x: 16, y: 70, width: contentWidth - 32, height: 34)))
-        automationSection.addSubview(settingToggleRow(title: "Auto switch", detail: autoSwitchDetailText(), isOn: autoSwitchEnabled, action: .editAutoSwitch, frame: NSRect(x: 16, y: 106, width: contentWidth - 32, height: 34)))
-        automationSection.addSubview(settingToggleRow(title: "Auto resume", detail: autoResumeDetailText(), isOn: autoResumeMode != .off, action: .editAutoResume, frame: NSRect(x: 16, y: 142, width: contentWidth - 32, height: 34)))
-        automationSection.addSubview(settingToggleRow(title: "Confirm before switching", detail: "Arm the account card before relaunch", isOn: confirmBeforeSwitching, action: .toggleConfirmSwitch, frame: NSRect(x: 16, y: 178, width: contentWidth - 32, height: 34)))
-        addSubview(automationSection)
-
-        addSubview(healthSection(frame: NSRect(x: outerInset, y: 432, width: contentWidth, height: 104)))
-        addSubview(settingsFooter(frame: NSRect(x: outerInset, y: 556, width: contentWidth, height: 76)))
-    }
-
-    private func buildRouteBContent() {
-        let contentWidth = bounds.width - (outerInset * 2)
-        addSubview(routeBHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 44)))
-        addSubview(routeBSafetyBanner(frame: NSRect(x: outerInset, y: 72, width: contentWidth, height: 62)))
-
-        for (index, profile) in routeBProfiles.prefix(2).enumerated() {
-            let y = 146 + CGFloat(index) * 142
-            addSubview(routeBProfileCard(profile, frame: NSRect(x: outerInset, y: y, width: contentWidth, height: 130)))
-        }
-
-        addSubview(routeBFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
-    }
-
-    private func buildResetCreditsContent() {
-        let contentWidth = bounds.width - (outerInset * 2)
-        addSubview(resetCreditsHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 44)))
-
-        if accounts.isEmpty {
-            let empty = emptyStateCard()
-            empty.frame = NSRect(x: outerInset, y: 74, width: contentWidth, height: bounds.height - 74 - outerInset)
-            addSubview(empty)
-            return
-        }
-
-        let orderedAccounts = orderedSettingsAccounts()
-        let areaY: CGFloat = 74
-        let areaHeight = bounds.height - areaY - outerInset
-        let columns = orderedAccounts.count >= 4 ? 2 : 1
-        let cardWidth = columns == 1 ? contentWidth : (contentWidth - cardGap) / 2
-
-        if columns == 1 {
-            var y = areaY
-            for account in orderedAccounts {
-                let creditCount = resetCreditsByEmail[account.email]?.availableCredits.count ?? 0
-                let cardHeight = min(188, 132 + CGFloat(max(0, creditCount - 1)) * 19)
-                addSubview(resetCreditAccountCard(account, frame: NSRect(x: outerInset, y: y, width: cardWidth, height: cardHeight)))
-                y += cardHeight + cardGap
-            }
-            return
-        }
-
-        let rows = Int(ceil(Double(orderedAccounts.count) / Double(columns)))
-        let cardHeight = (areaHeight - CGFloat(max(0, rows - 1)) * cardGap) / CGFloat(max(1, rows))
-
-        for (index, account) in orderedAccounts.enumerated() {
-            let column = index % columns
-            let row = index / columns
-            let x = outerInset + CGFloat(column) * (cardWidth + cardGap)
-            let y = areaY + CGFloat(row) * (cardHeight + cardGap)
-            addSubview(resetCreditAccountCard(account, frame: NSRect(x: x, y: y, width: cardWidth, height: cardHeight)))
-        }
-    }
-
-    private func resetCreditsHeader(frame: NSRect) -> NSView {
-        let header = FlippedContainerView(frame: frame)
-        header.addSubview(label("RESET VAULT", frame: NSRect(x: 2, y: 0, width: 130, height: 14), size: 9.5, weight: .bold, color: theme.tertiaryText))
-        header.addSubview(label("Usage resets", frame: NSRect(x: 2, y: 13, width: 190, height: 28), size: 24, weight: .bold, color: theme.primaryText))
-        header.addSubview(label(resetCreditsHeaderSubtitle(), frame: NSRect(x: 196, y: 21, width: frame.width - 302, height: 15), size: 10.5, weight: .medium, color: theme.secondaryText, alignment: .right))
-
-        let back = SettingsActionButton(frame: NSRect(x: frame.width - 92, y: 7, width: 92, height: 30), title: "Accounts", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
-        back.target = self
-        back.action = #selector(settingsActionPressed(_:))
-        header.addSubview(back)
-        return header
-    }
-
-    private func resetCreditsHeaderSubtitle() -> String {
-        let state = resetCreditsSummaryState()
-        if state.knownAccounts == 0 {
-            return "Checking saved accounts"
-        }
-        if state.knownTotal == 0 {
-            return state.hasError ? "Some accounts could not be checked" : "No available reset credits"
-        }
-        let suffix = state.hasError ? " plus unchecked accounts" : ""
-        return state.knownTotal == 1 ? "1 available reset\(suffix)" : "\(state.knownTotal) available resets\(suffix)"
-    }
-
-    private func resetCreditAccountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
-        let snapshot = resetCreditsByEmail[account.email]
-        let count = snapshot?.displayCount
-        let countText: String
-        if let count {
-            countText = count == 1 ? "1 RESET" : "\(count) RESETS"
-        } else {
-            countText = "CHECKING"
-        }
-
-        let color = resetCreditsAccentColor(snapshot: snapshot)
-        let card = RoundedPanelView(
-            frame: frame,
-            fillColor: account.isActive ? cardFillColor(isActive: true) : cardFillColor(isActive: false),
-            borderColor: account.isActive ? color.withAlphaComponent(0.45) : cardBorderColor(isActive: false),
-            cornerRadius: accounts.count >= 4 ? 10 : 16
-        )
-
-        let labelText = labelForAccount(account)
-        card.addSubview(label(labelText, frame: NSRect(x: 14, y: 13, width: 42, height: 24), size: 18, weight: .semibold, color: color, alignment: .center))
-        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 58, y: 15, width: frame.width - 148, height: 18), size: 11.5, weight: .semibold, color: theme.primaryText))
-
-        let badge = ResetTimeBadgeView(frame: NSRect(x: frame.width - 86, y: 13, width: 72, height: 22), text: countText, color: color, isActive: account.isActive)
-        card.addSubview(badge)
-
-        let divider = NSView(frame: NSRect(x: 14, y: 48, width: frame.width - 28, height: 1))
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = theme.divider.cgColor
-        card.addSubview(divider)
-
-        if let error = snapshot?.lastError {
-            card.addSubview(label("Unavailable", frame: NSRect(x: 16, y: 64, width: frame.width - 32, height: 18), size: 12, weight: .semibold, color: NSColor.systemOrange))
-            card.addSubview(label(error, frame: NSRect(x: 16, y: 86, width: frame.width - 32, height: 36), size: 10, weight: .medium, color: theme.secondaryText))
-            return card
-        }
-
-        guard let snapshot else {
-            card.addSubview(label("Checking reset credits...", frame: NSRect(x: 16, y: 72, width: frame.width - 32, height: 18), size: 11.5, weight: .semibold, color: theme.secondaryText))
-            return card
-        }
-
-        let credits = sortedAvailableResetCredits(snapshot)
-        if credits.isEmpty {
-            card.addSubview(label("No available reset credits", frame: NSRect(x: 16, y: 72, width: frame.width - 32, height: 18), size: 11.5, weight: .semibold, color: theme.secondaryText))
-            let updated = "Updated \(snapshot.lastUpdatedText)"
-            card.addSubview(label(updated, frame: NSRect(x: 16, y: 94, width: frame.width - 32, height: 16), size: 10, weight: .medium, color: theme.tertiaryText))
-            return card
-        }
-
-        let rowHeight: CGFloat = accounts.count >= 4 ? 34 : 22
-        let maxRows = max(1, Int((frame.height - 58) / rowHeight))
-        for (index, credit) in credits.prefix(maxRows).enumerated() {
-            let y = 58 + CGFloat(index) * rowHeight
-            card.addSubview(resetCreditRow(credit, index: index + 1, account: account, frame: NSRect(x: 14, y: y, width: frame.width - 28, height: rowHeight)))
-        }
-
-        if credits.count > maxRows {
-            let remaining = credits.count - maxRows
-            let text = remaining == 1 ? "1 more reset available" : "\(remaining) more resets available"
-            card.addSubview(label(text, frame: NSRect(x: 16, y: frame.height - 22, width: frame.width - 32, height: 14), size: 9.5, weight: .medium, color: theme.tertiaryText))
-        }
-        return card
-    }
-
-    private func resetCreditsAccentColor(snapshot: ResetCreditsSnapshot?) -> NSColor {
-        if snapshot?.lastError != nil {
-            return .systemOrange
-        }
-        if let count = snapshot?.displayCount, count > 0 {
-            return .systemBlue
-        }
-        return theme.inactiveAccent
-    }
-
-    private func sortedAvailableResetCredits(_ snapshot: ResetCreditsSnapshot) -> [ResetCredit] {
-        snapshot.availableCredits.sorted { left, right in
-            switch (left.expiresAt, right.expiresAt) {
-            case let (left?, right?):
-                return left < right
-            case (.some, nil):
-                return true
-            case (nil, .some):
-                return false
-            case (nil, nil):
-                return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
-            }
-        }
-    }
-
-    private func resetCreditRow(_ credit: ResetCredit, index: Int, account: CodexAccount, frame: NSRect) -> NSView {
-        let row = FlippedContainerView(frame: frame)
-        let urgencyColor = resetCreditUrgencyColor(for: credit)
-        let buttonWidth: CGFloat = 54
-        let buttonX = frame.width - buttonWidth
-        let indexWidth: CGFloat = 34
-        let expiresWidth: CGFloat = min(160, max(118, frame.width * 0.34))
-        let daysX = indexWidth + expiresWidth + 18
-        let daysWidth = max(82, buttonX - daysX - 16)
-        let primaryTextY: CGFloat = frame.height >= 28 ? 1 : 2
-        let buttonHeight: CGFloat = frame.height >= 28 ? 18 : 16
-        let buttonY: CGFloat = primaryTextY
-
-        row.addSubview(label("#\(index)", frame: NSRect(x: 0, y: primaryTextY, width: indexWidth, height: 16), size: 10.8, weight: .semibold, color: urgencyColor))
-        row.addSubview(label(resetCreditExpiryText(credit), frame: NSRect(x: indexWidth, y: primaryTextY, width: expiresWidth, height: 16), size: 10.8, weight: .semibold, color: urgencyColor))
-        row.addSubview(label(resetCreditDaysLeftText(credit), frame: NSRect(x: daysX, y: primaryTextY, width: daysWidth, height: 16), size: 10.8, weight: .semibold, color: urgencyColor))
-        if frame.height >= 28 {
-            row.addSubview(label(resetCreditGrantedText(credit), frame: NSRect(x: indexWidth, y: 17, width: frame.width - indexWidth - buttonWidth - 12, height: 14), size: 9.5, weight: .medium, color: theme.secondaryText))
-        }
-
-        let redeem = SettingsActionButton(frame: NSRect(x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight), title: "Use", color: urgencyColor.withAlphaComponent(theme.isDark ? 0.42 : 0.22), textColor: urgencyColor)
-        redeem.identifier = NSUserInterfaceItemIdentifier(resetCreditActionPayload(email: account.email, creditID: credit.id))
-        redeem.target = self
-        redeem.action = #selector(resetCreditRedeemPressed(_:))
-        redeem.toolTip = "Redeem this reset credit after confirmation"
-        row.addSubview(redeem)
-        return row
-    }
-
-    private func resetCreditExpiryText(_ credit: ResetCredit) -> String {
-        let expires = credit.expiresAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown expiry"
-        return expires
-    }
-
-    private func resetCreditDaysLeftText(_ credit: ResetCredit) -> String {
-        guard let days = resetCreditDaysLeft(credit) else {
-            return "unknown"
-        }
-        if days <= 0 {
-            return "today"
-        }
-        return days == 1 ? "1 day left" : "\(days) days left"
-    }
-
-    private func resetCreditGrantedText(_ credit: ResetCredit) -> String {
-        let granted = credit.grantedAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown grant"
-        return "Grant \(granted)"
-    }
-
-    private func resetCreditDaysLeft(_ credit: ResetCredit) -> Int? {
-        guard let expiresAt = credit.expiresAt else { return nil }
-        let seconds = expiresAt.timeIntervalSince(Date())
-        return max(0, Int(ceil(seconds / 86_400)))
-    }
-
-    private func resetCreditUrgencyColor(for credit: ResetCredit) -> NSColor {
-        guard let days = resetCreditDaysLeft(credit) else {
-            return .systemBlue
-        }
-        if days <= 7 {
-            return .systemRed
-        }
-        if days <= 20 {
-            return .systemOrange
-        }
-        return .systemGreen
-    }
-
-    private func routeBHeader(frame: NSRect) -> NSView {
-        let header = FlippedContainerView(frame: frame)
-        header.addSubview(label("OpenRouter", frame: NSRect(x: 2, y: 1, width: 190, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
-        header.addSubview(label("Route B · secondary profiles", frame: NSRect(x: 2, y: 28, width: 220, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
-
-        let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
-        back.target = self
-        back.action = #selector(settingsActionPressed(_:))
-        header.addSubview(back)
-        return header
-    }
-
-    private func routeBSafetyBanner(frame: NSRect) -> NSView {
-        let banner = RoundedPanelView(
-            frame: frame,
-            fillColor: NSColor.systemIndigo.withAlphaComponent(theme.isDark ? 0.16 : 0.09),
-            borderColor: NSColor.systemIndigo.withAlphaComponent(0.32),
-            cornerRadius: 14
-        )
-        banner.addSubview(label("SECONDARY LANE ONLY", frame: NSRect(x: 14, y: 10, width: frame.width - 28, height: 15), size: 10.5, weight: .bold, color: NSColor.systemIndigo))
-        banner.addSubview(label("No requests or keys in this prototype. Native Codex stays the default", frame: NSRect(x: 14, y: 27, width: frame.width - 28, height: 14), size: 10, weight: .medium, color: theme.secondaryText))
-        banner.addSubview(label("for sends, uploads, accounts, and other live operations.", frame: NSRect(x: 14, y: 41, width: frame.width - 28, height: 14), size: 10, weight: .medium, color: theme.secondaryText))
-        return banner
-    }
-
-    private func routeBProfileCard(_ profile: RouteBProviderProfile, frame: NSRect) -> NSView {
-        let isSelected = profile.id == selectedRouteBProfileID
-        let card = RoundedPanelView(
-            frame: frame,
-            fillColor: cardFillColor(isActive: isSelected),
-            borderColor: isSelected ? NSColor.systemGreen.withAlphaComponent(0.48) : cardBorderColor(isActive: false),
-            cornerRadius: 16
-        )
-        card.addSubview(label(profile.name, frame: NSRect(x: 16, y: 13, width: frame.width - 112, height: 20), size: 15, weight: .semibold, color: theme.primaryText))
-        card.addSubview(label("\(profile.provider) · \(profile.model)", frame: NSRect(x: 16, y: 34, width: frame.width - 32, height: 16), size: 10.5, weight: .medium, color: theme.secondaryText))
-        card.addSubview(label(profile.summary, frame: NSRect(x: 16, y: 53, width: frame.width - 32, height: 16), size: 10.5, weight: .medium, color: theme.valueText))
-
-        let button = SettingsActionButton(
-            frame: NSRect(x: frame.width - 88, y: 12, width: 72, height: 24),
-            title: isSelected ? "Selected" : "Switch",
-            color: isSelected ? NSColor.systemGreen : theme.inactiveButtonFill,
-            textColor: isSelected ? .white : theme.primaryText
-        )
-        button.identifier = NSUserInterfaceItemIdentifier("routeBSelect|\(profile.id)")
-        button.target = self
-        button.action = #selector(settingsActionPressed(_:))
-        button.isEnabled = !isSelected
-        card.addSubview(button)
-
-        var x: CGFloat = 16
-        var y: CGFloat = 82
-        for capability in profile.capabilities {
-            let width = routeBCapabilityWidth(capability.label)
-            if x + width > frame.width - 16 {
-                x = 16
-                y += 27
-            }
-            card.addSubview(routeBCapabilityBadge(capability, frame: NSRect(x: x, y: y, width: width, height: 21)))
-            x += width + 8
-        }
-        return card
-    }
-
-    private func routeBCapabilityBadge(_ capability: RouteBCapability, frame: NSRect) -> NSView {
-        let color: NSColor
-        let symbol: String
-        switch capability.state {
-        case .ready:
-            color = .systemGreen
-            symbol = "✓"
-        case .testRequired:
-            color = .systemOrange
-            symbol = "!"
-        case .blocked:
-            color = .systemRed
-            symbol = "×"
-        }
-
-        let badge = RoundedPanelView(frame: frame, fillColor: color.withAlphaComponent(theme.isDark ? 0.16 : 0.10), borderColor: color.withAlphaComponent(0.34), cornerRadius: 10)
-        badge.addSubview(label("\(symbol)  \(capability.label)", frame: NSRect(x: 8, y: 3, width: frame.width - 16, height: 15), size: 9.5, weight: .semibold, color: color))
-        return badge
-    }
-
-    private func routeBCapabilityWidth(_ text: String) -> CGFloat {
-        max(100, min(180, CGFloat(text.count) * 6.4 + 36))
-    }
-
-    private func routeBFooter(frame: NSRect) -> NSView {
-        let footer = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 14)
-        footer.addSubview(label("Profile selection only · execution disabled", frame: NSRect(x: 14, y: 12, width: frame.width - 110, height: 18), size: 10.5, weight: .semibold, color: theme.secondaryText))
-        let settings = SettingsActionButton(frame: NSRect(x: frame.width - 88, y: 8, width: 76, height: 26), title: "Settings", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        settings.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.settingsView.rawValue)
-        settings.target = self
-        settings.action = #selector(settingsActionPressed(_:))
-        footer.addSubview(settings)
-        return footer
-    }
-
-    private func autoSwitchDetailText() -> String {
-        switch autoSwitchMode {
-        case .off:
-            return "Off"
-        case .ask:
-            return "Ask at \(autoSwitchThreshold)%"
-        case .threshold:
-            return "Switch at \(autoSwitchThreshold)%"
-        case .zero:
-            return "Ask at 0%"
-        }
-    }
-
-    private func autoResumeDetailText() -> String {
-        switch autoResumeMode {
-        case .off:
-            return "Off"
-        case .ask:
-            return "Ask first"
-        case .idle5:
-            return "Idle 5s"
-        case .idle10:
-            return "Idle 10s"
-        case .always:
-            return "Always"
-        }
-    }
-
-    private func buildApiContent() {
-        let contentWidth = bounds.width - (outerInset * 2)
-        addSubview(apiHeader(frame: NSRect(x: outerInset, y: outerInset, width: contentWidth, height: 44)))
-        addSubview(apiUsageCard(frame: NSRect(x: outerInset, y: 74, width: contentWidth, height: 258)))
-        addSubview(apiActionBar(frame: NSRect(x: outerInset, y: 342, width: contentWidth, height: 46)))
-        addSubview(apiFooter(frame: NSRect(x: outerInset, y: bounds.height - outerInset - bottomBarHeight, width: contentWidth, height: bottomBarHeight)))
-    }
-
-    private func settingsHeader(frame: NSRect) -> NSView {
-        let header = FlippedContainerView(frame: frame)
-        header.addSubview(label("CONTROL ROOM", frame: NSRect(x: 2, y: 0, width: 130, height: 14), size: 9.5, weight: .bold, color: theme.tertiaryText))
-        header.addSubview(label("Settings", frame: NSRect(x: 2, y: 14, width: 160, height: 28), size: 24, weight: .bold, color: theme.primaryText))
-        header.addSubview(label("Display, automation and switcher health", frame: NSRect(x: 2, y: 41, width: 240, height: 14), size: 10.5, weight: .medium, color: theme.secondaryText))
-        let openRouter = SettingsActionButton(frame: NSRect(x: frame.width - 176, y: 13, width: 82, height: 30), title: "Route B", color: NSColor.systemIndigo.withAlphaComponent(0.78), textColor: .white)
-        openRouter.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.routeBView.rawValue)
-        openRouter.target = self
-        openRouter.action = #selector(settingsActionPressed(_:))
-        header.addSubview(openRouter)
-
-        let back = SettingsActionButton(frame: NSRect(x: frame.width - 86, y: 13, width: 86, height: 30), title: "Accounts", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
-        back.target = self
-        back.action = #selector(settingsActionPressed(_:))
-        header.addSubview(back)
-        return header
-    }
-
-    private func apiHeader(frame: NSRect) -> NSView {
-        let header = FlippedContainerView(frame: frame)
-        header.addSubview(label("API Mode", frame: NSRect(x: 2, y: 1, width: 160, height: 26), size: 22, weight: .semibold, color: theme.primaryText))
-        let status = apiModeActive ? "Active OpenAI API login" : "Codex account login active"
-        header.addSubview(label(status, frame: NSRect(x: 2, y: 28, width: 220, height: 14), size: 10.5, weight: .medium, color: apiModeActive ? NSColor.systemGreen : theme.secondaryText))
-
-        let back = SettingsActionButton(frame: NSRect(x: frame.width - 78, y: 4, width: 78, height: 28), title: "Usage", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        back.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.usageView.rawValue)
-        back.target = self
-        back.action = #selector(settingsActionPressed(_:))
-        header.addSubview(back)
-        return header
-    }
-
-    private func apiUsageCard(frame: NSRect) -> NSView {
-        let percent = apiUsage.usedPercent
-        let color = apiColor(for: percent)
-        let card = RoundedPanelView(frame: frame, fillColor: apiModeActive ? cardFillColor(isActive: true) : cardFillColor(isActive: false), borderColor: apiModeActive ? color.withAlphaComponent(0.45) : cardBorderColor(isActive: false))
-
-        card.addSubview(label(apiModeActive ? "ACTIVE" : "READY", frame: NSRect(x: 18, y: 18, width: 74, height: 22), size: 12, weight: .semibold, color: apiModeActive ? color : theme.secondaryText))
-        card.addSubview(label("Daily complimentary tokens", frame: NSRect(x: 18, y: 42, width: frame.width - 36, height: 18), size: 12, weight: .medium, color: theme.secondaryText))
-
-        let ringSize: CGFloat = 138
-        let ringX = (frame.width - ringSize) / 2
-        let ringY: CGFloat = 70
-        card.addSubview(UsageRingView(frame: NSRect(x: ringX, y: ringY, width: ringSize, height: ringSize), color: color, trackColor: theme.ringTrack, percent: CGFloat(percent) / 100.0, isActive: true))
-        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: ringY + 31, width: ringSize - 16, height: 46), percent: percent, color: color))
-        card.addSubview(label("USED", frame: NSRect(x: ringX + 12, y: ringY + 73, width: ringSize - 24, height: 16), size: 9.5, weight: .medium, color: theme.secondaryText, alignment: .center))
-
-        let used = tokenText(apiUsage.usedTokens)
-        let limit = tokenText(apiUsage.limitTokens)
-        card.addSubview(label("\(used) / \(limit)", frame: NSRect(x: 24, y: 214, width: frame.width - 48, height: 18), size: 13, weight: .semibold, color: theme.primaryText, alignment: .center))
-
-        let detail = apiUsage.lastError ?? "Updated \(apiUsage.lastUpdatedText) · alert at \(apiUsage.warningPercent)%"
-        card.addSubview(label(detail, frame: NSRect(x: 24, y: 235, width: frame.width - 48, height: 16), size: 10, weight: .medium, color: apiUsage.lastError == nil ? theme.secondaryText : NSColor.systemOrange, alignment: .center))
-        return card
-    }
-
-    private func apiActionBar(frame: NSRect) -> NSView {
-        let bar = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 14)
-        let setup = SettingsActionButton(frame: NSRect(x: 12, y: 10, width: 68, height: 26), title: apiKeyConfigured ? "Keys" : "Setup", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        setup.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.setupApiMode.rawValue)
-        setup.target = self
-        setup.action = #selector(settingsActionPressed(_:))
-        bar.addSubview(setup)
-
-        let switchButton = SettingsActionButton(frame: NSRect(x: 90, y: 10, width: 96, height: 26), title: apiModeActive ? "API Active" : "Use API", color: apiModeActive ? NSColor.systemGreen : theme.inactiveButtonFill, textColor: apiModeActive ? .white : theme.primaryText)
-        switchButton.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.switchApiMode.rawValue)
-        switchButton.target = self
-        switchButton.action = #selector(settingsActionPressed(_:))
-        switchButton.isEnabled = !apiModeActive
-        bar.addSubview(switchButton)
-
-        let limit = SettingsActionButton(frame: NSRect(x: 196, y: 10, width: 58, height: 26), title: "Limit", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        limit.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.editApiLimit.rawValue)
-        limit.target = self
-        limit.action = #selector(settingsActionPressed(_:))
-        bar.addSubview(limit)
-
-        let test = SettingsActionButton(frame: NSRect(x: frame.width - 70, y: 10, width: 58, height: 26), title: "Test", color: theme.bottomBarFill, textColor: theme.primaryText)
-        test.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.testApiReminder.rawValue)
-        test.target = self
-        test.action = #selector(settingsActionPressed(_:))
-        bar.addSubview(test)
-        return bar
-    }
-
-    private func apiFooter(frame: NSRect) -> NSView {
-        let footer = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 14)
-        let api = iconButton(symbol: "server.rack", frame: NSRect(x: 16, y: 9, width: 24, height: 24), action: #selector(apiPressed(_:)), toolTip: "API mode")
-        footer.addSubview(api)
-
-        let centerText = apiModeActive ? "switch back from account card" : "switch API on when ready"
-        footer.addSubview(CenteredTextView(frame: NSRect(x: 68, y: 10, width: frame.width - 136, height: 22), text: centerText, size: 12.5, weight: .medium, color: theme.primaryText, alignment: .center))
-
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: frame.width - 86, y: 9, width: 24, height: 24), action: #selector(apiRefreshPressed), toolTip: "Refresh API token usage")
-        footer.addSubview(refreshButton)
-        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: frame.width - 40, y: 9, width: 24, height: 24), action: #selector(closePressed), toolTip: "Quit Account Switcher")
-        footer.addSubview(closeButton)
-        return footer
-    }
-
-    private func settingsSection(frame: NSRect, title: String) -> NSView {
-        let section = RoundedPanelView(frame: frame, fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false), cornerRadius: 18, shadowOpacity: 0.07, shadowRadius: 10)
-        section.addSubview(label(title, frame: NSRect(x: 16, y: 12, width: frame.width - 32, height: 18), size: 12.5, weight: .bold, color: theme.primaryText))
-        return section
-    }
-
-    private func healthSection(frame: NSRect) -> NSView {
-        let section = settingsSection(frame: frame, title: "Health")
-        let rows = Array(healthStatuses.prefix(6))
-        let badgeWidth = (frame.width - 40) / 2
-        for (index, status) in rows.enumerated() {
-            let column = index % 2
-            let row = index / 2
-            let x = 14 + CGFloat(column) * (badgeWidth + 12)
-            let y = 28 + CGFloat(row) * 22
-            section.addSubview(healthBadge(status, frame: NSRect(x: x, y: y, width: badgeWidth, height: 14)))
-        }
-        return section
-    }
-
-    private func healthBadge(_ status: HealthStatus, frame: NSRect) -> NSView {
-        let badge = FlippedContainerView(frame: frame)
-        let dot = DotView(frame: NSRect(x: 0, y: 4, width: 6, height: 6), color: status.color)
-        badge.addSubview(dot)
-        badge.addSubview(label(status.title, frame: NSRect(x: 12, y: 0, width: 56, height: 14), size: 8.8, weight: .medium, color: theme.secondaryText))
-        badge.addSubview(label(status.value, frame: NSRect(x: 66, y: 0, width: frame.width - 66, height: 14), size: 8.8, weight: .semibold, color: theme.primaryText, alignment: .right))
-        return badge
-    }
-
-    private func settingsAccountRow(_ account: CodexAccount, frame: NSRect) -> NSView {
-        let row = FlippedContainerView(frame: frame)
-        let accent = account.isActive ? NSColor.systemGreen : theme.inactiveAccent
-        row.addSubview(label(labelForAccount(account), frame: NSRect(x: 0, y: 0, width: 42, height: 24), size: 14, weight: .semibold, color: accent, alignment: .center))
-        row.addSubview(label(compactSettingsEmail(account.email), frame: NSRect(x: 48, y: 2, width: 126, height: 20), size: 11.5, weight: .medium, color: theme.primaryText))
-
-        let switchButton = SettingsActionButton(frame: NSRect(x: frame.width - 150, y: 1, width: 58, height: 22), title: account.isActive ? "Active" : "Switch", color: account.isActive ? NSColor.systemGreen : theme.inactiveButtonFill, textColor: account.isActive ? .white : theme.primaryText)
-        switchButton.identifier = NSUserInterfaceItemIdentifier("switch|\(account.email)")
-        switchButton.target = self
-        switchButton.action = #selector(accountSettingsActionPressed(_:))
-        switchButton.isEnabled = !account.isActive && !isSwitching
-        row.addSubview(switchButton)
-
-        let labelButton = SettingsActionButton(frame: NSRect(x: frame.width - 84, y: 1, width: 40, height: 22), title: "Label", color: theme.bottomBarFill, textColor: theme.primaryText)
-        labelButton.identifier = NSUserInterfaceItemIdentifier(SettingsPanelAction.editLabels.rawValue)
-        labelButton.target = self
-        labelButton.action = #selector(settingsActionPressed(_:))
-        row.addSubview(labelButton)
-
-        let removeButton = SettingsActionButton(frame: NSRect(x: frame.width - 38, y: 1, width: 38, height: 22), title: "Del", color: theme.bottomBarFill, textColor: NSColor.systemRed)
-        removeButton.identifier = NSUserInterfaceItemIdentifier("remove|\(account.email)")
-        removeButton.target = self
-        removeButton.action = #selector(accountSettingsActionPressed(_:))
-        removeButton.isEnabled = !isSwitching
-        row.addSubview(removeButton)
-        return row
-    }
-
-    private func segmentedRow(label title: String, frame: NSRect, options: [(String, Bool, SettingsPanelAction)]) -> NSView {
-        let row = FlippedContainerView(frame: frame)
-        row.addSubview(label(title, frame: NSRect(x: 0, y: 2, width: 76, height: 18), size: 11, weight: .medium, color: theme.secondaryText))
-        let segmentWidth = (frame.width - 84) / CGFloat(options.count)
-        for (index, option) in options.enumerated() {
-            let color = option.1 ? NSColor.systemGreen : theme.bottomBarFill
-            let textColor = option.1 ? NSColor.white : theme.primaryText
-            let button = SettingsActionButton(frame: NSRect(x: 84 + CGFloat(index) * segmentWidth, y: 0, width: segmentWidth - 6, height: 24), title: option.0, color: color, textColor: textColor)
-            button.identifier = NSUserInterfaceItemIdentifier(option.2.rawValue)
-            button.target = self
-            button.action = #selector(settingsActionPressed(_:))
-            row.addSubview(button)
-        }
-        return row
-    }
-
-    private func settingToggleRow(title: String, detail: String, isOn: Bool, action: SettingsPanelAction, frame: NSRect) -> NSView {
-        let row = FlippedContainerView(frame: frame)
-        row.addSubview(label(title, frame: NSRect(x: 0, y: 1, width: frame.width - 52, height: 16), size: 11.5, weight: .semibold, color: theme.primaryText))
-        row.addSubview(label(detail, frame: NSRect(x: 0, y: 18, width: frame.width - 52, height: 14), size: 9.5, weight: .medium, color: theme.secondaryText))
-        let toggle = MiniSwitchButton(frame: NSRect(x: frame.width - 40, y: 6, width: 38, height: 24), isOn: isOn, offColor: theme.switchOffFill)
-        toggle.identifier = NSUserInterfaceItemIdentifier(action.rawValue)
-        toggle.target = self
-        toggle.action = #selector(settingsActionPressed(_:))
-        row.addSubview(toggle)
-        return row
-    }
-
-    private func settingsFooter(frame: NSRect) -> NSView {
-        let footer = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 18, shadowOpacity: 0.06)
-        let actions: [(String, SettingsPanelAction)] = [
-            ("Add account", .addAccount),
-            ("Device login", .addDeviceAccount),
-            ("Reminder", .editUsageReminder),
-            ("Refresh rate", .editRefresh),
-            ("Check update", .checkUpdates),
-            ("Diagnostics", .diagnostics)
-        ]
-        let inset: CGFloat = 10
-        let gap: CGFloat = 8
-        let buttonWidth = (frame.width - (inset * 2) - (gap * 2)) / 3
-        for (index, action) in actions.enumerated() {
-            let column = index % 3
-            let row = index / 3
-            let x = inset + CGFloat(column) * (buttonWidth + gap)
-            let y = 8 + CGFloat(row) * 32
-            let button = SettingsActionButton(frame: NSRect(x: x, y: y, width: buttonWidth, height: 26), title: action.0, color: theme.inactiveButtonFill, textColor: theme.primaryText)
-            button.identifier = NSUserInterfaceItemIdentifier(action.1.rawValue)
-            button.target = self
-            button.action = #selector(settingsActionPressed(_:))
-            footer.addSubview(button)
-        }
-        return footer
-    }
-
-    private func makeHeader() -> NSView {
-        let view = FlippedContainerView(frame: NSRect(x: 0, y: 0, width: 520, height: 88))
-
-        let icon = CircleIconView(frame: NSRect(x: 38, y: 24, width: 42, height: 42), color: .systemIndigo, symbol: "chevron.left.forwardslash.chevron.right")
-        view.addSubview(icon)
-
-        let title = label("Codex Control", frame: NSRect(x: 98, y: 23, width: 250, height: 28), size: 22, weight: .semibold, color: .white.withAlphaComponent(0.94))
-        view.addSubview(title)
-
-        let subtitleText = activeAccount.map { "Active account \(labelForAccount($0))" } ?? (lastError ?? "No active account")
-        let subtitle = label(subtitleText, frame: NSRect(x: 99, y: 52, width: 260, height: 19), size: 13, weight: .medium, color: activeAccount == nil ? .systemOrange : .white.withAlphaComponent(0.58))
-        subtitle.lineBreakMode = .byTruncatingTail
-        view.addSubview(subtitle)
-
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: 377, y: 29, width: 32, height: 32), action: #selector(refreshPressed), toolTip: "Refresh usage for all saved accounts")
-        view.addSubview(refreshButton)
-
-        let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: 421, y: 28, width: 34, height: 34), action: #selector(settingsPressed(_:)), toolTip: "Open settings")
-        view.addSubview(settingsButton)
-
-        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: 465, y: 29, width: 32, height: 32), action: #selector(closePressed), toolTip: "Quit Account Switcher")
-        view.addSubview(closeButton)
-
-        return view
-    }
-
-    private func usageHeader(frame: NSRect) -> NSView {
-        let header = RoundedPanelView(
-            frame: frame,
-            fillColor: theme.bottomBarFill,
-            borderColor: theme.inactiveCardBorder,
-            cornerRadius: 18,
-            shadowOpacity: 0.08,
-            shadowRadius: 12
-        )
-
-        let signalColor = activeAccount.map { usageColor(for: $0.fiveHourUsedPercent) } ?? NSColor.systemOrange
-        header.addSubview(PanelMarkView(frame: NSRect(x: 14, y: 12, width: 42, height: 42), color: signalColor))
-        header.addSubview(label("CODEX ACCOUNT ROUTER", frame: NSRect(x: 68, y: 9, width: frame.width - 190, height: 15), size: 9.5, weight: .bold, color: theme.tertiaryText))
-
-        let activeTitle = activeAccount.map { "Account \(labelForAccount($0)) is live" } ?? "No active account"
-        header.addSubview(label(activeTitle, frame: NSRect(x: 68, y: 24, width: frame.width - 190, height: 24), size: 17.5, weight: .semibold, color: theme.primaryText))
-
-        let detail: String
-        if let activeAccount {
-            let plan = activeAccount.plan.isEmpty ? "ChatGPT" : activeAccount.plan.capitalized
-            detail = "\(plan)  ·  5-hour \(percentText(activeAccount.fiveHourUsedPercent))  ·  weekly \(percentText(activeAccount.weeklyUsedPercent))"
-        } else {
-            detail = lastError ?? "Open settings to add or repair an account"
-        }
-        header.addSubview(label(detail, frame: NSRect(x: 68, y: 47, width: frame.width - 184, height: 15), size: 10.5, weight: .medium, color: theme.secondaryText))
-
-        let stateFill = signalColor.withAlphaComponent(theme.isDark ? 0.13 : 0.10)
-        let state = RoundedPanelView(frame: NSRect(x: frame.width - 118, y: 17, width: 104, height: 32), fillColor: stateFill, borderColor: signalColor.withAlphaComponent(0.28), cornerRadius: 10, shadowOpacity: 0)
-        state.addSubview(DotView(frame: NSRect(x: 13, y: 13, width: 6, height: 6), color: signalColor))
-        state.addSubview(CenteredTextView(frame: NSRect(x: 0, y: 5, width: 104, height: 22), text: activeAccount == nil ? "OFFLINE" : "CONNECTED", size: 9.2, weight: .bold, color: signalColor, alignment: .center))
-        header.addSubview(state)
-        return header
-    }
-
-    private func compactAccountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
-        let weeklyPercent = account.weeklyUsedPercent
-        let fiveHourPercent = account.fiveHourUsedPercent
-        let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
-        let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
-        let usageWeight: NSFont.Weight = account.isActive ? .bold : .semibold
-        let card = RoundedPanelView(
-            frame: frame,
-            fillColor: cardFillColor(for: account),
-            borderColor: cardBorderColor(for: account),
-            cornerRadius: 16,
-            hoverFillColor: account.isActive || isSwitching ? nil : theme.inactiveCardHoverFill,
-            clickAction: account.isActive || isSwitching ? nil : { [weak self] in
-                self?.switchAccount(account.email)
-            },
-            shadowOpacity: account.isActive ? 0.18 : 0.09,
-            shadowRadius: account.isActive ? 18 : 10
-        )
-
-        if account.isActive {
-            card.addSubview(AccentRailView(frame: NSRect(x: 0, y: 18, width: 3, height: frame.height - 36), color: fiveHourColor))
-        }
-
-        let isArmed = confirmBeforeSwitching && armedSwitchEmail == account.email && !account.isActive
-        let statusTitle = account.isActive ? "ACTIVE" : (isSwitching ? "..." : (isArmed ? "CONFIRM" : "SWITCH"))
-        let buttonColor = account.isActive ? fiveHourColor.withAlphaComponent(0.82) : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
-        let switchButtonWidth: CGFloat = isArmed ? 68 : 58
-        let switchButton = PillButton(frame: NSRect(x: frame.width - switchButtonWidth - 14, y: 14, width: switchButtonWidth, height: 24), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
-        switchButton.toolTip = isArmed ? "Confirm \(switchPreviewText(for: account))" : switchPreviewText(for: account)
-        switchButton.target = self
-        switchButton.action = #selector(accountSwitchPressed(_:))
-        switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
-        switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
-        card.addSubview(switchButton)
-
-        let identityWidth = max(80, frame.width - switchButtonWidth - 46)
-        let emailText = compactCardEmail(account.email)
-        card.addSubview(label(emailText, frame: NSRect(x: 16, y: 16, width: identityWidth, height: 20), size: 10.8, weight: .semibold, color: account.isActive ? fiveHourColor : theme.primaryText))
-        let emailButton = NSButton(frame: NSRect(x: 16, y: 14, width: identityWidth, height: 24))
-        emailButton.title = ""
-        emailButton.bezelStyle = .regularSquare
-        emailButton.isBordered = false
-        emailButton.isTransparent = true
-        emailButton.focusRingType = .exterior
-        emailButton.setAccessibilityLabel(emailText)
-        emailButton.identifier = NSUserInterfaceItemIdentifier("label|\(account.email)")
-        emailButton.target = self
-        emailButton.action = #selector(accountSettingsActionPressed(_:))
-        emailButton.toolTip = "Edit account label"
-        card.addSubview(emailButton)
-
-        let contentX: CGFloat = 16
-        let contentWidth = frame.width - 32
-        let valueY: CGFloat = 50
-        card.addSubview(MetricValueView(frame: NSRect(x: contentX, y: valueY, width: 94, height: 44), percent: fiveHourPercent, color: fiveHourColor, isActive: account.isActive))
-        card.addSubview(label("5-hour left", frame: NSRect(x: frame.width - 96, y: valueY + 4, width: 80, height: 16), size: 10.5, weight: .semibold, color: theme.secondaryText, alignment: .right))
-        card.addSubview(label("resets \(fiveHourResetTimeText(from: account.fiveHourUsage))", frame: NSRect(x: frame.width - 110, y: valueY + 21, width: 94, height: 15), size: 9.5, weight: .medium, color: theme.tertiaryText, alignment: .right))
-        card.addSubview(ProgressLineView(frame: NSRect(x: contentX, y: 96, width: contentWidth, height: account.isActive ? 9 : 7), color: fiveHourColor, trackColor: theme.progressTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100))
-
-        let dividerY: CGFloat = 112
-        let divider = NSView(frame: NSRect(x: contentX, y: dividerY, width: contentWidth, height: 1))
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = theme.divider.cgColor
-        card.addSubview(divider)
-
-        let lowerY: CGFloat = 125
-        let halfWidth = (contentWidth - 13) / 2
-        card.addSubview(label("Weekly", frame: NSRect(x: contentX, y: lowerY, width: halfWidth, height: 14), size: 9.5, weight: .semibold, color: theme.tertiaryText))
-        card.addSubview(label(percentText(weeklyPercent), frame: NSRect(x: contentX, y: lowerY + 16, width: halfWidth, height: 20), size: 15, weight: usageWeight, color: weeklyColor))
-
-        let lowerDivider = NSView(frame: NSRect(x: contentX + halfWidth + 6, y: lowerY, width: 1, height: 37))
-        lowerDivider.wantsLayer = true
-        lowerDivider.layer?.backgroundColor = theme.divider.cgColor
-        card.addSubview(lowerDivider)
-
-        let resetX = contentX + halfWidth + 14
-        card.addSubview(label("Weekly reset", frame: NSRect(x: resetX, y: lowerY, width: halfWidth, height: 14), size: 9.5, weight: .semibold, color: theme.tertiaryText))
-        card.addSubview(label(weeklyResetText(from: account.weeklyUsage), frame: NSRect(x: resetX, y: lowerY + 16, width: halfWidth - 2, height: 20), size: 12, weight: .semibold, color: weeklyColor))
-        card.addSubview(ProgressLineView(frame: NSRect(x: contentX, y: lowerY + 44, width: contentWidth, height: 6), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100))
-        return card
-    }
-
-    private func emptyCompactAccountSlot(frame: NSRect) -> NSView {
-        let card = RoundedPanelView(frame: frame, fillColor: theme.inactiveCardFill, borderColor: theme.inactiveCardBorder, cornerRadius: 16, hoverFillColor: theme.inactiveCardHoverFill, clickAction: { [weak self] in self?.showSettings() }, shadowOpacity: 0.05)
-        card.addSubview(SymbolIconView(frame: NSRect(x: (frame.width - 28) / 2, y: (frame.height - 54) / 2, width: 28, height: 28), symbol: "plus", color: theme.iconTint.withAlphaComponent(0.62)))
-        card.addSubview(label("Add another account", frame: NSRect(x: 14, y: (frame.height / 2) + 13, width: frame.width - 28, height: 18), size: 11, weight: .semibold, color: theme.secondaryText, alignment: .center))
-        return card
-    }
-
-    private func accountCard(_ account: CodexAccount, frame: NSRect) -> NSView {
-        let weeklyPercent = account.weeklyUsedPercent
-        let fiveHourPercent = account.fiveHourUsedPercent
-        let weeklyColor = accentColor(for: weeklyPercent, isActive: account.isActive)
-        let fiveHourColor = accentColor(for: fiveHourPercent, isActive: account.isActive)
-        let usageWeight: NSFont.Weight = account.isActive ? .semibold : .medium
-        let fullProgressHeight = progressLineHeight(isActive: account.isActive)
-        let card = RoundedPanelView(
-            frame: frame,
-            fillColor: cardFillColor(for: account),
-            borderColor: cardBorderColor(for: account),
-            hoverFillColor: account.isActive || isSwitching ? nil : theme.inactiveCardHoverFill,
-            clickAction: account.isActive || isSwitching ? nil : { [weak self] in
-                self?.switchAccount(account.email)
-            }
-        )
-        let labelText = labelForAccount(account)
-
-        let isArmed = confirmBeforeSwitching && armedSwitchEmail == account.email && !account.isActive
-        let statusTitle = account.isActive ? "  ACTIVE" : (isSwitching ? "SWITCHING..." : (isArmed ? "CONFIRM" : "SWITCH"))
-        let buttonColor = account.isActive ? fiveHourColor : (isArmed ? NSColor.systemBlue : theme.usageInactiveButtonFill)
-        let switchButtonWidth: CGFloat = account.isActive ? 74 : (isArmed ? 80 : 66)
-        let switchButton = PillButton(frame: NSRect(x: 18, y: 18, width: switchButtonWidth, height: 26), title: statusTitle, color: buttonColor, showsDot: isArmed, allowsHover: !account.isActive)
-        switchButton.toolTip = isArmed ? "Confirm \(switchPreviewText(for: account))" : switchPreviewText(for: account)
-        switchButton.target = self
-        switchButton.action = #selector(accountSwitchPressed(_:))
-        switchButton.identifier = NSUserInterfaceItemIdentifier(account.email)
-        switchButton.isEnabled = !account.isActive && !isSwitching && !accounts.isEmpty
-        card.addSubview(switchButton)
-
-        let accountSettingsButton = AccountMoreButton(frame: NSRect(x: frame.width - 62, y: 14, width: 46, height: 38), tintColor: account.isActive ? fiveHourColor : theme.iconTint, label: labelText)
-        accountSettingsButton.identifier = NSUserInterfaceItemIdentifier("label|\(account.email)")
-        accountSettingsButton.target = self
-        accountSettingsButton.action = #selector(accountSettingsActionPressed(_:))
-        card.addSubview(accountSettingsButton)
-
-        card.addSubview(label(compactCardEmail(account.email), frame: NSRect(x: 8, y: 64, width: frame.width - 16, height: 18), size: 12, weight: .medium, color: theme.tertiaryText, alignment: .center))
-
-        let ringSize: CGFloat = columnsFitWide(frame.width) ? 142 : 126
-        let ringX = (frame.width - ringSize) / 2
-        let ringY: CGFloat = 90
-        let ring = UsageRingView(frame: NSRect(x: ringX, y: ringY, width: ringSize, height: ringSize), color: fiveHourColor, trackColor: theme.ringTrack, percent: CGFloat(fiveHourPercent ?? 0) / 100, isActive: account.isActive)
-        card.addSubview(ring)
-        card.addSubview(PercentCenterLabelView(frame: NSRect(x: ringX + 8, y: ringY + 31, width: ringSize - 16, height: 46), percent: fiveHourPercent, color: fiveHourColor))
-        card.addSubview(label("5H REMAINING", frame: NSRect(x: ringX + 12, y: ringY + 73, width: ringSize - 24, height: 16), size: 9.5, weight: .medium, color: theme.secondaryText, alignment: .center))
-
-        let resetBlockY = ringY + ringSize + 8
-        card.addSubview(resetRow(
-            title: "5H",
-            value: fiveHourResetTimeText(from: account.fiveHourUsage),
-            color: fiveHourColor,
-            isActive: account.isActive,
-            frame: NSRect(x: 22, y: resetBlockY, width: frame.width - 44, height: 22)
-        ))
-        let dividerY = resetBlockY + 32
-        let divider = NSView(frame: NSRect(x: 22, y: dividerY, width: frame.width - 44, height: 1))
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = theme.divider.cgColor
-        card.addSubview(divider)
-
-        let weeklyY = dividerY + 15
-        let weeklyLabel = label("WEEKLY", frame: NSRect(x: 22, y: weeklyY, width: 74, height: 16), size: 10.8, weight: .medium, color: theme.secondaryText)
-        card.addSubview(weeklyLabel)
-        let weeklyValue = label(percentText(weeklyPercent), frame: NSRect(x: frame.width - 70, y: weeklyY, width: 48, height: 16), size: 12, weight: usageWeight, color: weeklyColor, alignment: .right)
-        card.addSubview(weeklyValue)
-
-        let progress = ProgressLineView(frame: NSRect(x: 22, y: weeklyY + 27, width: frame.width - 44, height: fullProgressHeight), color: weeklyColor, trackColor: theme.progressTrack, percent: CGFloat(weeklyPercent ?? 0) / 100)
-        card.addSubview(progress)
-        card.addSubview(resetRow(
-            title: "RESET",
-            value: weeklyResetText(from: account.weeklyUsage),
-            color: weeklyColor,
-            isActive: account.isActive,
-            frame: NSRect(x: 22, y: weeklyY + 44, width: frame.width - 44, height: 22)
-        ))
-        return card
-    }
-
-    private func percentText(_ percent: Int?) -> String {
-        guard let percent else { return "--" }
-        return "\(max(0, min(100, percent)))%"
-    }
-
-    private func percentNumberText(_ percent: Int?) -> String {
-        guard let percent else { return "--" }
-        return "\(max(0, min(100, percent)))"
-    }
-
-    private func switchPreviewText(for account: CodexAccount) -> String {
-        "Switch to \(labelForAccount(account)) · 5H \(percentText(account.fiveHourUsedPercent)) · Weekly \(percentText(account.weeklyUsedPercent))"
-    }
-
-    private func fiveHourResetTimeText(from usage: String) -> String {
-        guard let inner = parenthesizedValue(from: usage) else { return "--.--" }
-        let parts = inner.split(separator: ":")
-        guard parts.count >= 2, let hour = Int(parts[0]) else {
-            return inner
-        }
-        let minute = String(parts[1].prefix(2))
-        return String(format: "%02d.%@", hour, minute)
-    }
-
-    private func weeklyResetText(from usage: String) -> String {
-        guard let inner = parenthesizedValue(from: usage) else { return "--" }
-        let time = firstClockText(in: inner)
-        let day = firstWeekdayText(in: inner) ?? inferredWeekdayText(from: inner)
-
-        switch (time, day) {
-        case let (time?, day?) where !time.isEmpty && !day.isEmpty:
-            return "\(time) \(day)"
-        case let (time?, nil):
-            return time
-        default:
-            return inner.uppercased()
-        }
-    }
-
-    private func firstClockText(in text: String) -> String? {
-        let pattern = #"(?<!\d)(\d{1,2}):(\d{2})(?!\d)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-              let range = Range(match.range, in: text) else {
-            return nil
-        }
-        return String(text[range])
-    }
-
-    private func firstWeekdayText(in text: String) -> String? {
-        for token in text.split(whereSeparator: { !$0.isLetter }) {
-            let day = compactWeekdayText(String(token))
-            if isWeekdayAbbreviation(day) {
-                return day
-            }
-        }
-        return nil
-    }
-
-    private func compactWeekdayText(_ text: String) -> String {
-        let lower = text.trimmingCharacters(in: .punctuationCharacters).lowercased()
-        switch lower {
-        case "monday", "mon":
-            return "MON"
-        case "tuesday", "tue", "tues":
-            return "TUES"
-        case "wednesday", "wed":
-            return "WED"
-        case "thursday", "thu", "thur", "thurs":
-            return "THUR"
-        case "friday", "fri":
-            return "FRI"
-        case "saturday", "sat":
-            return "SAT"
-        case "sunday", "sun":
-            return "SUN"
-        default:
-            return text.uppercased()
-        }
-    }
-
-    private func isWeekdayAbbreviation(_ text: String) -> Bool {
-        ["MON", "TUES", "WED", "THUR", "FRI", "SAT", "SUN"].contains(text)
-    }
-
-    private func inferredWeekdayText(from text: String) -> String? {
-        let cleaned = text
-            .replacingOccurrences(of: ",", with: " ")
-            .replacingOccurrences(of: " on ", with: " ")
-            .replacingOccurrences(of: "  ", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let currentYear = Calendar.current.component(.year, from: Date())
-        let candidates = [
-            cleaned,
-            "\(cleaned) \(currentYear)",
-            "\(currentYear) \(cleaned)"
-        ]
-        let formats = [
-            "HH:mm MMM d yyyy",
-            "HH:mm MMMM d yyyy",
-            "HH:mm d MMM yyyy",
-            "HH:mm d MMMM yyyy",
-            "MMM d HH:mm yyyy",
-            "MMMM d HH:mm yyyy",
-            "d MMM HH:mm yyyy",
-            "d MMMM HH:mm yyyy",
-            "yyyy HH:mm MMM d",
-            "yyyy HH:mm MMMM d",
-            "yyyy HH:mm d MMM",
-            "yyyy HH:mm d MMMM",
-            "yyyy MMM d HH:mm",
-            "yyyy MMMM d HH:mm",
-            "yyyy d MMM HH:mm",
-            "yyyy d MMMM HH:mm"
-        ]
-
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-
-        for candidate in candidates {
-            for format in formats {
-                formatter.dateFormat = format
-                if let date = formatter.date(from: candidate) {
-                    let weekday = Calendar.current.component(.weekday, from: date)
-                    return weekdayText(from: weekday)
-                }
-            }
-        }
-        return nil
-    }
-
-    private func weekdayText(from weekday: Int) -> String? {
-        switch weekday {
-        case 1:
-            return "SUN"
-        case 2:
-            return "MON"
-        case 3:
-            return "TUES"
-        case 4:
-            return "WED"
-        case 5:
-            return "THUR"
-        case 6:
-            return "FRI"
-        case 7:
-            return "SAT"
-        default:
-            return nil
-        }
-    }
-
-    private func resetRow(title: String, value: String, color: NSColor, isActive: Bool, frame: NSRect) -> NSView {
-        let row = FlippedContainerView(frame: frame)
-        row.addSubview(label(title, frame: NSRect(x: 0, y: 3, width: 50, height: 16), size: 10.2, weight: .semibold, color: theme.tertiaryText))
-        row.addSubview(ResetTimeBadgeView(frame: NSRect(x: 56, y: 0, width: frame.width - 56, height: 22), text: value, color: color, isActive: isActive))
-        return row
-    }
-
-    private func parenthesizedValue(from usage: String) -> String? {
-        guard let open = usage.firstIndex(of: "("), let close = usage.firstIndex(of: ")"), open < close else {
-            return nil
-        }
-        return String(usage[usage.index(after: open)..<close])
-    }
-
-    private func compactCardEmail(_ email: String) -> String {
-        let maximumLength = 20
-        guard email.count > maximumLength else { return email }
-        return String(email.prefix(maximumLength - 3)) + "..."
-    }
-
-    private func compactSettingsEmail(_ email: String) -> String {
-        let maximumLength = 21
-        guard email.count > maximumLength else { return email }
-        return String(email.prefix(maximumLength - 3)) + "..."
-    }
-
-    private func columnsFitWide(_ width: CGFloat) -> Bool {
-        width > 200
-    }
-
-    private func orderedSettingsAccounts() -> [CodexAccount] {
-        accounts.sorted { left, right in
-            let leftPriority = panelSortPriority(for: left)
-            let rightPriority = panelSortPriority(for: right)
-            if leftPriority != rightPriority {
-                return leftPriority < rightPriority
-            }
-            return labelForAccount(left).localizedCaseInsensitiveCompare(labelForAccount(right)) == .orderedAscending
-        }
-    }
-
-    private func panelSortPriority(for account: CodexAccount) -> Int {
-        switch labelForAccount(account) {
-        case "L":
-            return 0
-        case "A":
-            return 1
-        default:
-            return 10
-        }
-    }
-
-    private func emptyStateCard() -> NSView {
-        let card = RoundedPanelView(frame: NSRect(x: usageInset, y: usageInset, width: bounds.width - (usageInset * 2), height: accountCardHeight), fillColor: cardFillColor(isActive: false), borderColor: cardBorderColor(isActive: false))
-        card.addSubview(label("No accounts available", frame: NSRect(x: 22, y: 28, width: 240, height: 24), size: 18, weight: .semibold, color: theme.primaryText))
-        card.addSubview(label(lastError ?? "Open settings to add an account.", frame: NSRect(x: 22, y: 62, width: 276, height: 40), size: 12, weight: .medium, color: theme.secondaryText))
-        let settingsButton = SettingsActionButton(frame: NSRect(x: 22, y: 118, width: 92, height: 28), title: "Settings", color: theme.inactiveButtonFill, textColor: theme.primaryText)
-        settingsButton.target = self
-        settingsButton.action = #selector(settingsPressedFromEmptyState)
-        card.addSubview(settingsButton)
-
-        let refreshButton = SettingsActionButton(frame: NSRect(x: 126, y: 118, width: 86, height: 28), title: "Refresh", color: theme.bottomBarFill, textColor: theme.primaryText)
-        refreshButton.target = self
-        refreshButton.action = #selector(refreshPressedFromEmptyState)
-        card.addSubview(refreshButton)
-        return card
-    }
-
-    @objc private func settingsPressedFromEmptyState() {
-        showSettings()
-    }
-
-    @objc private func refreshPressedFromEmptyState() {
-        refresh()
-    }
-
-    private func bottomBar(frame: NSRect) -> NSView {
-        let bar = RoundedPanelView(frame: frame, fillColor: theme.bottomBarFill, borderColor: theme.inactiveCardBorder, cornerRadius: 16)
-        let toolbarInset: CGFloat = 16
-        let toolbarGap: CGFloat = 16
-        let iconSize: CGFloat = 24
-        let clockSize: CGFloat = 20
-        let iconY = (frame.height - iconSize) / 2
-        let clockY = (frame.height - clockSize) / 2
-
-        let settingsButton = iconButton(symbol: "gearshape", frame: NSRect(x: toolbarInset, y: iconY, width: iconSize, height: iconSize), action: #selector(settingsPressed(_:)), toolTip: "Open settings")
-        bar.addSubview(settingsButton)
-
-        let leftDivider = NSView(frame: NSRect(x: toolbarInset + iconSize + 14, y: 10, width: 1, height: frame.height - 20))
-        leftDivider.wantsLayer = true
-        leftDivider.layer?.backgroundColor = theme.divider.cgColor
-        bar.addSubview(leftDivider)
-
-        let closeX = frame.width - toolbarInset - iconSize
-        let refreshX = closeX - toolbarGap - iconSize - 10
-        let resetWidth: CGFloat = frame.width >= 370 ? 82 : 74
-        let resetX = refreshX - resetWidth - 12
-        let clockX = toolbarInset + iconSize + toolbarGap + 12
-        let clock = SymbolIconView(frame: NSRect(x: clockX, y: clockY, width: clockSize, height: clockSize), symbol: "clock", color: theme.iconTint)
-        bar.addSubview(clock)
-        let updatedX = clockX + clockSize + 6
-        let updatedWidth = max(46, resetX - updatedX - 8)
-        bar.addSubview(CenteredTextView(frame: NSRect(x: updatedX, y: (frame.height - 22) / 2, width: updatedWidth, height: 22), text: lastUpdatedText, size: 12.2, weight: .medium, color: theme.primaryText, alignment: .left))
-
-        let resetButton = SettingsActionButton(frame: NSRect(x: resetX, y: 8, width: resetWidth, height: 26), title: resetCreditsButtonTitle(), color: resetCreditsButtonColor(), textColor: resetCreditsButtonTextColor())
-        resetButton.target = self
-        resetButton.action = #selector(resetCreditsPressed(_:))
-        resetButton.toolTip = resetCreditsTooltip()
-        bar.addSubview(resetButton)
-
-        let refreshButton = iconButton(symbol: "arrow.clockwise", frame: NSRect(x: refreshX, y: iconY, width: iconSize, height: iconSize), action: #selector(refreshPressed), toolTip: "Refresh usage for all saved accounts")
-        bar.addSubview(refreshButton)
-
-        let rightDivider = NSView(frame: NSRect(x: refreshX + iconSize + 10, y: 10, width: 1, height: frame.height - 20))
-        rightDivider.wantsLayer = true
-        rightDivider.layer?.backgroundColor = theme.divider.cgColor
-        bar.addSubview(rightDivider)
-
-        let closeButton = iconButton(symbol: "xmark", frame: NSRect(x: closeX, y: iconY, width: iconSize, height: iconSize), action: #selector(closePressed), toolTip: "Quit Account Switcher")
-        closeButton.toolTip = "Quit Account Switcher"
-        bar.addSubview(closeButton)
-        return bar
-    }
-
-    private func resetCreditsButtonTitle() -> String {
-        let state = resetCreditsSummaryState()
-        if state.hasError, state.knownTotal == 0 {
-            return "RESETS ?"
-        }
-        guard state.knownAccounts > 0 else {
-            return "RESETS ..."
-        }
-        if state.knownTotal == 0 {
-            return "NO RESETS"
-        }
-        let suffix = state.hasError ? "+" : ""
-        return state.knownTotal == 1 ? "1\(suffix) RESET" : "\(state.knownTotal)\(suffix) RESETS"
-    }
-
-    private func resetCreditsButtonColor() -> NSColor {
-        let state = resetCreditsSummaryState()
-        if state.hasError, state.knownTotal == 0 {
-            return NSColor.systemOrange.withAlphaComponent(theme.isDark ? 0.34 : 0.20)
-        }
-        if state.knownTotal > 0 {
-            return NSColor.systemBlue.withAlphaComponent(theme.isDark ? 0.42 : 0.22)
-        }
-        return theme.inactiveButtonFill
-    }
-
-    private func resetCreditsButtonTextColor() -> NSColor {
-        let state = resetCreditsSummaryState()
-        if state.hasError, state.knownTotal == 0 {
-            return NSColor.systemOrange
-        }
-        if state.knownTotal > 0 {
-            return NSColor.systemBlue
-        }
-        return theme.primaryText
-    }
-
-    private func resetCreditsTooltip() -> String {
-        let state = resetCreditsSummaryState()
-        if state.hasError, state.knownTotal == 0 {
-            return "One or more reset-credit checks failed"
-        }
-        guard state.knownAccounts > 0 else {
-            return "Checking reset credits"
-        }
-        return state.knownTotal == 0 ? "No Codex reset credits available" : "Show Codex reset credits by account"
-    }
-
-    private func resetCreditsSummaryState() -> (knownTotal: Int, knownAccounts: Int, hasError: Bool) {
-        let snapshots = accounts.compactMap { resetCreditsByEmail[$0.email] }
-        let knownCounts = snapshots.compactMap { $0.displayCount }
-        let total = knownCounts.reduce(0, +)
-        let hasError = snapshots.contains { $0.lastError != nil }
-        return (total, knownCounts.count, hasError)
-    }
-
-    private func resetCreditActionPayload(email: String, creditID: String) -> String {
-        "redeemReset|\(email)\u{1F}\(creditID)"
-    }
-
-    private func resetCreditActionParts(from rawValue: String) -> (email: String, creditID: String)? {
-        guard rawValue.hasPrefix("redeemReset|") else { return nil }
-        let payload = String(rawValue.dropFirst("redeemReset|".count))
-        let parts = payload.split(separator: "\u{1F}", maxSplits: 1).map(String.init)
-        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
-        return (parts[0], parts[1])
-    }
-
-    private func usageColor(for percent: Int?) -> NSColor {
-        usageStatusColor(for: percent)
-    }
-
-    private func apiColor(for percent: Int) -> NSColor {
-        if percent >= apiUsage.warningPercent { return .systemRed }
-        if percent >= max(1, apiUsage.warningPercent - 20) { return .systemOrange }
-        return .systemBlue
-    }
-
-    private func tokenText(_ value: Int) -> String {
-        if value >= 1_000_000 {
-            let millions = Double(value) / 1_000_000.0
-            return String(format: "%.1fM", millions)
-        }
-        if value >= 1_000 {
-            let thousands = Double(value) / 1_000.0
-            return String(format: "%.1fk", thousands)
-        }
-        return "\(value)"
-    }
-
-    private func accentColor(for percent: Int?, isActive: Bool) -> NSColor {
-        let color = usageColor(for: percent)
-        return isActive ? color : color.withAlphaComponent(theme.isDark ? 0.48 : 0.44)
-    }
-
-    private func progressLineHeight(isActive: Bool) -> CGFloat {
-        isActive ? 8 : 6
-    }
-
-    private func inactiveAccentColor() -> NSColor {
-        theme.inactiveAccent
-    }
-
-    private func cardFillColor(isActive: Bool) -> NSColor {
-        if isActive {
-            return theme.activeCardFill
-        }
-        return theme.inactiveCardFill
-    }
-
-    private func cardBorderColor(isActive: Bool) -> NSColor {
-        isActive ? NSColor.systemGreen.withAlphaComponent(theme.isDark ? 0.68 : 0.52) : theme.inactiveCardBorder
-    }
-
-    private func cardFillColor(for account: CodexAccount) -> NSColor {
-        guard account.isActive else { return theme.inactiveCardFill }
-        return activeCardFillColor(for: account.fiveHourUsedPercent)
-    }
-
-    private func cardBorderColor(for account: CodexAccount) -> NSColor {
-        guard account.isActive else { return theme.inactiveCardBorder }
-        return usageColor(for: account.fiveHourUsedPercent).withAlphaComponent(theme.isDark ? 0.48 : 0.40)
-    }
-
-    private func activeCardFillColor(for percent: Int?) -> NSColor {
-        guard let percent else {
-            return theme.isDark
-                ? NSColor(red: 0.065, green: 0.075, blue: 0.085, alpha: 0.76)
-                : NSColor(red: 0.955, green: 0.965, blue: 0.975, alpha: 0.96)
-        }
-        if percent >= 50 {
-            return theme.activeCardFill
-        }
-        if percent >= 20 {
-            return theme.isDark
-                ? NSColor(red: 0.145, green: 0.092, blue: 0.025, alpha: 0.78)
-                : NSColor(red: 1.00, green: 0.945, blue: 0.835, alpha: 0.96)
-        }
-        return theme.isDark
-            ? NSColor(red: 0.135, green: 0.045, blue: 0.048, alpha: 0.78)
-            : NSColor(red: 1.00, green: 0.91, blue: 0.91, alpha: 0.96)
-    }
-
-    private func label(_ string: String, frame: NSRect, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) -> NSTextField {
-        let field = NSTextField(labelWithString: string)
-        field.frame = frame
-        field.font = .systemFont(ofSize: size, weight: weight)
-        field.textColor = color
-        field.alignment = alignment
-        field.lineBreakMode = .byTruncatingTail
-        return field
-    }
-
-    private func iconButton(symbol: String, frame: NSRect, action: Selector, toolTip: String? = nil) -> NSButton {
-        let button = NSButton(frame: frame)
-        button.bezelStyle = .regularSquare
-        button.isBordered = false
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        image?.size = NSSize(width: 18, height: 18)
-        button.image = image
-        button.imagePosition = .imageOnly
-        button.contentTintColor = theme.iconTint
-        button.target = self
-        button.action = action
-        button.toolTip = toolTip
-        return button
-    }
-
-    @objc private func refreshPressed() {
-        refresh()
-    }
-
-    @objc private func resetCreditsPressed(_ sender: NSButton) {
-        showResetCredits()
-    }
-
-    @objc private func resetCreditRedeemPressed(_ sender: NSControl) {
-        guard
-            let rawValue = sender.identifier?.rawValue,
-            let action = resetCreditActionParts(from: rawValue)
-        else {
-            return
-        }
-        redeemResetCredit(action.email, action.creditID)
-    }
-
-    @objc private func settingsPressed(_ sender: NSButton) {
-        showSettings()
-    }
-
-    @objc private func apiPressed(_ sender: NSButton) {
-        performSettingsAction(.apiView)
-    }
-
-    @objc private func apiRefreshPressed() {
-        performSettingsAction(.refreshApiUsage)
-    }
-
-    @objc private func closePressed() {
-        close()
-    }
-
-    @objc private func launchAtLoginPressed() {
-        toggleLaunchAtLogin()
-    }
-
-    @objc private func accountSwitchPressed(_ sender: NSButton) {
-        guard let email = sender.identifier?.rawValue, !email.isEmpty else { return }
-        switchAccount(email)
-    }
-
-    @objc private func settingsActionPressed(_ sender: NSControl) {
-        guard let rawValue = sender.identifier?.rawValue else { return }
-        if rawValue.hasPrefix("routeBSelect|") {
-            let profileID = String(rawValue.dropFirst("routeBSelect|".count))
-            guard !profileID.isEmpty else { return }
-            selectRouteBProfile(profileID)
-            return
-        }
-        guard let action = SettingsPanelAction(rawValue: rawValue) else { return }
-        performSettingsAction(action)
-    }
-
-    @objc private func accountSettingsActionPressed(_ sender: NSControl) {
-        guard let rawValue = sender.identifier?.rawValue else { return }
-        let parts = rawValue.split(separator: "|", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return }
-        switch parts[0] {
-        case "switch":
-            switchAccount(parts[1])
-        case "label":
-            editAccountLabel(parts[1])
-        case "remove":
-            performSettingsAction(.removeAccount)
-        default:
-            break
-        }
-    }
-}
-
 final class AccountFloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -1636,10 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let idleRefreshIntervalDefaultsKey = "idleRefreshIntervalSeconds"
     private let protectFrontmostCodexDefaultsKey = "protectFrontmostCodex"
     private let toolbarDisplayStyleDefaultsKey = "toolbarDisplayStyle"
+    private let fiveHourMenuBarMigrationDefaultsKey = "fiveHourMenuBarMigrationV1"
     private let selectedRouteBProfileDefaultsKey = "selectedRouteBProfileID"
-    private let apiDailyLimitDefaultsKey = "apiDailyLimitTokens"
-    private let apiWarningPercentDefaultsKey = "apiWarningPercent"
-    private let apiUsageNotificationDefaultsKey = "apiUsageNotificationEnabled"
     private let apiModeActiveDefaultsKey = "apiModeActive"
     private let apiTokenUsageService = "com.mohamedfuad.codexaccountswitcher.openai"
     private let apiCodexKeyAccount = "codex-api-key"
@@ -1658,8 +47,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private let resetCreditsRefreshInterval: TimeInterval = 300
     private let directUsageRefreshInterval: TimeInterval = 30
     private var refreshTimer: Timer?
+    private var cachedCodexAuthPath: String?
+    private let codexAuthPathLock = NSLock()
+    private var isResolvingCodexAuthPath = false
+    private var codexAuthResolveFinished = false
+    private var labelsCache: [String: String]?
+    private var lastPanelSignature: String?
+    private let authIndexLock = NSLock()
+    private var authIndexCache: (modified: Date, index: [String: URL])?
     private var currentStatusTitleKey = ""
-    private var currentStatusItemLength: CGFloat = 0
+    private var statusSpinnerFrame: Int?
     private var accounts: [CodexAccount] = []
     private var lastError: String?
     private var lastUpdatedAt: Date?
@@ -1684,20 +81,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var panelRefreshScheduled = false
     private var statusAnimationTitle = "Switching"
     private var statusAnimationGeneration = 0
-    private let switchAnimationFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     private var notifiedLowUsageKeys = Set<String>()
     private var notifiedAutoSwitchPauseKeys = Set<String>()
-    private var notifiedApiUsageKeys = Set<String>()
     private var pendingResumeWorkItems: [String: DispatchWorkItem] = [:]
     private var savedClipboardString: String?
-    private var settingsMenu = NSMenu()
     private weak var accountLabelDialogField: NSTextField?
     private weak var accountLabelDialogPopup: NSPopUpButton?
     private var notificationHealthTitle = "Checking"
     private var notificationHealthColor = NSColor.systemOrange
     private var updateHealthTitle = "Check"
     private var updateHealthColor = NSColor.systemOrange
-    private var latestReleaseURL: URL?
     private var resetCreditsByEmail: [String: ResetCreditsSnapshot] = [:]
     private var remindersEnabled: Bool {
         get {
@@ -1812,7 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
     private var usageMode: UsageDisplayMode {
         get {
-            UsageDisplayMode(rawValue: UserDefaults.standard.string(forKey: "usageDisplayMode") ?? "") ?? .weekly
+            UsageDisplayMode(rawValue: UserDefaults.standard.string(forKey: "usageDisplayMode") ?? "") ?? .fiveHour
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "usageDisplayMode")
@@ -1826,46 +219,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             UserDefaults.standard.set(newValue.rawValue, forKey: toolbarDisplayStyleDefaultsKey)
         }
     }
-    private var apiDailyLimit: Int {
-        get {
-            let stored = UserDefaults.standard.integer(forKey: apiDailyLimitDefaultsKey)
-            return stored == 0 ? 50_000 : max(1_000, stored)
-        }
-        set {
-            UserDefaults.standard.set(max(1_000, newValue), forKey: apiDailyLimitDefaultsKey)
-        }
-    }
-    private var apiWarningPercent: Int {
-        get {
-            let stored = UserDefaults.standard.integer(forKey: apiWarningPercentDefaultsKey)
-            return stored == 0 ? 80 : max(1, min(99, stored))
-        }
-        set {
-            UserDefaults.standard.set(max(1, min(99, newValue)), forKey: apiWarningPercentDefaultsKey)
-        }
-    }
-    private var apiUsageNotificationsEnabled: Bool {
-        get {
-            if UserDefaults.standard.object(forKey: apiUsageNotificationDefaultsKey) == nil {
-                return true
-            }
-            return UserDefaults.standard.bool(forKey: apiUsageNotificationDefaultsKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: apiUsageNotificationDefaultsKey)
-        }
-    }
-    private var apiModeActive: Bool {
-        get { false }
-        set {
-            if !newValue {
-                UserDefaults.standard.set(false, forKey: apiModeActiveDefaultsKey)
-            }
-        }
-    }
-    private var apiUsedTokens: Int = 0
-    private var apiUsageLastError: String?
-    private var apiUsageUpdatedAt: Date?
     private var demoMode: Bool {
         ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_DEMO"] == "1"
     }
@@ -1882,17 +235,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_SHOW_RESETS"] == "1"
     }
 
-    private func disableApiMode() {
+    /// Removes the retired API-mode keys once; later launches skip the keychain entirely.
+    private func removeLegacyApiModeDataIfNeeded() {
+        let migrationKey = "legacyApiModeRemovedV3"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
         UserDefaults.standard.set(false, forKey: apiModeActiveDefaultsKey)
         deleteKeychainSecret(account: apiCodexKeyAccount)
         deleteKeychainSecret(account: apiUsageKeyAccount)
-        apiUsedTokens = 0
-        apiUsageLastError = nil
-        apiUsageUpdatedAt = nil
+        UserDefaults.standard.set(true, forKey: migrationKey)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        if demoMode, let appearance = ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_APPEARANCE"] {
+            NSApp.appearance = NSAppearance(named: appearance == "light" ? .aqua : .darkAqua)
+        }
         if ProcessInfo.processInfo.arguments.contains("--install-lifecycle-monitor") {
             do {
                 try installLaunchAgent()
@@ -1908,7 +265,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             NSApp.terminate(nil)
             return
         }
-        disableApiMode()
+        migrateMenuBarUsageModeToFiveHourIfNeeded()
+        removeLegacyApiModeDataIfNeeded()
         DispatchQueue.global(qos: .utility).async {
             let accountsDirectory = URL(fileURLWithPath: NSHomeDirectory())
                 .appendingPathComponent(".codex/accounts", isDirectory: true)
@@ -1938,10 +296,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let timer = Timer(timeInterval: timerTickInterval, repeats: true) { [weak self] _ in
             self?.refreshAccountsIfNeeded()
         }
+        timer.tolerance = 1
         RunLoop.current.add(timer, forMode: .common)
         refreshTimer = timer
 
         installPanelDismissHandlers()
+    }
+
+    private func migrateMenuBarUsageModeToFiveHourIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: fiveHourMenuBarMigrationDefaultsKey) else { return }
+        usageMode = .fiveHour
+        UserDefaults.standard.set(true, forKey: fiveHourMenuBarMigrationDefaultsKey)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -2056,32 +421,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard let button = statusItem.button else { return }
         button.title = ""
         button.toolTip = "Codex Account Switcher"
-        button.image = nil
-        button.imagePosition = .noImage
+        button.image = MenuBarGlyph.symbol("arrow.left.arrow.right", color: nil)
+        button.imagePosition = .imageOnly
+        button.imageHugsTitle = true
         button.target = self
         button.action = #selector(toggleAccountPanel)
     }
 
-    private func loadCodexIcon() -> NSImage? {
-        let bundledCandidates = [
-            Bundle.main.path(forResource: "ToolbarIcon", ofType: "png"),
-            Bundle.main.path(forResource: "AccountSwitcherIcon", ofType: "png"),
-            Bundle.main.path(forResource: "AccountSwitcherIcon", ofType: "icns")
-        ].compactMap { $0 }
-        let candidates = bundledCandidates + [
-            "\(codexDesktopAppPath)/Contents/Resources/icon.icns",
-            "\(codexDesktopAppPath)/Contents/Resources/codexTemplate@2x.png",
-            "\(codexDesktopAppPath)/Contents/Resources/codexTemplate.png"
-        ]
-
-        guard let path = candidates.first(where: { FileManager.default.fileExists(atPath: $0) }),
-              let image = NSImage(contentsOfFile: path) else {
-            return nil
-        }
-        image.size = NSSize(width: 18, height: 18)
-        image.isTemplate = false
-        return image
-    }
 
     private func refreshAccountsIfNeeded() {
         let interval = codexIsFrontmost() ? activeRefreshInterval : idleRefreshInterval
@@ -2092,20 +438,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         refreshAccounts(force: false)
     }
 
-    private func refreshAccounts(force: Bool = false) {
+    private func refreshAccounts(force: Bool = false, refreshResets: Bool = true) {
         guard !isSwitching, !isRedeemingReset else { return }
         if demoMode {
             accounts = demoAccounts()
             resetCreditsByEmail = demoResetCreditsByEmail(for: accounts)
             lastError = nil
             lastUpdatedAt = Date()
-            rebuildMenu()
+            refreshUI()
             return
         }
         guard !isRefreshing else {
             if force {
                 pendingForceRefresh = true
-                rebuildMenu()
+                refreshUI()
             }
             return
         }
@@ -2120,7 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let shouldRefreshResets = !isRefreshingResetCredits && ResetRefreshPolicy.shouldRefresh(
             lastRefresh: lastResetCreditsRefreshAt,
             ttl: resetCreditsRefreshInterval,
-            force: force
+            force: force && refreshResets
         )
         if shouldRefreshResets {
             isRefreshingResetCredits = true
@@ -2131,7 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             force: force
         )
         if force {
-            rebuildMenu()
+            refreshUI()
         }
         DispatchQueue.global(qos: .utility).async {
             var result = self.runCodexAuth(force ? ["list", "--debug"] : ["list"])
@@ -2194,131 +540,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     self.lastError = newError
                     self.checkUsageReminder()
                     self.checkAutoSwitch()
-                    self.rebuildMenu()
+                    self.refreshUI()
                 }
 
                 if self.pendingForceRefresh {
                     self.pendingForceRefresh = false
-                    self.refreshAccounts(force: true)
+                    self.refreshAccounts(force: true, refreshResets: false)
                 }
                 }
             }
         }
     }
 
-    private func refreshApiUsage(force: Bool = false) {
-        disableApiMode()
-    }
 
-    private func rebuildMenu() {
-        let menu = NSMenu()
-
-        if let active = accounts.first(where: { $0.isActive }) {
-            if !isSwitching {
+    private func refreshUI() {
+        if !isSwitching {
+            if accounts.contains(where: { $0.isActive }) {
                 updateStatusTitle()
-            }
-            menu.addItem(headerItem("Active: \(compactEmail(active.email)) (\(displayPlan(active.plan)))"))
-        } else {
-            if !isSwitching {
+            } else {
                 clearStatusTitle()
             }
-            menu.addItem(headerItem(lastError ?? "No active account"))
         }
-
-        menu.addItem(headerItem("Updated: \(lastUpdatedText())"))
-        menu.addItem(.separator())
-
-        if accounts.isEmpty {
-            let item = NSMenuItem(title: lastError ?? "No accounts available", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-        } else {
-            menu.addItem(accountColumnsHeaderItem())
-            for account in toolbarAccounts() {
-                let item = NSMenuItem(title: "", action: #selector(switchAccount(_:)), keyEquivalent: "")
-                item.target = self
-                item.representedObject = account.email
-                item.attributedTitle = accountAttributedTitle(for: account)
-                item.state = account.isActive ? .on : .off
-                item.toolTip = accountUsageTooltip(for: account)
-                item.isEnabled = !isSwitching
-                menu.addItem(item)
-            }
-        }
-
-        menu.addItem(.separator())
-
-        let toggle = NSMenuItem(title: "Toggle Account", action: #selector(toggleAccount), keyEquivalent: "")
-        toggle.target = self
-        toggle.isEnabled = accounts.count == 2 && !isSwitching
-        menu.addItem(toggle)
-
-        menu.addItem(.separator())
-
-        let addAccount = NSMenuItem(title: "Add Account...", action: #selector(addAccountBrowser), keyEquivalent: "")
-        addAccount.target = self
-        addAccount.isEnabled = !isSwitching
-        menu.addItem(addAccount)
-
-        let addDevice = NSMenuItem(title: "Add Account with Device Code...", action: #selector(addAccountDeviceCode), keyEquivalent: "")
-        addDevice.target = self
-        addDevice.isEnabled = !isSwitching
-        addDevice.toolTip = "Opens Terminal so the device code remains visible while login waits."
-        menu.addItem(addDevice)
-
-        if !accounts.isEmpty {
-            let labelsItem = NSMenuItem(title: "Account Display Labels", action: #selector(showAccountDisplayLabelsDialog), keyEquivalent: "")
-            labelsItem.target = self
-            menu.addItem(labelsItem)
-
-            let displayItem = NSMenuItem(title: "Menu Bar Display", action: #selector(showMenuBarDisplayDialog), keyEquivalent: "")
-            displayItem.target = self
-            menu.addItem(displayItem)
-
-            let removeItem = NSMenuItem(title: "Remove Account", action: #selector(showRemoveAccountDialog), keyEquivalent: "")
-            removeItem.target = self
-            removeItem.isEnabled = !isSwitching
-            menu.addItem(removeItem)
-        }
-
-        let reminderItem = NSMenuItem(title: "Usage Reminder", action: #selector(showUsageReminderDialog), keyEquivalent: "")
-        reminderItem.target = self
-        menu.addItem(reminderItem)
-
-        let confirmItem = NSMenuItem(title: "Confirm Panel Switches", action: #selector(toggleConfirmBeforeSwitching), keyEquivalent: "")
-        confirmItem.target = self
-        confirmItem.state = confirmBeforeSwitching ? .on : .off
-        confirmItem.isEnabled = !isSwitching
-        menu.addItem(confirmItem)
-
-        let refreshSettings = NSMenuItem(title: "Refresh Settings", action: #selector(showRefreshSettingsDialog), keyEquivalent: "")
-        refreshSettings.target = self
-        menu.addItem(refreshSettings)
-
-        let refresh = NSMenuItem(title: "Force Usage Refresh", action: #selector(refreshNow), keyEquivalent: "")
-        refresh.target = self
-        refresh.toolTip = "Refreshes live usage for all saved accounts."
-        refresh.isEnabled = !isSwitching
-        menu.addItem(refresh)
-
-        let updates = NSMenuItem(title: "Check for Updates", action: #selector(checkForUpdatesMenu), keyEquivalent: "")
-        updates.target = self
-        menu.addItem(updates)
-
-        let cleanBackups = NSMenuItem(title: "Clean Account Backups", action: #selector(cleanAccountBackups), keyEquivalent: "")
-        cleanBackups.target = self
-        cleanBackups.isEnabled = !isSwitching
-        menu.addItem(cleanBackups)
-
-        let quit = NSMenuItem(title: "Quit Account Switcher", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
-        menu.addItem(quit)
-
-        settingsMenu = menu
-        statusItem.menu = nil
         if accountPanel?.isVisible == true {
             refreshAccountPanelContentIfVisible()
         } else {
             accountPanel = nil
+            lastPanelSignature = nil
         }
     }
 
@@ -2348,19 +595,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         accountPanelMode = .usage
         let panel = accountPanel ?? makeAccountPanel()
         accountPanel = panel
-        refreshAccountPanelContent()
+        refreshAccountPanelContent(force: true)
+        refreshNotificationHealth(rebuildVisiblePanel: true)
         positionAccountPanel()
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
-        refreshAccounts(force: true)
+        let isStale = lastUpdatedAt.map { Date().timeIntervalSince($0) > 10 } ?? true
+        if isStale {
+            refreshAccounts(force: true, refreshResets: false)
+        }
     }
 
     private func showSettingsPanel() {
         accountPanelMode = .settings
         let panel = accountPanel ?? makeAccountPanel()
         accountPanel = panel
-        refreshAccountPanelContent()
+        refreshAccountPanelContent(force: true)
+        refreshNotificationHealth(rebuildVisiblePanel: true)
         positionAccountPanel()
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
@@ -2371,21 +623,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         accountPanelMode = .routeB
         let panel = accountPanel ?? makeAccountPanel()
         accountPanel = panel
-        refreshAccountPanelContent()
+        refreshAccountPanelContent(force: true)
+        refreshNotificationHealth(rebuildVisiblePanel: true)
         positionAccountPanel()
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
     }
 
-    @objc private func showApiModePanel() {
-        showAccountPanel()
-    }
 
-    @objc private func switchToApiModeFromMenu() {
-        disableApiMode()
-        showAccountPanel()
-    }
 
     private func makeAccountPanel() -> NSPanel {
         let panel = AccountFloatingPanel(
@@ -2405,11 +651,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func currentAccountPanelSize() -> NSSize {
-        AccountSwitcherPanelView.preferredSize(mode: accountPanelMode, accountCount: toolbarAccounts().count)
+        if let size = accountPanel?.contentViewController?.view.frame.size, size.width > 0, size.height > 0 {
+            return size
+        }
+        return AccountSwitcherPanelView.preferredSize(mode: accountPanelMode, accountCount: toolbarAccounts().count)
     }
 
-    private func refreshAccountPanelContent() {
-        refreshNotificationHealth()
+    /// Everything the panel draws, flattened. When it matches the last build the
+    /// rebuild is skipped, so the open panel no longer re-creates its views on
+    /// every background refresh.
+    private func panelSignature() -> String {
+        let health = healthStatusRows().map { "\($0.title)=\($0.value)" }.joined(separator: ",")
+        let resets = resetCreditsByEmail.keys.sorted().map { email in
+            "\(email):\(String(describing: resetCreditsByEmail[email]))"
+        }.joined(separator: ";")
+        return [
+            "\(accountPanelMode)",
+            String(describing: accounts),
+            lastUpdatedText(),
+            lastError ?? "",
+            "\(isSwitching)",
+            "\(confirmBeforeSwitching)|\(armedSwitchEmail ?? "")",
+            "\(launchAtLoginEnabled())|\(remindersEnabled)|\(reminderThreshold)",
+            "\(autoSwitchMode.rawValue)|\(autoSwitchThreshold)|\(autoResumeMode.rawValue)",
+            "\(usageMode.rawValue)|\(toolbarDisplayStyle.rawValue)|\(activeRefreshInterval)|\(idleRefreshInterval)",
+            UserDefaults.standard.string(forKey: selectedRouteBProfileDefaultsKey) ?? "",
+            accountLabels().sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ","),
+            health,
+            resets
+        ].joined(separator: "\u{1E}")
+    }
+
+    private func refreshAccountPanelContent(force: Bool = false) {
+        let signature = panelSignature()
+        if !force, signature == lastPanelSignature, accountPanel?.contentViewController != nil {
+            return
+        }
+        lastPanelSignature = signature
         let panel = AccountSwitcherPanelView(
             accounts: toolbarAccounts(),
             activeAccount: accounts.first(where: { $0.isActive }),
@@ -2420,17 +698,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             launchAtLoginEnabled: launchAtLoginEnabled(),
             remindersEnabled: remindersEnabled,
             reminderThreshold: reminderThreshold,
-            autoSwitchEnabled: autoSwitchEnabled,
             autoSwitchThreshold: autoSwitchThreshold,
             autoSwitchMode: autoSwitchMode,
             autoResumeMode: autoResumeMode,
-            confirmBeforeSwitching: confirmBeforeSwitching,
-            armedSwitchEmail: armedSwitchEmail,
-            protectFrontmostCodex: protectFrontmostCodex,
-            apiModeActive: apiModeActive,
-            apiKeyConfigured: apiKeyConfigured(),
-            usageKeyConfigured: usageKeyConfigured(),
-            apiUsage: apiUsageSnapshot(),
+            confirmBeforeSwitching: demoScenario == "four" ? true : confirmBeforeSwitching,
+            armedSwitchEmail: demoScenario == "four" ? "creative@example.com" : armedSwitchEmail,
             resetCreditsByEmail: resetCreditsByEmail,
             healthStatuses: healthStatusRows(),
             routeBProfiles: routeBProviderProfiles,
@@ -2442,17 +714,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             labelForAccount: { [weak self] account in
                 self?.toolbarLabel(for: account) ?? String(account.selector.prefix(1))
             },
-            compactEmail: { [weak self] email in
-                self?.compactEmail(email) ?? email
-            },
             switchAccount: { [weak self] email in
                 self?.handlePanelSwitchRequest(email)
             },
+            logoutAccount: { [weak self] email in
+                self?.confirmLogoutAccount(email)
+            },
             refresh: { [weak self] in
                 self?.refreshAccounts(force: true)
-            },
-            showSettings: { [weak self] in
-                self?.showSettingsPanel()
             },
             checkUpdates: { [weak self] in
                 self?.checkForUpdates(showResult: true)
@@ -2482,6 +751,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let controller = NSViewController()
         controller.view = panel
         accountPanel?.contentViewController = controller
+        accountPanel?.setContentSize(panel.frame.size)
+        if accountPanel?.isVisible == true {
+            positionAccountPanel()
+        }
     }
 
     private func handlePanelSwitchRequest(_ email: String) {
@@ -2524,10 +797,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func healthStatusRows() -> [HealthStatus] {
-        let codexAuthOK = codexAuthPath() != nil
+        // Never resolve codex-auth here: this runs on the main thread for every panel build.
+        codexAuthPathLock.lock()
+        let codexAuthOK = cachedCodexAuthPath != nil
+        codexAuthPathLock.unlock()
+        if !codexAuthOK {
+            resolveCodexAuthPathInBackground()
+        }
+        let authStillChecking = !codexAuthOK && !codexAuthResolveFinished
         let codexAppOK = FileManager.default.fileExists(atPath: codexDesktopAppPath)
         return [
-            HealthStatus(title: "Auth", value: codexAuthOK ? "OK" : "Missing", color: codexAuthOK ? .systemGreen : .systemRed),
+            HealthStatus(
+                title: "Auth",
+                value: codexAuthOK ? "OK" : (authStillChecking ? "Checking" : "Missing"),
+                color: codexAuthOK ? .systemGreen : (authStillChecking ? .systemOrange : .systemRed)
+            ),
             HealthStatus(title: "Codex", value: codexAppOK ? "Found" : "Missing", color: codexAppOK ? .systemGreen : .systemRed),
             HealthStatus(title: "Mode", value: "ChatGPT", color: .systemGreen),
             HealthStatus(title: "Refresh", value: lastUpdatedText(), color: refreshHealthColor()),
@@ -2581,6 +865,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func handleSettingsPanelAction(_ action: SettingsPanelAction) {
         switch action {
         case .usageView:
+            clearArmedSwitch()
             accountPanelMode = .usage
         case .settingsView:
             accountPanelMode = .settings
@@ -2589,40 +874,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         case .resetCreditsView:
             accountPanelMode = .resets
             refreshResetCreditsIfNeeded(force: false)
-        case .apiView:
-            accountPanelMode = .usage
         case .addAccount:
             addAccountBrowser()
         case .addDeviceAccount:
             addAccountDeviceCode()
-        case .setupApiMode:
-            disableApiMode()
-            showAlert(title: "API mode removed", message: "This build only switches between saved ChatGPT accounts.")
-        case .switchApiMode:
-            disableApiMode()
-            showAlert(title: "API mode removed", message: "This build only switches between saved ChatGPT accounts.")
-        case .editApiLimit:
-            disableApiMode()
-        case .refreshApiUsage:
-            disableApiMode()
-        case .testApiReminder:
-            disableApiMode()
         case .editLabels:
             showAccountDisplayLabelsDialog()
         case .removeAccount:
             showRemoveAccountDialog()
         case .usageWeekly:
             usageMode = .weekly
-            rebuildMenu()
+            refreshUI()
         case .usageFiveHour:
             usageMode = .fiveHour
-            rebuildMenu()
+            refreshUI()
         case .styleDetailed:
             toolbarDisplayStyle = .detailed
-            rebuildMenu()
+            refreshUI()
         case .styleCompact:
             toolbarDisplayStyle = .compact
-            rebuildMenu()
+            refreshUI()
         case .toggleLaunchAtLogin:
             toggleLaunchAtLogin()
         case .toggleUsageReminder:
@@ -2688,7 +959,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 self.isRefreshingResetCredits = false
                 self.lastResetCreditsRefreshAt = Date()
                 self.resetCreditsByEmail = refreshed
-                self.rebuildMenu()
+                self.refreshUI()
             }
         }
     }
@@ -2705,145 +976,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         confirmAndRedeemResetCredit(account: account, credit: credit)
     }
 
-    private func showSettingsMenu(from sender: NSView) {
-        settingsMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
-    }
 
-    private func showSettingsMenuForScreenshot() {
-        guard demoMode, let panel = accountPanel else { return }
-        let point = NSPoint(x: panel.frame.maxX - 190, y: panel.frame.maxY - 96)
-        settingsMenu.popUp(positioning: nil, at: point, in: nil)
-    }
 
-    private func showResetCreditsMenu(from sender: NSView) {
-        let menu = NSMenu()
-        let header = NSMenuItem(title: resetCreditsMenuHeader(), action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.addItem(header)
-        menu.addItem(.separator())
 
-        for (accountIndex, account) in toolbarAccounts().enumerated() {
-            if accountIndex > 0 {
-                menu.addItem(.separator())
-            }
 
-            let snapshot = resetCreditsByEmail[account.email]
-            let count = snapshot?.displayCount
-            let accountHeader = NSMenuItem(title: resetAccountHeaderTitle(account, count: count), action: nil, keyEquivalent: "")
-            accountHeader.isEnabled = false
-            menu.addItem(accountHeader)
 
-            if let error = snapshot?.lastError {
-                let item = NSMenuItem(title: "Unavailable: \(error)", action: nil, keyEquivalent: "")
-                item.isEnabled = false
-                menu.addItem(item)
-                continue
-            }
 
-            guard let snapshot else {
-                let item = NSMenuItem(title: "Checking reset credits...", action: nil, keyEquivalent: "")
-                item.isEnabled = false
-                menu.addItem(item)
-                continue
-            }
 
-            let credits = snapshot.availableCredits.sorted { left, right in
-                switch (left.expiresAt, right.expiresAt) {
-                case let (left?, right?):
-                    return left < right
-                case (.some, nil):
-                    return true
-                case (nil, .some):
-                    return false
-                case (nil, nil):
-                    return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
-                }
-            }
 
-            if credits.isEmpty {
-                let item = NSMenuItem(title: "No available reset credits", action: nil, keyEquivalent: "")
-                item.isEnabled = false
-                menu.addItem(item)
-            } else {
-                for (index, credit) in credits.enumerated() {
-                    let title = resetCreditMenuTitle(credit, index: index + 1)
-                    let item = NSMenuItem(title: title, action: #selector(redeemResetCreditMenuItem(_:)), keyEquivalent: "")
-                    item.target = self
-                    item.representedObject = resetCreditActionPayload(email: account.email, creditID: credit.id)
-                    item.toolTip = "Redeem this reset credit after confirmation"
-                    menu.addItem(item)
-                }
-            }
-        }
 
-        menu.addItem(.separator())
-        let updated = NSMenuItem(title: resetCreditsUpdatedText(), action: nil, keyEquivalent: "")
-        updated.isEnabled = false
-        menu.addItem(updated)
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
-    }
-
-    private func resetCreditsMenuHeader() -> String {
-        let counts = toolbarAccounts().compactMap { resetCreditsByEmail[$0.email]?.displayCount }
-        guard !counts.isEmpty else {
-            return "Codex reset credits"
-        }
-        let total = counts.reduce(0, +)
-        return total == 1 ? "1 Codex reset available" : "\(total) Codex resets available"
-    }
-
-    private func resetAccountHeaderTitle(_ account: CodexAccount, count: Int?) -> String {
-        let label = toolbarLabel(for: account)
-        let countText: String
-        if let count {
-            countText = count == 1 ? "1 reset" : "\(count) resets"
-        } else {
-            countText = "checking"
-        }
-        return "\(label)  \(compactEmail(account.email))  -  \(countText)"
-    }
-
-    private func resetCreditMenuTitle(_ credit: ResetCredit, index: Int) -> String {
-        let granted = credit.grantedAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown grant"
-        let expires = credit.expiresAt.map { DateFormatter.resetCreditDisplay.string(from: $0) } ?? "unknown expiry"
-        return "#\(index)  Redeem reset  -  granted \(granted), expires \(expires)"
-    }
-
-    private func resetCreditsUpdatedText() -> String {
-        let updates = toolbarAccounts().compactMap { resetCreditsByEmail[$0.email]?.lastUpdatedText }
-        let unique = Array(Set(updates))
-        if unique.count == 1, let first = unique.first {
-            return "Updated \(first)"
-        }
-        if updates.isEmpty {
-            return "Updated never"
-        }
-        return "Updated per account"
-    }
-
-    private func resetCreditActionPayload(email: String, creditID: String) -> String {
-        "\(email)\u{1F}\(creditID)"
-    }
-
-    private func resetCreditActionParts(from payload: String) -> (email: String, creditID: String)? {
-        let parts = payload.split(separator: "\u{1F}", maxSplits: 1).map(String.init)
-        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
-        return (parts[0], parts[1])
-    }
-
-    @objc private func redeemResetCreditMenuItem(_ sender: NSMenuItem) {
-        guard
-            let payload = sender.representedObject as? String,
-            let action = resetCreditActionParts(from: payload),
-            let account = accounts.first(where: { $0.email == action.email }),
-            let credit = resetCreditsByEmail[action.email]?.credits.first(where: { $0.id == action.creditID })
-        else {
-            showAlert(title: "Reset unavailable", message: "The selected reset credit could not be found. Refresh the switcher and try again.")
-            return
-        }
-
-        confirmAndRedeemResetCredit(account: account, credit: credit)
-    }
 
     private func confirmAndRedeemResetCredit(account: CodexAccount, credit: ResetCredit) {
         guard !isRedeemingReset else {
@@ -2901,7 +1042,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     )
                     self.showAlert(title: "Reset failed", message: message)
                     self.setResetStatus(nil)
-                    self.rebuildMenu()
+                    self.refreshUI()
                 }
 
             case .success(let receipt):
@@ -2940,7 +1081,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                         usage: verification.usageSnapshot,
                         detail: verification.detail
                     )
-                    self.rebuildMenu()
+                    self.refreshUI()
 
                     if confirmed {
                         self.showAlert(
@@ -2973,7 +1114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     }
 
                     self.setResetStatus(nil)
-                    self.rebuildMenu()
+                    self.refreshUI()
                     self.scheduleAllResetCreditsRefresh()
                 }
             }
@@ -3194,7 +1335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     self.applyDirectUsage(usageSnapshot, toEmail: auth.email)
                     self.lastUpdatedAt = Date()
                 }
-                self.rebuildMenu()
+                self.refreshUI()
 
                 if creditConfirmed && usageConfirmed {
                     self.recordReset(
@@ -3228,60 +1369,79 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                     self.resetCreditsByEmail[email] = snapshot
                 }
                 self.lastResetCreditsRefreshAt = Date()
-                self.rebuildMenu()
+                self.refreshUI()
             }
         }
     }
 
     private func updateStatusTitle() {
-        let title = statusAttributedTitle()
         let titleKey = statusTitleKey()
-        let stableLength = statusItemLength(for: title)
-        guard titleKey != currentStatusTitleKey || abs(stableLength - currentStatusItemLength) > 0.5 else { return }
-
-        statusItem.button?.title = ""
-        statusItem.button?.attributedTitle = title
-        statusItem.length = stableLength
-        statusItem.button?.needsDisplay = true
+        guard titleKey != currentStatusTitleKey else { return }
         currentStatusTitleKey = titleKey
-        currentStatusItemLength = stableLength
+        guard let button = statusItem.button else { return }
+        let content = statusItemContent()
+        button.title = ""
+        button.image = content.image
+        button.imagePosition = content.image == nil ? .noImage : (content.title.length == 0 ? .imageOnly : .imageLeading)
+        button.attributedTitle = content.title
+        button.setAccessibilityLabel(content.accessibilityLabel)
+        statusItem.length = NSStatusItem.variableLength
+        button.needsDisplay = true
     }
 
     private func clearStatusTitle() {
-        statusItem.button?.title = ""
-        statusItem.button?.attributedTitle = NSAttributedString(string: "")
-        statusItem.length = NSStatusItem.variableLength
-        statusItem.button?.needsDisplay = true
         currentStatusTitleKey = ""
-        currentStatusItemLength = 0
+        guard let button = statusItem.button else { return }
+        button.title = ""
+        button.attributedTitle = NSAttributedString(string: "")
+        button.image = MenuBarGlyph.symbol("arrow.left.arrow.right", color: nil)
+        button.imagePosition = .imageOnly
+        button.setAccessibilityLabel("Codex Account Switcher")
+        statusItem.length = NSStatusItem.variableLength
+        button.needsDisplay = true
     }
 
-    private func statusAttributedTitle() -> NSAttributedString {
+    private func statusItemContent() -> (image: NSImage?, title: NSAttributedString, accessibilityLabel: String) {
+        let compact = toolbarDisplayStyle == .compact
+        let fontSize: CGFloat = compact ? 11 : 12.5
+        let diameter: CGFloat = compact ? 11 : 13
         if let resetStatusText {
-            return NSAttributedString(
-                string: resetStatusText,
-                attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .semibold),
-                    .foregroundColor: NSColor.systemOrange
-                ]
+            let color: NSColor = resetStatusText.hasPrefix("Switching") ? .systemBlue : .systemOrange
+            let image = statusSpinnerFrame.map { MenuBarGlyph.spinner(frame: $0, color: color, diameter: diameter) }
+            return (image, statusTitle(resetStatusText, size: fontSize, color: nil), resetStatusText)
+        }
+        guard let account = toolbarStatusAccounts().first else {
+            return (MenuBarGlyph.symbol("arrow.left.arrow.right", color: nil), NSAttributedString(string: ""), "Codex Account Switcher")
+        }
+        let label = toolbarLabel(for: account)
+        if accountNeedsLogin(account) {
+            return (
+                MenuBarGlyph.symbol("exclamationmark.triangle.fill", color: .systemRed, pointSize: fontSize - 1.5),
+                statusTitle("\(label) Sign in", size: fontSize, color: .systemRed),
+                "Account \(label) needs a fresh sign-in"
             )
         }
-        let result = NSMutableAttributedString()
-        for (index, account) in toolbarStatusAccounts().enumerated() {
-            if index > 0 {
-                result.append(NSAttributedString(string: " ", attributes: toolbarTitleAttributes(for: nil)))
-            }
-            result.append(NSAttributedString(
-                string: toolbarStatusText(for: account),
-                attributes: toolbarTitleAttributes(for: account)
-            ))
-        }
-        return result
+        let percent = toolbarUsagePercent(for: account)
+        let image = MenuBarGlyph.ring(percent: percent, color: usageStatusColor(for: percent), diameter: diameter, lineWidth: compact ? 2 : 2.2)
+        let isLow = (percent ?? 100) < 10
+        let window = usageMode == .fiveHour ? "5-hour" : "weekly"
+        return (
+            image,
+            statusTitle(toolbarStatusText(for: account), size: fontSize, color: isLow ? .systemRed : nil),
+            "Account \(label), \(remainingPercentText(fromUsed: percent)) of the \(window) window left"
+        )
+    }
+
+    private func statusTitle(_ text: String, size: CGFloat, color: NSColor?) -> NSAttributedString {
+        NSAttributedString(string: text, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .semibold),
+            .foregroundColor: color ?? NSColor.labelColor
+        ])
     }
 
     private func statusTitleKey() -> String {
         if let resetStatusText {
-            return "reset|\(resetStatusText)"
+            return "reset|\(resetStatusText)|\(statusSpinnerFrame.map { String($0 % 12) } ?? "-")|\(toolbarDisplayStyle.rawValue)"
         }
         return toolbarStatusAccounts().map { account in
             [
@@ -3302,35 +1462,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         updateStatusTitle()
     }
 
-    private func statusItemLength(for title: NSAttributedString) -> CGFloat {
-        max(20, ceil(title.size().width) + 1)
-    }
-
     private func toolbarStatusText(for account: CodexAccount) -> String {
         let label = toolbarLabel(for: account)
         let percent = toolbarUsagePercent(for: account)
         switch toolbarDisplayStyle {
         case .detailed:
-            return "\(label)\(remainingPercentText(fromUsed: percent))"
+            return "\(label) \(remainingPercentText(fromUsed: percent))"
         case .compact:
             return "\(label)\(remainingPercentNumberText(fromUsed: percent))"
         }
-    }
-
-    private func toolbarTitleAttributes(for account: CodexAccount?) -> [NSAttributedString.Key: Any] {
-        let size: CGFloat = toolbarDisplayStyle == .detailed ? 12.5 : 10.5
-        let color: NSColor
-        if let account, accountNeedsLogin(account) {
-            color = .systemRed
-        } else if let account, account.isActive {
-            color = usageStatusColor(for: toolbarUsagePercent(for: account))
-        } else {
-            color = NSColor.secondaryLabelColor
-        }
-        return [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .medium),
-            .foregroundColor: color
-        ]
     }
 
     private func toolbarUsagePercent(for account: CodexAccount) -> Int? {
@@ -3361,31 +1501,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return sortedAccounts.prefix(1).map { $0 }
     }
 
-    private func apiUsageSnapshot() -> ApiUsageSnapshot {
-        ApiUsageSnapshot(
-            usedTokens: apiUsedTokens,
-            limitTokens: apiDailyLimit,
-            warningPercent: apiWarningPercent,
-            lastUpdatedText: apiUsageLastUpdatedText(),
-            lastError: apiUsageLastError
-        )
-    }
 
-    private func apiUsageLastUpdatedText() -> String {
-        guard let apiUsageUpdatedAt else { return "never" }
-        let elapsed = max(0, Int(Date().timeIntervalSince(apiUsageUpdatedAt)))
-        if elapsed < 15 { return "just now" }
-        if elapsed < 60 { return "\(elapsed)s ago" }
-        let minutes = elapsed / 60
-        if minutes < 60 { return "\(minutes)m ago" }
-        return "\(minutes / 60)h ago"
-    }
 
-    private func apiStatusColor(for percent: Int) -> NSColor {
-        if percent >= apiWarningPercent { return .systemRed }
-        if percent >= max(1, apiWarningPercent - 20) { return .systemOrange }
-        return .systemBlue
-    }
 
     private func toolbarSortPriority(for account: CodexAccount) -> Int {
         switch toolbarLabel(for: account) {
@@ -3429,14 +1546,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return name == "codex" || name == "chatgpt" || bundleIdentifier == "com.openai.codex"
     }
 
-    private func remainingSummary(for account: CodexAccount) -> String {
-        switch usageMode {
-        case .fiveHour:
-            return "5h \(remainingPercentText(fromUsed: account.fiveHourUsedPercent)) left"
-        case .weekly:
-            return "W \(remainingPercentText(fromUsed: account.weeklyUsedPercent)) left"
-        }
-    }
 
     private func remainingPercentText(fromUsed used: Int?) -> String {
         guard let used else { return "--%" }
@@ -3448,22 +1557,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return "\(max(0, min(100, used)))"
     }
 
-    private func usageModeItem(title: String, percent: String, reset: String, mode: UsageDisplayMode) -> NSMenuItem {
-        let item = NSMenuItem(title: "", action: #selector(setUsageMode(_:)), keyEquivalent: "")
-        item.target = self
-        item.representedObject = mode.rawValue
-        item.state = usageMode == mode ? .on : .off
-        item.attributedTitle = usageAttributedTitle(title: title, percent: percent, reset: reset)
-        return item
-    }
 
-    private func toolbarDisplayStyleItem(title: String, style: ToolbarDisplayStyle) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: #selector(setToolbarDisplayStyle(_:)), keyEquivalent: "")
-        item.target = self
-        item.representedObject = style.rawValue
-        item.state = toolbarDisplayStyle == style ? .on : .off
-        return item
-    }
 
     private func accountPopup(width: CGFloat) -> NSPopUpButton {
         let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
@@ -3516,130 +1610,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return row
     }
 
-    private func usageAttributedTitle(title: String, percent: String, reset: String) -> NSAttributedString {
-        attributedColumns(
-            "\(title)\t\(percent)\t\(reset)",
-            tabs: [112, 162],
-            font: NSFont.menuFont(ofSize: 0),
-            color: .labelColor
-        )
-    }
 
-    private func accountColumnsHeaderItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        item.attributedTitle = attributedColumns(
-            "\tAccounts:\t5H\tReset\tWeekly",
-            tabs: [18, 178, 226, 308],
-            font: NSFont.menuFont(ofSize: 0),
-            color: .secondaryLabelColor
-        )
-        return item
-    }
 
-    private func accountAttributedTitle(for account: CodexAccount) -> NSAttributedString {
-        let label = toolbarLabel(for: account)
-        let fiveHourPercent = remainingPercentText(fromUsed: account.fiveHourUsedPercent)
-        let fiveHourReset = resetTimeText(from: account.fiveHourUsage)
-        let weeklyPercent = remainingPercentText(fromUsed: account.weeklyUsedPercent)
-        return attributedColumns(
-            "\(label)\t\(compactEmail(account.email))\t\(fiveHourPercent)\t\(fiveHourReset)\t\(weeklyPercent)",
-            tabs: [18, 178, 226, 308],
-            font: NSFont.menuFont(ofSize: 0),
-            color: accountNeedsLogin(account) ? .systemRed : .labelColor
-        )
-    }
 
     private func accountNeedsLogin(_ account: CodexAccount) -> Bool {
         account.fiveHourUsage == "Login expired" || account.weeklyUsage == "Login expired"
     }
 
-    private func accountUsageTooltip(for account: CodexAccount) -> String {
-        var parts = ["Plan \(account.plan)", "5h \(account.fiveHourUsage)", "weekly \(account.weeklyUsage)"]
-        if usageRefreshPending(account) {
-            parts.append("showing saved usage; live refresh pending")
-        }
-        return parts.joined(separator: ", ")
-    }
 
-    private func usageRefreshPending(_ account: CodexAccount) -> Bool {
-        directUsageSnapshotsByEmail[account.email] == nil
-    }
 
-    private func attributedColumns(_ text: String, tabs: [CGFloat], font: NSFont, color: NSColor) -> NSAttributedString {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.tabStops = tabs.map { NSTextTab(textAlignment: .left, location: $0) }
-        paragraph.defaultTabInterval = 48
-        return NSAttributedString(
-            string: text,
-            attributes: [
-                .font: font,
-                .foregroundColor: color,
-                .paragraphStyle: paragraph
-            ]
-        )
-    }
 
-    private func resetTimeText(from usage: String) -> String {
-        let inner = parenthesizedValue(from: usage)
-        guard let inner else { return "" }
-        let parts = inner.split(separator: ":")
-        guard parts.count >= 2, let hour = Int(parts[0]) else { return inner }
-        let minute = String(parts[1].prefix(2))
-        let suffix = hour >= 12 ? "PM" : "AM"
-        let hour12 = hour % 12 == 0 ? 12 : hour % 12
-        return "\(hour12):\(minute) \(suffix)"
-    }
 
-    private func resetDateText(from usage: String) -> String {
-        guard let inner = parenthesizedValue(from: usage) else { return "" }
-        if let range = inner.range(of: " on ") {
-            return monthFirstDate(String(inner[range.upperBound...]))
-        }
-        let parts = inner.split(separator: " ")
-        if parts.count >= 3, let onIndex = parts.firstIndex(of: "on"), onIndex + 2 < parts.endIndex {
-            return monthFirstDate("\(parts[onIndex + 1]) \(parts[onIndex + 2])")
-        }
-        if parts.count >= 2 {
-            return monthFirstDate("\(parts[parts.count - 2]) \(parts[parts.count - 1])")
-        }
-        return inner
-    }
 
-    private func monthFirstDate(_ text: String) -> String {
-        let parts = text.split(separator: " ")
-        guard parts.count == 2 else { return text }
 
-        let day: String
-        let month: String
-        if parts[0].allSatisfy(\.isNumber) {
-            day = String(parts[0])
-            month = String(parts[1])
-        } else {
-            month = String(parts[0])
-            day = String(parts[1])
-        }
 
-        let months = [
-            "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April",
-            "May": "May", "Jun": "June", "Jul": "July", "Aug": "August",
-            "Sep": "September", "Oct": "October", "Nov": "November", "Dec": "December"
-        ]
-        return "\(months[month] ?? month) \(day)"
-    }
-
-    private func parenthesizedValue(from usage: String) -> String? {
-        guard let open = usage.firstIndex(of: "("),
-              let close = usage.firstIndex(of: ")"),
-              open < close else { return nil }
-        return String(usage[usage.index(after: open)..<close])
-    }
-
-    private func headerItem(_ title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        return item
-    }
 
     private func lastUpdatedText() -> String {
         if isRefreshing {
@@ -3682,9 +1666,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         refreshAccounts(force: true)
     }
 
-    @objc private func checkForUpdatesMenu() {
-        checkForUpdates(showResult: true)
-    }
 
     private func checkForUpdates(showResult: Bool) {
         guard let url = URL(string: "https://api.github.com/repos/lordydord/Codex-Account-Switcher/releases/latest") else { return }
@@ -3722,7 +1703,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
 
                 let releaseURL = (object["html_url"] as? String).flatMap(URL.init(string:))
-                self.latestReleaseURL = releaseURL
                 let latestVersion = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
                 let currentVersion = self.currentAppVersion()
                 if self.version(latestVersion, isNewerThan: currentVersion) {
@@ -3772,36 +1752,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return false
     }
 
-    @objc private func setActiveRefreshInterval(_ sender: NSMenuItem) {
-        guard let seconds = sender.representedObject as? Int else { return }
-        activeRefreshInterval = seconds
-        rebuildMenu()
-    }
 
-    @objc private func setIdleRefreshInterval(_ sender: NSMenuItem) {
-        guard let seconds = sender.representedObject as? Int else { return }
-        idleRefreshInterval = seconds
-        rebuildMenu()
-    }
 
-    @objc private func setFiveHourMode() {
-        usageMode = .fiveHour
-        rebuildMenu()
-    }
 
-    @objc private func setUsageMode(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let mode = UsageDisplayMode(rawValue: rawValue) else { return }
-        usageMode = mode
-        rebuildMenu()
-    }
 
-    @objc private func setToolbarDisplayStyle(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let style = ToolbarDisplayStyle(rawValue: rawValue) else { return }
-        toolbarDisplayStyle = style
-        rebuildMenu()
-    }
 
     @objc private func showAccountDisplayLabelsDialog() {
         showAccountDisplayLabelsDialogForAccount(nil)
@@ -3851,10 +1805,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             } else {
                 setCustomLabel(limitedLabel(value), forEmail: email)
             }
-            rebuildMenu()
+            refreshUI()
         } else if response == .alertSecondButtonReturn {
             clearCustomLabel(forEmail: email)
-            rebuildMenu()
+            refreshUI()
         }
         accountLabelDialogField = nil
         accountLabelDialogPopup = nil
@@ -3868,43 +1822,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         field.placeholderString = defaultLabel(forEmail: account.email)
     }
 
-    @objc private func showMenuBarDisplayDialog() {
-        let usagePopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 26), pullsDown: false)
-        addPopupItem(to: usagePopup, title: "Weekly usage left", representedObject: UsageDisplayMode.weekly.rawValue)
-        addPopupItem(to: usagePopup, title: "5-hour usage left", representedObject: UsageDisplayMode.fiveHour.rawValue)
-        usagePopup.selectItem(withTitle: usageMode == .weekly ? "Weekly usage left" : "5-hour usage left")
-
-        let stylePopup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 26), pullsDown: false)
-        addPopupItem(to: stylePopup, title: "Large with Percentage", representedObject: ToolbarDisplayStyle.detailed.rawValue)
-        addPopupItem(to: stylePopup, title: "Small Number Only", representedObject: ToolbarDisplayStyle.compact.rawValue)
-        stylePopup.selectItem(withTitle: toolbarDisplayStyle == .detailed ? "Large with Percentage" : "Small Number Only")
-
-        let stack = NSStackView(views: [usagePopup, stylePopup])
-        stack.orientation = .vertical
-        stack.spacing = 8
-        stack.frame = NSRect(x: 0, y: 0, width: 280, height: 58)
-
-        let alert = NSAlert()
-        alert.messageText = "Menu bar display"
-        alert.informativeText = "Choose which usage appears in the menu bar. The account panel keeps 5-hour as the main ring and weekly as the top bar."
-        alert.accessoryView = stack
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-
-        if alert.runModal() == .alertFirstButtonReturn,
-           let usageRawValue = usagePopup.selectedItem?.representedObject as? String,
-           let selectedUsageMode = UsageDisplayMode(rawValue: usageRawValue),
-           let styleRawValue = stylePopup.selectedItem?.representedObject as? String,
-           let style = ToolbarDisplayStyle(rawValue: styleRawValue) {
-            usageMode = selectedUsageMode
-            toolbarDisplayStyle = style
-            updateStatusTitle()
-            rebuildMenu()
-            DispatchQueue.main.async { [weak self] in
-                self?.updateStatusTitle()
-            }
-        }
-    }
 
     @objc private func showRemoveAccountDialog() {
         guard !accounts.isEmpty else { return }
@@ -3920,6 +1837,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if alert.runModal() == .alertFirstButtonReturn,
            let email = selectedAccountEmail(from: popup) {
             runAccountMaintenance(title: "Removing account", args: ["remove", email])
+        }
+    }
+
+    private func confirmLogoutAccount(_ email: String) {
+        guard let account = accounts.first(where: { $0.email == email }) else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Log out of this account?"
+        alert.informativeText = "This removes \(account.email) from Codex Account Switcher on this Mac. You can add it again later by signing in."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Log out")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            runAccountMaintenance(title: "Logging out", args: ["remove", email])
         }
     }
 
@@ -3963,7 +1895,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             configureNotifications()
         }
         checkUsageReminder()
-        rebuildMenu()
+        refreshUI()
     }
 
     @objc private func showAutoSwitchDialog() {
@@ -4014,7 +1946,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             configureNotifications()
             checkAutoSwitch()
         }
-        rebuildMenu()
+        refreshUI()
     }
 
     @objc private func showAutoResumeDialog() {
@@ -4053,7 +1985,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if autoResumeMode != .off {
             configureNotifications()
         }
-        rebuildMenu()
+        refreshUI()
     }
 
     @objc private func showRefreshSettingsDialog() {
@@ -4078,113 +2010,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
            let idle = idlePopup.selectedItem?.representedObject as? Int {
             activeRefreshInterval = active
             idleRefreshInterval = idle
-            rebuildMenu()
+            refreshUI()
         }
     }
 
-    private func showApiSetupDialog() {
-        let codexField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
-        codexField.placeholderString = apiKeyConfigured() ? "Codex API key already saved" : "OpenAI project API key"
 
-        let usageField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 440, height: 28))
-        usageField.placeholderString = usageKeyConfigured() ? "Usage/Admin key already saved" : "Usage/Admin API key"
 
-        let codexLabel = NSTextField(labelWithString: "Codex API key")
-        codexLabel.font = .systemFont(ofSize: 12, weight: .semibold)
-        let usageLabel = NSTextField(labelWithString: "Usage meter key")
-        usageLabel.font = .systemFont(ofSize: 12, weight: .semibold)
 
-        let stack = NSStackView(views: [
-            codexLabel,
-            codexField,
-            usageLabel,
-            usageField
-        ])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 7
-        stack.frame = NSRect(x: 0, y: 0, width: 440, height: 94)
-
-        let alert = NSAlert()
-        alert.messageText = "API token mode"
-        alert.informativeText = "Keys are saved in macOS Keychain. The usage meter key is optional unless you want the daily token count."
-        alert.accessoryView = stack
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Clear Keys")
-        alert.addButton(withTitle: "Cancel")
-
-        let response = alert.runModal()
-        if response == .alertSecondButtonReturn {
-            deleteKeychainSecret(account: apiCodexKeyAccount)
-            deleteKeychainSecret(account: apiUsageKeyAccount)
-            apiModeActive = false
-            apiUsedTokens = 0
-            apiUsageLastError = "API keys cleared"
-            rebuildMenu()
-            return
-        }
-        guard response == .alertFirstButtonReturn else { return }
-
-        let codexKey = codexField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let usageKey = usageField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !codexKey.isEmpty {
-            saveKeychainSecret(codexKey, account: apiCodexKeyAccount)
-        }
-        if !usageKey.isEmpty {
-            saveKeychainSecret(usageKey, account: apiUsageKeyAccount)
-        }
-        refreshApiUsage(force: true)
-        rebuildMenu()
-    }
-
-    private func showApiLimitDialog() {
-        let limitField = NSTextField(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
-        limitField.stringValue = "\(apiDailyLimit)"
-        let warningField = NSTextField(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
-        warningField.stringValue = "\(apiWarningPercent)"
-        let notifyCheck = NSButton(checkboxWithTitle: "Notify when approaching the daily token limit", target: nil, action: nil)
-        notifyCheck.state = apiUsageNotificationsEnabled ? .on : .off
-
-        let stack = NSStackView(views: [
-            settingsRow(label: "Daily limit", control: limitField),
-            settingsRow(label: "Alert %", control: warningField),
-            notifyCheck
-        ])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.frame = NSRect(x: 0, y: 0, width: 330, height: 96)
-
-        let alert = NSAlert()
-        alert.messageText = "API token warning"
-        alert.informativeText = "Set the daily token allowance you want this app to watch."
-        alert.accessoryView = stack
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let limit = Int(limitField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
-        let warning = Int(warningField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
-        guard let limit, limit >= 1_000, let warning, (1...99).contains(warning) else {
-            showAlert(title: "Invalid API limit", message: "Use a daily limit of at least 1,000 tokens and an alert percentage from 1 to 99.")
-            return
-        }
-        apiDailyLimit = limit
-        apiWarningPercent = warning
-        apiUsageNotificationsEnabled = notifyCheck.state == .on
-        notifiedApiUsageKeys.removeAll()
-        checkApiUsageReminder()
-        rebuildMenu()
-    }
-
-    private func testApiUsageReminder() {
-        sendApiUsageReminder(reportResult: true)
-    }
-
-    private func switchToApiMode() {
-        disableApiMode()
-        showAlert(title: "API mode removed", message: "This build only switches between saved ChatGPT accounts.")
-    }
 
     @objc private func addAccountBrowser() {
         runAccountMaintenance(title: "Adding account", args: ["login"], restartAfterSuccess: true)
@@ -4218,7 +2050,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         } else {
             notifiedLowUsageKeys.removeAll()
         }
-        rebuildMenu()
+        refreshUI()
     }
 
     @objc private func toggleAutoSwitch() {
@@ -4227,68 +2059,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             configureNotifications()
             checkAutoSwitch()
         }
-        rebuildMenu()
+        refreshUI()
     }
 
     @objc private func toggleConfirmBeforeSwitching() {
         confirmBeforeSwitching.toggle()
         clearArmedSwitch()
-        rebuildMenu()
+        refreshUI()
     }
 
     @objc private func toggleProtectFrontmostCodex() {
         protectFrontmostCodex.toggle()
-        rebuildMenu()
+        refreshUI()
     }
 
-    @objc private func setReminderThreshold() {
-        let alert = NSAlert()
-        alert.messageText = "Usage reminder"
-        alert.informativeText = "Notify when the active account usage display is at or below this percentage."
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
 
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
-        field.stringValue = "\(reminderThreshold)"
-        field.placeholderString = "10"
-        alert.accessoryView = field
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let value = Int(trimmed), (1...99).contains(value) else {
-                showAlert(title: "Invalid percentage", message: "Enter a number from 1 to 99.")
-                return
-            }
-            reminderThreshold = value
-            notifiedLowUsageKeys.removeAll()
-            checkUsageReminder()
-            rebuildMenu()
-        }
-    }
-
-    @objc private func setAutoSwitchThreshold() {
-        let alert = NSAlert()
-        alert.messageText = "Auto-switch"
-        alert.informativeText = "Switch accounts when the active account's 5hr usage remaining is at or below this percentage."
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
-        field.stringValue = "\(autoSwitchThreshold)"
-        field.placeholderString = "10"
-        alert.accessoryView = field
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let value = Int(trimmed), (1...99).contains(value) else {
-                showAlert(title: "Invalid percentage", message: "Enter a number from 1 to 99.")
-                return
-            }
-            autoSwitchThreshold = value
-            checkAutoSwitch()
-            rebuildMenu()
-        }
-    }
 
     @objc private func testUsageReminder() {
         if let active = accounts.first(where: { $0.isActive }) {
@@ -4303,57 +2088,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    @objc private func setWeeklyMode() {
-        usageMode = .weekly
-        rebuildMenu()
-    }
 
-    @objc private func setAccountLabel(_ sender: NSMenuItem) {
-        guard let email = sender.representedObject as? String,
-              let account = accounts.first(where: { $0.email == email }) else { return }
 
-        let alert = NSAlert()
-        alert.messageText = "Set display label"
-        alert.informativeText = "Choose the label shown in the menu bar for \(account.email). Use up to four characters."
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
 
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        field.stringValue = displayLabel(for: account)
-        alert.accessoryView = field
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if value.isEmpty {
-                clearCustomLabel(forEmail: email)
-            } else {
-                setCustomLabel(limitedLabel(value), forEmail: email)
-            }
-            rebuildMenu()
-        }
-    }
-
-    @objc private func clearAccountLabel(_ sender: NSMenuItem) {
-        guard let email = sender.representedObject as? String else { return }
-        clearCustomLabel(forEmail: email)
-        rebuildMenu()
-    }
-
-    @objc private func removeAccount(_ sender: NSMenuItem) {
-        guard let query = sender.representedObject as? String,
-              let account = accounts.first(where: { $0.email == query || $0.selector == query }) else { return }
-
-        let alert = NSAlert()
-        alert.messageText = "Remove account?"
-        alert.informativeText = "Remove \(account.email) from codex-auth switching?"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Cancel")
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            runAccountMaintenance(title: "Removing account", args: ["remove", query])
-        }
-    }
 
     @objc private func cleanAccountBackups() {
         runAccountMaintenance(title: "Cleaning backups", args: ["clean"])
@@ -4369,21 +2106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         } catch {
             showAlert(title: "Launch at Login failed", message: error.localizedDescription)
         }
-        rebuildMenu()
+        refreshUI()
     }
 
-    @objc private func toggleAccount() {
-        guard accounts.count == 2, let inactive = accounts.first(where: { !$0.isActive }) else {
-            showAlert(title: "Cannot toggle", message: "Toggle requires exactly two saved accounts and one active account.")
-            return
-        }
-        switchTo(query: inactive.email)
-    }
 
-    @objc private func switchAccount(_ sender: NSMenuItem) {
-        guard let query = sender.representedObject as? String else { return }
-        switchTo(query: query)
-    }
 
     private func confirmSwitchPreview(for account: CodexAccount) -> Bool {
         let alert = NSAlert()
@@ -4416,7 +2142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         refreshAccountPanelContentIfVisible()
 
         DispatchQueue.global(qos: .userInitiated).async {
-            if !self.apiModeActive, let syncError = self.syncActiveAuthSnapshot() {
+            if let syncError = self.syncActiveAuthSnapshot() {
                 DispatchQueue.main.async {
                     self.isSwitching = false
                     self.endStatusAnimation()
@@ -4459,16 +2185,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
 
             DispatchQueue.main.sync {
-                self.apiModeActive = false
                 self.isSwitching = false
-                self.refreshAccounts(force: true)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                    guard let self, !self.isSwitching else { return }
-                    self.refreshAccounts(force: true)
-                }
+                self.refreshAccounts(force: true, refreshResets: false)
             }
 
             let restartResult = self.restartCodexApp()
+            if restartResult.status == 0, allowAutoResume, self.autoResumeMode != .off {
+                // The relaunch now returns as soon as ChatGPT is up; give its window a
+                // moment to finish loading before an automatic resume pastes into it.
+                Thread.sleep(forTimeInterval: 3)
+            }
             DispatchQueue.main.async {
                 if restartResult.status != 0 {
                     self.recordSwitch(from: previous, to: target, automatic: automatic, reason: "desktop relaunch", result: "account changed; relaunch failed")
@@ -4480,7 +2206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                         self.handleAutoResumeAfterSwitch(to: target)
                     }
                 }
-                self.refreshAccounts(force: true)
+                self.refreshAccounts(force: true, refreshResets: false)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     guard let self, !self.isSwitching else { return }
                     self.endStatusAnimation(expectedGeneration: switchStatusAnimationGeneration)
@@ -4511,17 +2237,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         switchAnimationFrame = 0
         statusAnimationTitle = title
         updateStatusAnimationTitle()
-        switchAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+        let animationTimer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.switchAnimationFrame += 1
             self.updateStatusAnimationTitle()
         }
+        animationTimer.tolerance = 0.02
+        RunLoop.main.add(animationTimer, forMode: .common)
+        switchAnimationTimer = animationTimer
         return statusAnimationGeneration
     }
 
     private func updateStatusAnimationTitle() {
-        let frame = switchAnimationFrames[switchAnimationFrame % switchAnimationFrames.count]
-        setResetStatus("\(statusAnimationTitle) \(frame)")
+        statusSpinnerFrame = switchAnimationFrame
+        setResetStatus("\(statusAnimationTitle)…")
     }
 
     private func endStatusAnimation(expectedGeneration: Int? = nil) {
@@ -4530,6 +2259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         switchAnimationTimer?.invalidate()
         switchAnimationTimer = nil
+        statusSpinnerFrame = nil
         setResetStatus(nil)
     }
 
@@ -4634,28 +2364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
     }
 
-    private func checkApiUsageReminder() {
-        guard apiUsageNotificationsEnabled, apiModeActive, apiDailyLimit > 0 else { return }
-        let percent = apiUsageSnapshot().usedPercent
-        let key = "\(DateFormatter.apiDayKey.string(from: Date()))|\(apiWarningPercent)"
-        if percent >= apiWarningPercent {
-            guard !notifiedApiUsageKeys.contains(key) else { return }
-            notifiedApiUsageKeys.insert(key)
-            sendApiUsageReminder()
-        } else {
-            notifiedApiUsageKeys.remove(key)
-        }
-    }
 
-    private func sendApiUsageReminder(reportResult: Bool = false) {
-        let snapshot = apiUsageSnapshot()
-        sendNotification(
-            title: "OpenAI API token usage",
-            subtitle: "\(snapshot.usedPercent)% of \(snapshot.limitTokens) tokens",
-            body: "\(snapshot.usedTokens) tokens used today. Switch back to a normal Codex account from the account cards when you are ready.",
-            reportResult: reportResult
-        )
-    }
 
     private func sendNotification(
         title: String,
@@ -5078,9 +2787,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func runAccountMaintenance(title: String, args: [String], restartAfterSuccess: Bool = false) {
         guard !isSwitching else { return }
         isSwitching = true
+        statusItem.button?.image = nil
+        statusItem.button?.imagePosition = .noImage
         statusItem.button?.attributedTitle = NSAttributedString(string: "")
         statusItem.button?.title = title
-        rebuildMenu()
+        currentStatusTitleKey = ""
+        refreshUI()
 
         DispatchQueue.global(qos: .userInitiated).async {
             let result = self.runCodexAuth(args)
@@ -5104,12 +2816,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         var transcript: [String] = []
         transcript.append("Quitting \(codexDesktopAppName) process tree...")
 
-        for attempt in 1...6 {
+        // Ask politely first, then force; each step returns as soon as the processes are gone.
+        for (signal, timeout) in [("-TERM", 4.0), ("-KILL", 2.0), ("-KILL", 1.0)] {
             let pids = codexAppPIDs()
             if pids.isEmpty { break }
-            let signal = attempt == 1 ? "-TERM" : "-KILL"
             _ = run("/bin/kill", [signal] + pids)
-            Thread.sleep(forTimeInterval: 1)
+            if waitUntil(timeout: timeout, { self.codexAppPIDs().isEmpty }) { break }
         }
 
         let remaining = codexAppPIDs()
@@ -5127,18 +2839,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return CommandResult(status: openResult.status, output: transcript.joined(separator: "\n") + "\n" + openResult.output)
         }
 
-        Thread.sleep(forTimeInterval: 4)
-        let runningResult = run("/usr/bin/osascript", ["-e", "application \"\(codexDesktopAppName)\" is running"])
-        if runningResult.output.trimmingCharacters(in: .whitespacesAndNewlines) != "true" {
+        let mainExecutablePattern = "\(NSRegularExpression.escapedPattern(for: codexDesktopAppPath))/Contents/MacOS/"
+        let launched = waitUntil(timeout: 10) {
+            self.run("/usr/bin/pgrep", ["-f", mainExecutablePattern]).status == 0
+        }
+        guard launched else {
             transcript.append("\(codexDesktopAppName) did not report as running after launch.")
-            let stillRemaining = codexAppPIDs()
-            if !stillRemaining.isEmpty {
-                transcript.append("Remaining Codex process IDs: \(stillRemaining.joined(separator: ", "))")
-            }
             return CommandResult(status: 1, output: transcript.joined(separator: "\n"))
         }
-
         return CommandResult(status: 0, output: transcript.joined(separator: "\n"))
+    }
+
+    /// Polls `condition` every 0.2 s until it is true or `timeout` passes. Background threads only.
+    private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if condition() { return true }
+            Thread.sleep(forTimeInterval: 0.2)
+        } while Date() < deadline
+        return condition()
     }
 
     private func ensureComputerUsePluginConfigured() -> String? {
@@ -5246,42 +2965,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
+    /// Demo-only screenshot scenarios: "two" (default look for most users) or "four".
+    private var demoScenario: String? {
+        guard demoMode else { return nil }
+        return ProcessInfo.processInfo.environment["CODEX_ACCOUNT_SWITCHER_DEMO_SCENARIO"]
+    }
+
     private func demoAccounts() -> [CodexAccount] {
-        [
+        func account(_ selector: String, _ email: String, five: Int?, weekly: Int?, fiveReset: String, weeklyReset: String, active: Bool, expired: Bool = false) -> CodexAccount {
             CodexAccount(
-                selector: "01",
-                email: "alpha@example.com",
+                selector: selector,
+                email: email,
                 plan: "plus",
-                fiveHourUsage: "31% (16:40)",
-                weeklyUsage: "82% (Fri 09:00)",
-                fiveHourUsedPercent: 31,
-                weeklyUsedPercent: 82,
-                lastActivity: "Just now",
-                isActive: true
-            ),
-            CodexAccount(
-                selector: "02",
-                email: "beta@example.com",
-                plan: "plus",
-                fiveHourUsage: "92% (18:15)",
-                weeklyUsage: "64% (Fri 09:00)",
-                fiveHourUsedPercent: 92,
-                weeklyUsedPercent: 64,
-                lastActivity: "1h ago",
-                isActive: false
-            ),
-            CodexAccount(
-                selector: "03",
-                email: "gamma@example.com",
-                plan: "plus",
-                fiveHourUsage: "68% (20:25)",
-                weeklyUsage: "41% (Fri 09:00)",
-                fiveHourUsedPercent: 68,
-                weeklyUsedPercent: 41,
-                lastActivity: "2h ago",
-                isActive: false
+                fiveHourUsage: expired ? "Login expired" : "\(five ?? 0)% (\(fiveReset))",
+                weeklyUsage: expired ? "Login expired" : "\(weekly ?? 0)% (\(weeklyReset))",
+                fiveHourUsedPercent: expired ? nil : five,
+                weeklyUsedPercent: expired ? nil : weekly,
+                lastActivity: active ? "Just now" : "1h ago",
+                isActive: active
             )
-        ]
+        }
+        let alpha = account("01", "alpha@example.com", five: 31, weekly: 82, fiveReset: "16:40", weeklyReset: "Fri 09:00", active: true)
+        let beta = account("02", "beta@example.com", five: 92, weekly: 64, fiveReset: "18:15", weeklyReset: "Fri 09:00", active: false)
+        switch demoScenario {
+        case "two":
+            return [alpha, beta]
+        case "four":
+            return [
+                alpha,
+                account("02", "builds@example.com", five: 92, weekly: 64, fiveReset: "18:15", weeklyReset: "Fri 09:00", active: false),
+                account("03", "creative@example.com", five: 68, weekly: 18, fiveReset: "20:25", weeklyReset: "Fri 09:00", active: false),
+                account("04", "demo@example.com", five: nil, weekly: nil, fiveReset: "", weeklyReset: "", active: false, expired: true)
+            ]
+        default:
+            return [
+                alpha,
+                beta,
+                account("03", "gamma@example.com", five: 68, weekly: 41, fiveReset: "20:25", weeklyReset: "Fri 09:00", active: false)
+            ]
+        }
     }
 
     private func demoResetCreditsByEmail(for accounts: [CodexAccount]) -> [String: ResetCreditsSnapshot] {
@@ -5370,9 +3092,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return digits.isEmpty ? nil : Int(digits)
     }
 
-    private func fetchApiUsage() -> ApiUsageFetchResult {
-        .failure("API mode disabled")
-    }
 
     private func fetchResetCreditsForRefresh(
         accounts: [CodexAccount],
@@ -5740,63 +3459,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     private func authFileURL(forAccountID accountID: String, root: URL) -> URL? {
+        let modified = (try? root.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        authIndexLock.lock()
+        if let cache = authIndexCache, cache.modified == modified, let url = cache.index[accountID] {
+            authIndexLock.unlock()
+            return url
+        }
+        authIndexLock.unlock()
+
         guard let urls = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else {
             return nil
         }
+        var index: [String: URL] = [:]
         for url in urls where url.lastPathComponent.hasSuffix(".auth.json") {
             guard
                 let data = try? Data(contentsOf: url),
                 let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                 let tokens = object["tokens"] as? [String: Any],
-                let candidate = tokens["account_id"] as? String,
-                candidate == accountID
+                let candidate = tokens["account_id"] as? String
             else {
                 continue
             }
-            return url
+            index[candidate] = url
         }
-        return nil
+        authIndexLock.lock()
+        authIndexCache = (modified, index)
+        authIndexLock.unlock()
+        return index[accountID]
     }
 
-    private func apiKeyConfigured() -> Bool {
-        false
-    }
 
-    private func usageKeyConfigured() -> Bool {
-        false
-    }
 
-    private func saveKeychainSecret(_ secret: String, account: String) {
-        let data = Data(secret.utf8)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: apiTokenUsageService,
-            kSecAttrAccount as String: account
-        ]
-        SecItemDelete(query as CFDictionary)
-        var addQuery = query
-        addQuery[kSecValueData as String] = data
-        SecItemAdd(addQuery as CFDictionary, nil)
-    }
 
-    private func readKeychainSecret(account: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: apiTokenUsageService,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let secret = String(data: data, encoding: .utf8),
-              !secret.isEmpty else {
-            return nil
-        }
-        return secret
-    }
 
     private func deleteKeychainSecret(account: String) {
         let query: [String: Any] = [
@@ -5807,37 +3501,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         SecItemDelete(query as CFDictionary)
     }
 
-    private func backupActiveAuthBeforeApiMode() -> String? {
-        let home = NSHomeDirectory()
-        let authURL = URL(fileURLWithPath: "\(home)/.codex/auth.json")
-        guard FileManager.default.fileExists(atPath: authURL.path) else { return nil }
-        let backupDir = URL(fileURLWithPath: "\(home)/.codex/auth-backups")
-        do {
-            try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
-            let stamp = DateFormatter.apiBackupStamp.string(from: Date())
-            let backupURL = backupDir.appendingPathComponent("auth.chatgpt-before-api-\(stamp).json")
-            try FileManager.default.copyItem(at: authURL, to: backupURL)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
-            return nil
-        } catch {
-            return error.localizedDescription
-        }
-    }
 
-    private func runCodexLoginWithApiKey(_ apiKey: String) -> CommandResult {
-        let bundledCodex = "\(codexDesktopResourcesPath)/codex"
-        let codexPath = FileManager.default.isExecutableFile(atPath: bundledCodex) ? bundledCodex : "codex"
-        return runWithInput(codexPath, ["login", "--with-api-key"], input: apiKey)
-    }
 
     private func runCodexAuth(_ args: [String]) -> CommandResult {
         guard let path = codexAuthPath() else {
             return CommandResult(status: 127, output: "codex-auth was not found in known locations.")
         }
-        return run(path, args)
+        let result = run(path, args)
+        if result.status == 127 {
+            invalidateCodexAuthPath()
+        }
+        return result
     }
 
     private func codexAuthPath() -> String? {
+        codexAuthPathLock.lock()
+        let cached = cachedCodexAuthPath
+        codexAuthPathLock.unlock()
+        if let cached, FileManager.default.isExecutableFile(atPath: cached) {
+            return cached
+        }
+        let resolved = resolveCodexAuthPath()
+        codexAuthPathLock.lock()
+        cachedCodexAuthPath = resolved
+        codexAuthPathLock.unlock()
+        return resolved
+    }
+
+    private func resolveCodexAuthPathInBackground() {
+        guard !isResolvingCodexAuthPath else { return }
+        isResolvingCodexAuthPath = true
+        DispatchQueue.global(qos: .utility).async {
+            _ = self.codexAuthPath()
+            DispatchQueue.main.async {
+                self.isResolvingCodexAuthPath = false
+                self.codexAuthResolveFinished = true
+                self.refreshAccountPanelContentIfVisible()
+            }
+        }
+    }
+
+    private func invalidateCodexAuthPath() {
+        codexAuthPathLock.lock()
+        cachedCodexAuthPath = nil
+        codexAuthPathLock.unlock()
+    }
+
+    private func resolveCodexAuthPath() -> String? {
         let home = NSHomeDirectory()
         let stableCandidates = [
             "\(home)/.local/bin/codex-auth",
@@ -5892,15 +3602,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return ProcessRunner.run(executable, args, environment: environment, timeout: commandTimeout(for: executable, arguments: args))
     }
 
-    private func runWithInput(_ executable: String, _ args: [String], input: String) -> CommandResult {
-        ProcessRunner.run(
-            executable,
-            args,
-            environment: augmentedEnvironment(),
-            input: input.data(using: .utf8),
-            timeout: 90
-        )
-    }
 
     private func commandTimeout(for executable: String, arguments: [String]) -> TimeInterval {
         let command = URL(fileURLWithPath: executable).lastPathComponent
@@ -6080,10 +3781,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return String(email.prefix(maximumLength - 3)) + "..."
     }
 
-    private func displayPlan(_ plan: String) -> String {
-        guard let first = plan.first else { return plan }
-        return first.uppercased() + plan.dropFirst().lowercased()
-    }
 
     private func customLabel(forEmail email: String) -> String? {
         accountLabels()[email]
@@ -6093,16 +3790,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         var labels = accountLabels()
         labels[email] = label
         UserDefaults.standard.set(labels, forKey: labelsDefaultsKey)
+        labelsCache = labels
     }
 
     private func clearCustomLabel(forEmail email: String) {
         var labels = accountLabels()
         labels.removeValue(forKey: email)
         UserDefaults.standard.set(labels, forKey: labelsDefaultsKey)
+        labelsCache = labels
     }
 
     private func accountLabels() -> [String: String] {
-        UserDefaults.standard.dictionary(forKey: labelsDefaultsKey) as? [String: String] ?? [:]
+        if let labelsCache { return labelsCache }
+        let labels = UserDefaults.standard.dictionary(forKey: labelsDefaultsKey) as? [String: String] ?? [:]
+        labelsCache = labels
+        return labels
     }
 
     private func shellEscaped(_ value: String) -> String {

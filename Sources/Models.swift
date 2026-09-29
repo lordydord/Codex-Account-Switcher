@@ -88,23 +88,6 @@ let routeBProviderProfiles = [
     )
 ]
 
-struct ApiUsageSnapshot: Equatable {
-    let usedTokens: Int
-    let limitTokens: Int
-    let warningPercent: Int
-    let lastUpdatedText: String
-    let lastError: String?
-
-    var usedPercent: Int {
-        guard limitTokens > 0 else { return 0 }
-        return max(0, min(100, Int((Double(usedTokens) / Double(limitTokens)) * 100.0)))
-    }
-
-    var remainingTokens: Int {
-        max(0, limitTokens - usedTokens)
-    }
-}
-
 struct ResetCredit: Equatable {
     let id: String
     let title: String
@@ -182,7 +165,6 @@ enum AutoResumeMode: String {
 enum AccountPanelMode {
     case usage
     case settings
-    case api
     case routeB
     case resets
 }
@@ -194,12 +176,6 @@ enum SettingsPanelAction: String {
     case resetCreditsView
     case addAccount
     case addDeviceAccount
-    case apiView
-    case setupApiMode
-    case switchApiMode
-    case editApiLimit
-    case refreshApiUsage
-    case testApiReminder
     case editLabels
     case removeAccount
     case usageWeekly
@@ -238,82 +214,89 @@ extension NSAppearance {
 struct PanelTheme {
     let isDark: Bool
 
+    enum Tone {
+        case green
+        case orange
+        case red
+        case blue
+        case indigo
+        case neutral
+    }
+
     static func current(for appearance: NSAppearance?) -> PanelTheme {
         PanelTheme(isDark: appearance?.isDarkMode ?? NSApp.effectiveAppearance.isDarkMode)
     }
 
-    var primaryText: NSColor {
-        isDark ? NSColor(red: 0.93, green: 0.95, blue: 0.97, alpha: 1) : NSColor(red: 0.10, green: 0.12, blue: 0.15, alpha: 1)
+    private static func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: alpha
+        )
     }
 
-    var secondaryText: NSColor {
-        isDark ? NSColor(red: 0.58, green: 0.62, blue: 0.68, alpha: 1) : NSColor(red: 0.37, green: 0.41, blue: 0.46, alpha: 1)
+    // Text
+    var primaryText: NSColor { isDark ? NSColor.white.withAlphaComponent(0.92) : NSColor.black.withAlphaComponent(0.86) }
+    var secondaryText: NSColor { isDark ? Self.rgb(0xEBEBF5, 0.66) : Self.rgb(0x3C3C43, 0.76) }
+    var tertiaryText: NSColor { isDark ? Self.rgb(0xEBEBF5, 0.46) : Self.rgb(0x3C3C43, 0.58) }
+
+    // Glass surface
+    var panelTint: NSColor { isDark ? Self.rgb(0x16171E, 0.50) : Self.rgb(0xF6F6FA, 0.55) }
+    var panelEdge: NSColor { isDark ? NSColor.black.withAlphaComponent(0.60) : NSColor.black.withAlphaComponent(0.16) }
+    var panelHighlight: NSColor { isDark ? NSColor.white : NSColor.white }
+
+    // Tiles, hairlines and controls
+    var tileFill: NSColor { isDark ? NSColor.white.withAlphaComponent(0.06) : NSColor.white.withAlphaComponent(0.55) }
+    var tileHoverFill: NSColor { isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.white.withAlphaComponent(0.82) }
+    var tileBorder: NSColor { isDark ? NSColor.white.withAlphaComponent(0.08) : NSColor.black.withAlphaComponent(0.07) }
+    var hairline: NSColor { isDark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.08) }
+    var controlFill: NSColor { isDark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.05) }
+    var controlHoverFill: NSColor { isDark ? NSColor.white.withAlphaComponent(0.16) : NSColor.black.withAlphaComponent(0.09) }
+    var controlBorder: NSColor { isDark ? NSColor.white.withAlphaComponent(0.12) : NSColor.black.withAlphaComponent(0.06) }
+    var segmentTrack: NSColor { isDark ? NSColor.black.withAlphaComponent(0.26) : NSColor.black.withAlphaComponent(0.06) }
+    var segmentSelected: NSColor { isDark ? NSColor.white.withAlphaComponent(0.17) : NSColor.white }
+    var segmentSelectedBorder: NSColor { isDark ? NSColor.white.withAlphaComponent(0.14) : NSColor.black.withAlphaComponent(0.05) }
+    var trackFill: NSColor { isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.08) }
+    var switchOff: NSColor { isDark ? NSColor.white.withAlphaComponent(0.20) : NSColor.black.withAlphaComponent(0.14) }
+    var accent: NSColor { NSColor.controlAccentColor.usingColorSpace(.sRGB) ?? NSColor.controlAccentColor }
+
+    // Semantic colours: `color` for graphics, `text` for readable text on the glass
+    var blueText: NSColor { text(.blue) }
+
+    func color(_ tone: Tone) -> NSColor {
+        switch tone {
+        case .green: return isDark ? Self.rgb(0x30D158) : Self.rgb(0x34C759)
+        case .orange: return isDark ? Self.rgb(0xFF9F0A) : Self.rgb(0xFF9500)
+        case .red: return isDark ? Self.rgb(0xFF453A) : Self.rgb(0xFF3B30)
+        case .blue: return isDark ? Self.rgb(0x0A84FF) : Self.rgb(0x007AFF)
+        case .indigo: return isDark ? Self.rgb(0x5E5CE6) : Self.rgb(0x5856D6)
+        case .neutral: return secondaryText
+        }
     }
 
-    var tertiaryText: NSColor {
-        isDark ? NSColor(red: 0.40, green: 0.44, blue: 0.50, alpha: 1) : NSColor(red: 0.49, green: 0.53, blue: 0.58, alpha: 1)
+    func text(_ tone: Tone) -> NSColor {
+        switch tone {
+        case .green: return isDark ? Self.rgb(0x4BE07A) : Self.rgb(0x1A7A36)
+        case .orange: return isDark ? Self.rgb(0xFFB340) : Self.rgb(0xA34E00)
+        case .red: return isDark ? Self.rgb(0xFF7B72) : Self.rgb(0xC4271D)
+        case .blue: return isDark ? Self.rgb(0x8CC6FF) : Self.rgb(0x0055B3)
+        case .indigo: return isDark ? Self.rgb(0xC3C1FF) : Self.rgb(0x3F3DB8)
+        case .neutral: return primaryText
+        }
     }
 
-    var valueText: NSColor {
-        isDark ? NSColor(red: 0.75, green: 0.79, blue: 0.84, alpha: 1) : NSColor(red: 0.24, green: 0.28, blue: 0.33, alpha: 1)
+    func tint(_ tone: Tone) -> NSColor {
+        if tone == .neutral { return controlFill }
+        return color(tone).withAlphaComponent(isDark ? 0.20 : 0.14)
     }
 
-    var inactiveAccent: NSColor {
-        isDark ? NSColor(red: 0.42, green: 0.46, blue: 0.52, alpha: 1) : NSColor(red: 0.47, green: 0.51, blue: 0.56, alpha: 1)
+    static func usageTone(for percent: Int?) -> Tone {
+        guard let percent else { return .neutral }
+        if percent >= 50 { return .green }
+        if percent >= 20 { return .orange }
+        return .red
     }
-
-    var activeCardFill: NSColor {
-        isDark ? NSColor(red: 0.045, green: 0.105, blue: 0.088, alpha: 0.94) : NSColor(red: 0.91, green: 0.97, blue: 0.935, alpha: 0.98)
-    }
-
-    var inactiveCardFill: NSColor {
-        isDark ? NSColor(red: 0.060, green: 0.073, blue: 0.093, alpha: 0.96) : NSColor(red: 0.955, green: 0.965, blue: 0.978, alpha: 0.98)
-    }
-
-    var inactiveCardHoverFill: NSColor {
-        isDark ? NSColor(red: 0.082, green: 0.101, blue: 0.128, alpha: 1) : NSColor(red: 0.985, green: 0.99, blue: 1.0, alpha: 1)
-    }
-
-    var inactiveCardBorder: NSColor {
-        isDark ? NSColor(red: 0.42, green: 0.48, blue: 0.56, alpha: 0.16) : NSColor(red: 0.18, green: 0.23, blue: 0.29, alpha: 0.12)
-    }
-
-    var bottomBarFill: NSColor {
-        isDark ? NSColor(red: 0.055, green: 0.068, blue: 0.087, alpha: 0.98) : NSColor(red: 0.93, green: 0.945, blue: 0.965, alpha: 0.98)
-    }
-
-    var divider: NSColor {
-        isDark ? NSColor(red: 0.48, green: 0.54, blue: 0.62, alpha: 0.14) : NSColor(red: 0.18, green: 0.22, blue: 0.27, alpha: 0.10)
-    }
-
-    var iconTint: NSColor {
-        isDark ? NSColor(red: 0.64, green: 0.69, blue: 0.75, alpha: 1) : NSColor(red: 0.34, green: 0.39, blue: 0.44, alpha: 1)
-    }
-
-    var ringTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.075) : NSColor.black.withAlphaComponent(0.075)
-    }
-
-    var progressTrack: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.08)
-    }
-
-    var inactiveButtonFill: NSColor {
-        isDark ? NSColor(red: 0.12, green: 0.145, blue: 0.18, alpha: 1) : NSColor(red: 0.88, green: 0.905, blue: 0.935, alpha: 1)
-    }
-
-    var usageInactiveButtonFill: NSColor {
-        isDark ? NSColor(red: 0.14, green: 0.165, blue: 0.20, alpha: 1) : NSColor(red: 0.31, green: 0.35, blue: 0.40, alpha: 0.96)
-    }
-
-    var switchOffFill: NSColor {
-        isDark ? NSColor.white.withAlphaComponent(0.18) : NSColor.black.withAlphaComponent(0.18)
-    }
-}
-
-enum ApiUsageFetchResult {
-    case success(Int)
-    case failure(String)
 }
 
 enum ResetCreditsFetchResult {

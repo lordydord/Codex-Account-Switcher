@@ -36,6 +36,7 @@ enum ProcessRunner {
         let inputPipe = input == nil ? nil : Pipe()
         let outputBox = DataBox()
         let outputGroup = DispatchGroup()
+        let exited = DispatchSemaphore(value: 0)
 
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -43,6 +44,8 @@ enum ProcessRunner {
         process.standardOutput = outputPipe
         process.standardError = outputPipe
         process.standardInput = inputPipe
+        // Wake exactly when the process exits instead of polling every 20 ms.
+        process.terminationHandler = { _ in exited.signal() }
 
         do {
             try process.run()
@@ -61,20 +64,12 @@ enum ProcessRunner {
             inputPipe.fileHandleForWriting.closeFile()
         }
 
-        let deadline = Date().addingTimeInterval(max(0.1, timeout))
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.02)
-        }
-
-        let timedOut = process.isRunning
+        let timedOut = exited.wait(timeout: .now() + max(0.1, timeout)) == .timedOut
         if timedOut {
             process.terminate()
-            let terminationDeadline = Date().addingTimeInterval(0.5)
-            while process.isRunning && Date() < terminationDeadline {
-                Thread.sleep(forTimeInterval: 0.02)
-            }
-            if process.isRunning {
+            if exited.wait(timeout: .now() + 0.5) == .timedOut {
                 Darwin.kill(process.processIdentifier, SIGKILL)
+                _ = exited.wait(timeout: .now() + 1)
             }
         }
 
@@ -199,13 +194,26 @@ struct HTTPPayload {
 }
 
 enum CodexHTTPClient {
+    /// A dedicated ephemeral session: always-fresh responses, no token-bearing
+    /// data written to the shared on-disk URL cache, and warm connection reuse.
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 30
+        configuration.httpMaximumConnectionsPerHost = 4
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
     static func send(_ request: URLRequest, retries: Int) async throws -> HTTPPayload {
         var lastError: Error?
         let attempts = max(1, retries + 1)
 
         for attempt in 0..<attempts {
             do {
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await session.data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw URLError(.badServerResponse)
                 }

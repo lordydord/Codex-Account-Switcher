@@ -1,108 +1,191 @@
 import AppKit
 import Foundation
 
-final class DashboardBackgroundView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
+// MARK: - Layout primitives
+
+final class FlippedContainerView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+func textWidth(_ text: String, font: NSFont) -> CGFloat {
+    ceil((text as NSString).size(withAttributes: [.font: font]).width)
+}
+
+func makeLabel(
+    _ text: String,
+    size: CGFloat,
+    weight: NSFont.Weight = .regular,
+    color: NSColor,
+    alignment: NSTextAlignment = .left,
+    monospacedDigits: Bool = false,
+    kern: CGFloat? = nil
+) -> NSTextField {
+    let font: NSFont = monospacedDigits
+        ? .monospacedDigitSystemFont(ofSize: size, weight: weight)
+        : .systemFont(ofSize: size, weight: weight)
+    let field = NSTextField(labelWithString: text)
+    field.font = font
+    field.textColor = color
+    field.alignment = alignment
+    field.lineBreakMode = .byTruncatingTail
+    field.maximumNumberOfLines = 1
+    field.cell?.truncatesLastVisibleLine = true
+    if let kern {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineBreakMode = .byTruncatingTail
+        field.attributedStringValue = NSAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: color,
+            .kern: kern,
+            .paragraphStyle: paragraph
+        ])
+    }
+    field.sizeToFit()
+    return field
+}
+
+extension NSView {
+    /// Adds a label at a position, optionally constraining its width, and returns its frame.
+    @discardableResult
+    func place(_ view: NSView, x: CGFloat, y: CGFloat, width: CGFloat? = nil, height: CGFloat? = nil) -> NSRect {
+        var frame = view.frame
+        frame.origin = NSPoint(x: x, y: y)
+        if let width { frame.size.width = max(0, width) }
+        if let height { frame.size.height = height }
+        view.frame = frame
+        addSubview(view)
+        return frame
+    }
+}
+
+// MARK: - Glass panel
+
+/// The panel's Liquid Glass surface. On macOS 26 and later this is a real
+/// NSGlassEffectView (which honours the system transparency setting); older
+/// systems fall back to a popover material with a drawn edge.
+final class GlassPanelBackground: NSView {
+    let contentView: FlippedContainerView
+
+    init(frame: NSRect, theme: PanelTheme, cornerRadius: CGFloat = 16) {
+        contentView = FlippedContainerView(frame: NSRect(origin: .zero, size: frame.size))
+        contentView.autoresizingMask = [.width, .height]
+        super.init(frame: frame)
+        autoresizingMask = [.width, .height]
         wantsLayer = true
-        installFrostedBackdrop()
+
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView(frame: bounds)
+            glass.autoresizingMask = [.width, .height]
+            glass.cornerRadius = cornerRadius
+            glass.style = .regular
+            glass.tintColor = theme.panelTint
+            glass.contentView = contentView
+            addSubview(glass)
+        } else {
+            let material = NSVisualEffectView(frame: bounds)
+            material.autoresizingMask = [.width, .height]
+            material.material = .popover
+            material.blendingMode = .behindWindow
+            material.state = .active
+            material.wantsLayer = true
+            material.layer?.cornerRadius = cornerRadius
+            material.layer?.cornerCurve = .continuous
+            material.layer?.masksToBounds = true
+            addSubview(material)
+
+            let tint = NSView(frame: bounds)
+            tint.autoresizingMask = [.width, .height]
+            tint.wantsLayer = true
+            tint.layer?.backgroundColor = theme.panelTint.cgColor
+            material.addSubview(tint)
+            material.addSubview(contentView)
+
+            let edge = PanelEdgeView(frame: bounds, theme: theme, cornerRadius: cornerRadius)
+            edge.autoresizingMask = [.width, .height]
+            addSubview(edge)
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+/// Darkened outer edge plus a bright top highlight, for systems without NSGlassEffectView.
+final class PanelEdgeView: NSView {
+    private let theme: PanelTheme
+    private let cornerRadius: CGFloat
+
+    init(frame: NSRect, theme: PanelTheme, cornerRadius: CGFloat) {
+        self.theme = theme
+        self.cornerRadius = cornerRadius
+        super.init(frame: frame)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        needsDisplay = true
-    }
-
-    private func installFrostedBackdrop() {
-        let material = NSVisualEffectView(frame: bounds)
-        material.material = .popover
-        material.blendingMode = .behindWindow
-        material.state = .active
-        material.wantsLayer = true
-        material.layer?.cornerRadius = 22
-        material.layer?.masksToBounds = true
-        material.autoresizingMask = [.width, .height]
-        addSubview(material)
-    }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func draw(_ dirtyRect: NSRect) {
-        let rect = bounds
-        let isDark = effectiveAppearance.isDarkMode
-        let base = isDark
-            ? NSColor(red: 0.027, green: 0.034, blue: 0.045, alpha: 0.16)
-            : NSColor(red: 0.925, green: 0.94, blue: 0.958, alpha: 0.20)
-        base.setFill()
-        rect.fill()
+        let outer = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.25, dy: 0.25), xRadius: cornerRadius, yRadius: cornerRadius)
+        outer.lineWidth = 0.5
+        theme.panelEdge.setStroke()
+        outer.stroke()
 
-        let topGlow = NSGradient(
-            starting: isDark ? NSColor(red: 0.12, green: 0.19, blue: 0.18, alpha: 0.42) : NSColor(red: 0.70, green: 0.90, blue: 0.82, alpha: 0.42),
-            ending: base.withAlphaComponent(0)
-        )
-        topGlow?.draw(in: NSRect(x: -90, y: -150, width: rect.width + 180, height: 360), relativeCenterPosition: NSPoint(x: -0.10, y: 0.18))
-
-        let sideGlow = NSGradient(
-            starting: isDark ? NSColor(red: 0.14, green: 0.20, blue: 0.30, alpha: 0.28) : NSColor(red: 0.74, green: 0.82, blue: 0.94, alpha: 0.30),
-            ending: base.withAlphaComponent(0)
-        )
-        sideGlow?.draw(in: NSRect(x: rect.width * 0.36, y: rect.height * 0.42, width: rect.width * 0.88, height: rect.height * 0.72), relativeCenterPosition: NSPoint(x: 0.22, y: -0.10))
-
-        let gridColor = isDark ? NSColor.white.withAlphaComponent(0.024) : NSColor.black.withAlphaComponent(0.022)
-        gridColor.setStroke()
-        let grid = NSBezierPath()
-        grid.lineWidth = 0.5
-        var x: CGFloat = 22
-        while x < rect.width {
-            grid.move(to: NSPoint(x: x, y: 0))
-            grid.line(to: NSPoint(x: x, y: rect.height))
-            x += 44
-        }
-        var y: CGFloat = 22
-        while y < rect.height {
-            grid.move(to: NSPoint(x: 0, y: y))
-            grid.line(to: NSPoint(x: rect.width, y: y))
-            y += 44
-        }
-        grid.stroke()
-
-        (isDark ? NSColor.white.withAlphaComponent(0.10) : NSColor.black.withAlphaComponent(0.09)).setStroke()
-        let border = rect.insetBy(dx: 1, dy: 1).roundedPath(radius: 24)
-        border.lineWidth = 1
-        border.stroke()
+        let inner = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.75, dy: 0.75), xRadius: cornerRadius - 0.5, yRadius: cornerRadius - 0.5)
+        inner.lineWidth = 0.5
+        theme.panelHighlight.withAlphaComponent(theme.isDark ? 0.10 : 0.6).setStroke()
+        inner.stroke()
     }
 }
 
-final class FlippedContainerView: NSView {
-    override var isFlipped: Bool { true }
-}
+// MARK: - Tiles
 
-final class RoundedPanelView: NSView {
-    private let fillColor: NSColor
+/// A rounded glass tile. With an action it behaves like a large button (hover, click, VoiceOver press).
+final class TileView: NSView {
+    private var fillColor: NSColor
     private let hoverFillColor: NSColor?
-    private let borderColor: NSColor
-    private let cornerRadius: CGFloat
-    private let clickAction: (() -> Void)?
+    private let action: (() -> Void)?
     private var trackingArea: NSTrackingArea?
+    private var pressed = false
 
-    init(frame: NSRect, fillColor: NSColor, borderColor: NSColor, cornerRadius: CGFloat = 18, hoverFillColor: NSColor? = nil, clickAction: (() -> Void)? = nil, shadowOpacity: Float = 0.12, shadowRadius: CGFloat = 12) {
-        self.fillColor = fillColor
-        self.hoverFillColor = hoverFillColor
-        self.borderColor = borderColor
-        self.cornerRadius = cornerRadius
-        self.clickAction = clickAction
+    init(
+        frame: NSRect,
+        fill: NSColor,
+        border: NSColor? = nil,
+        borderWidth: CGFloat = 0.5,
+        cornerRadius: CGFloat = 12,
+        hoverFill: NSColor? = nil,
+        shadow: NSColor? = nil,
+        accessibilityLabel: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.fillColor = fill
+        self.hoverFillColor = hoverFill
+        self.action = action
         super.init(frame: frame)
         wantsLayer = true
         layer?.cornerRadius = cornerRadius
-        layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = borderColor.cgColor
-        layer?.shadowColor = NSColor(red: 0.01, green: 0.02, blue: 0.035, alpha: 1).cgColor
-        layer?.shadowOpacity = shadowOpacity
-        layer?.shadowRadius = shadowRadius
-        layer?.shadowOffset = NSSize(width: 0, height: -5)
+        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = fill.cgColor
+        if let border {
+            layer?.borderColor = border.cgColor
+            layer?.borderWidth = borderWidth
+        }
+        if let shadow {
+            layer?.shadowColor = shadow.cgColor
+            layer?.shadowOpacity = 1
+            layer?.shadowRadius = 1.5
+            layer?.shadowOffset = NSSize(width: 0, height: -1)
+        }
+        if action != nil {
+            setAccessibilityElement(true)
+            setAccessibilityRole(.button)
+            setAccessibilityLabel(accessibilityLabel)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -113,9 +196,7 @@ final class RoundedPanelView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
+        if let trackingArea { removeTrackingArea(trackingArea) }
         guard hoverFillColor != nil else { return }
         let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
         addTrackingArea(area)
@@ -129,135 +210,364 @@ final class RoundedPanelView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         layer?.backgroundColor = fillColor.cgColor
+        pressed = false
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        guard clickAction != nil, let hitView = super.hitTest(point) else {
-            return super.hitTest(point)
-        }
-        return hitView is NSButton ? hitView : self
+        guard action != nil, let hit = super.hitTest(point) else { return super.hitTest(point) }
+        return hit is NSControl ? hit : self
     }
 
     override func mouseDown(with event: NSEvent) {
-        if let clickAction {
-            clickAction()
+        guard action != nil else { return super.mouseDown(with: event) }
+        pressed = true
+        layer?.opacity = 0.82
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let action else { return super.mouseUp(with: event) }
+        layer?.opacity = 1
+        let inside = bounds.contains(convert(event.locationInWindow, from: nil))
+        if pressed, inside { action() }
+        pressed = false
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard let action else { return false }
+        action()
+        return true
+    }
+}
+
+final class HairlineView: NSView {
+    init(frame: NSRect, color: NSColor) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.backgroundColor = color.cgColor
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+// MARK: - Buttons
+
+final class GlassButton: NSButton {
+    enum Style {
+        case primary
+        case secondary
+        case icon
+        case text(NSColor)
+        case popup
+        case use
+    }
+
+    private let style: Style
+    private let theme: PanelTheme
+    private let onPress: () -> Void
+    private var trackingArea: NSTrackingArea?
+    private var hovering = false
+    private var pressedDown = false
+    private let buttonTitle: String
+    private let fontSize: CGFloat
+
+    init(
+        title: String = "",
+        symbol: String? = nil,
+        style: Style,
+        theme: PanelTheme,
+        height: CGFloat = 28,
+        fontSize: CGFloat = 12,
+        accessibilityLabel: String? = nil,
+        onPress: @escaping () -> Void
+    ) {
+        self.style = style
+        self.theme = theme
+        self.onPress = onPress
+        self.buttonTitle = title
+        self.fontSize = fontSize
+        super.init(frame: .zero)
+        isBordered = false
+        bezelStyle = .regularSquare
+        setButtonType(.momentaryChange)
+        focusRingType = .exterior
+        wantsLayer = true
+        layer?.cornerCurve = .continuous
+        target = self
+        action = #selector(firePress)
+        if let accessibilityLabel { setAccessibilityLabel(accessibilityLabel) }
+
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+        var width: CGFloat
+        switch style {
+        case .icon:
+            width = height
+            imagePosition = .imageOnly
+            let config = NSImage.SymbolConfiguration(pointSize: fontSize, weight: .semibold)
+            image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: accessibilityLabel)?.withSymbolConfiguration(config) }
+        case .popup:
+            width = textWidth(title, font: .systemFont(ofSize: fontSize, weight: .medium)) + 28
+            imagePosition = .imageTrailing
+            let config = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
+            image = NSImage(systemSymbolName: "chevron.up.chevron.down", accessibilityDescription: nil)?.withSymbolConfiguration(config)
+        case .text:
+            width = textWidth(title, font: font) + 14
+            if let symbol {
+                imagePosition = .imageTrailing
+                let config = NSImage.SymbolConfiguration(pointSize: fontSize - 3, weight: .bold)
+                image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+                width += 12
+            }
+        case .primary:
+            width = textWidth(title, font: font) + 28
+        case .secondary:
+            width = textWidth(title, font: .systemFont(ofSize: fontSize, weight: .medium)) + 24
+        case .use:
+            width = textWidth(title, font: font) + 24
+        }
+        frame = NSRect(x: 0, y: 0, width: ceil(width), height: height)
+        switch style {
+        case .icon, .primary, .secondary, .use:
+            layer?.cornerRadius = height / 2
+        case .popup, .text:
+            layer?.cornerRadius = 6
+        }
+        applyAppearance()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isEnabled: Bool {
+        didSet { applyAppearance() }
+    }
+
+    @objc private func firePress() {
+        onPress()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hovering = true
+        applyAppearance()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hovering = false
+        applyAppearance()
+    }
+
+    override func highlight(_ flag: Bool) {
+        super.highlight(flag)
+        pressedDown = flag
+        applyAppearance()
+    }
+
+    private func applyAppearance() {
+        let active = isEnabled && hovering
+        var fill: NSColor = .clear
+        var textColor = theme.primaryText
+        var weight: NSFont.Weight = .semibold
+        var borderColor: NSColor?
+
+        switch style {
+        case .primary:
+            fill = active ? theme.accent.blended(withFraction: 0.12, of: .white) ?? theme.accent : theme.accent
+            textColor = .white
+        case .secondary:
+            fill = active ? theme.controlHoverFill : theme.controlFill
+            borderColor = theme.controlBorder
+            weight = .medium
+        case .icon:
+            fill = active ? theme.controlHoverFill : theme.controlFill
+            borderColor = theme.controlBorder
+            textColor = active ? theme.primaryText : theme.secondaryText
+        case .text(let color):
+            fill = active ? theme.controlFill : .clear
+            textColor = color
+            weight = .medium
+        case .popup:
+            fill = active ? theme.controlHoverFill : theme.controlFill
+            borderColor = theme.controlBorder
+            weight = .medium
+        case .use:
+            fill = active ? theme.accent : theme.controlFill
+            textColor = active ? .white : theme.primaryText
+            borderColor = active ? nil : theme.controlBorder
+        }
+        if pressedDown {
+            fill = fill.blended(withFraction: 0.18, of: theme.isDark ? .black : .gray) ?? fill
+        }
+        layer?.backgroundColor = fill.cgColor
+        layer?.borderColor = borderColor?.cgColor
+        layer?.borderWidth = borderColor == nil ? 0 : 0.5
+        alphaValue = isEnabled ? 1 : 0.45
+        contentTintColor = textColor
+
+        if !buttonTitle.isEmpty {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            attributedTitle = NSAttributedString(string: buttonTitle, attributes: [
+                .font: NSFont.systemFont(ofSize: fontSize, weight: weight),
+                .foregroundColor: textColor,
+                .paragraphStyle: paragraph
+            ])
         } else {
-            super.mouseDown(with: event)
+            title = ""
         }
     }
 }
 
-final class CircleIconView: NSView {
-    private let color: NSColor
-    private let symbolColor: NSColor
-    private let symbol: String
+final class ToggleSwitch: NSButton {
+    private let theme: PanelTheme
+    private let onToggle: () -> Void
 
-    init(frame: NSRect, color: NSColor, symbol: String, symbolColor: NSColor = NSColor.white.withAlphaComponent(0.78)) {
-        self.color = color
-        self.symbolColor = symbolColor
-        self.symbol = symbol
-        super.init(frame: frame)
+    init(isOn: Bool, theme: PanelTheme, accessibilityLabel: String, onToggle: @escaping () -> Void) {
+        self.theme = theme
+        self.onToggle = onToggle
+        super.init(frame: NSRect(x: 0, y: 0, width: 34, height: 20))
+        title = ""
+        isBordered = false
+        bezelStyle = .regularSquare
+        setButtonType(.switch)
         wantsLayer = true
+        focusRingType = .exterior
+        state = isOn ? .on : .off
+        setAccessibilityLabel(accessibilityLabel)
+        target = self
+        action = #selector(toggled)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override var isFlipped: Bool { true }
+
+    @objc private func toggled() {
+        needsDisplay = true
+        onToggle()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        color.withAlphaComponent(0.24).setFill()
-        bounds.insetBy(dx: 1, dy: 1).roundedPath(radius: bounds.width / 2).fill()
-        if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
-            image.isTemplate = true
-            symbolColor.set()
-            image.draw(in: bounds.insetBy(dx: bounds.width * 0.28, dy: bounds.height * 0.28))
+        let on = state == .on
+        let track = bounds
+        (on ? theme.accent : theme.switchOff).setFill()
+        NSBezierPath(roundedRect: track, xRadius: track.height / 2, yRadius: track.height / 2).fill()
+
+        let knobSize = track.height - 4
+        let knobX = on ? track.maxX - knobSize - 2 : track.minX + 2
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+        shadow.set()
+        NSColor.white.setFill()
+        NSBezierPath(ovalIn: NSRect(x: knobX, y: track.minY + 2, width: knobSize, height: knobSize)).fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
+// MARK: - Segmented tabs
+
+final class SegmentedTabsView: NSView {
+    struct Segment {
+        let title: String
+        let badge: String?
+        let isSelected: Bool
+        let action: () -> Void
+    }
+
+    init(frame: NSRect, theme: PanelTheme, segments: [Segment], fontSize: CGFloat = 12) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = frame.height >= 28 ? 9 : 8
+        layer?.cornerCurve = .continuous
+        layer?.backgroundColor = theme.segmentTrack.cgColor
+        layer?.borderWidth = 0.5
+        layer?.borderColor = theme.tileBorder.cgColor
+
+        guard !segments.isEmpty else { return }
+        let gap: CGFloat = 2
+        let segmentRadius: CGFloat = (frame.height >= 28 ? 9 : 8) - 2
+        let width = (frame.width - 4 - gap * CGFloat(segments.count - 1)) / CGFloat(segments.count)
+        for (index, segment) in segments.enumerated() {
+            let rect = NSRect(x: 2 + CGFloat(index) * (width + gap), y: 2, width: width, height: frame.height - 4)
+            let tile = TileView(
+                frame: rect,
+                fill: segment.isSelected ? theme.segmentSelected : .clear,
+                border: segment.isSelected ? theme.segmentSelectedBorder : nil,
+                cornerRadius: segmentRadius,
+                hoverFill: segment.isSelected ? nil : theme.controlFill,
+                shadow: segment.isSelected ? NSColor.black.withAlphaComponent(theme.isDark ? 0.30 : 0.12) : nil,
+                accessibilityLabel: segment.badge.map { "\(segment.title), \($0)" } ?? segment.title,
+                action: segment.isSelected ? nil : segment.action
+            )
+            if segment.isSelected {
+                tile.setAccessibilityElement(true)
+                tile.setAccessibilityRole(.button)
+                tile.setAccessibilityLabel(segment.title)
+                tile.setAccessibilitySelected(true)
+            }
+
+            let font = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+            let titleLabel = makeLabel(segment.title, size: fontSize, weight: .medium, color: segment.isSelected ? theme.primaryText : theme.secondaryText)
+            var groupWidth = textWidth(segment.title, font: font)
+            var badgeView: CapsuleTagView?
+            if let badge = segment.badge {
+                let view = CapsuleTagView(text: badge, theme: theme, foreground: theme.blueText, background: theme.tint(.blue), height: 16, fontSize: 10.5, minWidth: 16)
+                groupWidth += 6 + view.frame.width
+                badgeView = view
+            }
+            let startX = max(4, (rect.width - groupWidth) / 2)
+            tile.place(titleLabel, x: startX, y: (rect.height - titleLabel.frame.height) / 2, width: min(titleLabel.frame.width + 2, rect.width - 8))
+            if let badgeView {
+                tile.place(badgeView, x: startX + textWidth(segment.title, font: font) + 6, y: (rect.height - badgeView.frame.height) / 2)
+            }
+            addSubview(tile)
         }
     }
-}
-
-final class SymbolIconView: NSView {
-    init(frame: NSRect, symbol: String, color: NSColor) {
-        super.init(frame: frame)
-        wantsLayer = true
-        let imageView = NSImageView(frame: bounds)
-        imageView.autoresizingMask = [.width, .height]
-        imageView.imageScaling = .scaleProportionallyDown
-        imageView.contentTintColor = color
-        imageView.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        imageView.image?.isTemplate = true
-        addSubview(imageView)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
-final class PanelMarkView: NSView {
-    private let color: NSColor
-
-    init(frame: NSRect, color: NSColor) {
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let plate = bounds.insetBy(dx: 1, dy: 1)
-        color.withAlphaComponent(0.12).setFill()
-        plate.roundedPath(radius: 12).fill()
-        color.withAlphaComponent(0.34).setStroke()
-        let outline = plate.roundedPath(radius: 12)
-        outline.lineWidth = 1
-        outline.stroke()
-
-        let bars: [NSRect] = [
-            NSRect(x: 11, y: 11, width: 20, height: 3),
-            NSRect(x: 11, y: 19, width: 14, height: 3),
-            NSRect(x: 11, y: 27, width: 20, height: 3)
-        ]
-        color.withAlphaComponent(0.96).setFill()
-        for (index, bar) in bars.enumerated() {
-            let shifted = index == 1 ? bar.offsetBy(dx: 6, dy: 0) : bar
-            shifted.roundedPath(radius: 1.5).fill()
-        }
-    }
+    override var isFlipped: Bool { true }
 }
 
-final class AccentRailView: NSView {
-    private let color: NSColor
+// MARK: - Small visual pieces
 
-    init(frame: NSRect, color: NSColor) {
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
+final class CapsuleTagView: NSView {
+    private let text: String
+    private let foreground: NSColor
+    private let background: NSColor
+    private let dotColor: NSColor?
+    private let font: NSFont
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        color.withAlphaComponent(0.92).setFill()
-        bounds.roundedPath(radius: bounds.width / 2).fill()
-    }
-}
-
-final class MetricValueView: NSView {
-    private let percent: Int?
-    private let color: NSColor
-    private let isActive: Bool
-
-    init(frame: NSRect, percent: Int?, color: NSColor, isActive: Bool) {
-        self.percent = percent
-        self.color = color
-        self.isActive = isActive
-        super.init(frame: frame)
-        wantsLayer = true
+    init(text: String, theme: PanelTheme, foreground: NSColor, background: NSColor, dot: NSColor? = nil, height: CGFloat = 18, fontSize: CGFloat = 10.5, weight: NSFont.Weight = .semibold, minWidth: CGFloat = 0, fixedWidth: CGFloat? = nil) {
+        self.text = text
+        self.foreground = foreground
+        self.background = background
+        self.dotColor = dot
+        self.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: weight)
+        let content = textWidth(text, font: font) + (dot == nil ? 0 : 11)
+        let width = fixedWidth ?? max(minWidth, content + 14)
+        super.init(frame: NSRect(x: 0, y: 0, width: ceil(width), height: height))
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel(text)
     }
 
     required init?(coder: NSCoder) {
@@ -267,25 +577,78 @@ final class MetricValueView: NSView {
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
-        let text = NSMutableAttributedString(
-            string: value,
-            attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 32, weight: isActive ? .bold : .semibold),
-                .foregroundColor: color,
-                .kern: -1.3
-            ]
-        )
-        text.append(NSAttributedString(
-            string: "\u{2009}%",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 13, weight: .bold),
-                .foregroundColor: color.withAlphaComponent(0.90),
-                .baselineOffset: 3.0,
-                .kern: 0.2
-            ]
-        ))
-        text.draw(at: NSPoint(x: 0, y: 3))
+        background.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: foreground]
+        let size = (text as NSString).size(withAttributes: attributes)
+        let content = size.width + (dotColor == nil ? 0 : 11)
+        var x = (bounds.width - content) / 2
+        if let dotColor {
+            dotColor.setFill()
+            NSBezierPath(ovalIn: NSRect(x: x, y: (bounds.height - 6) / 2, width: 6, height: 6)).fill()
+            x += 11
+        }
+        (text as NSString).draw(at: NSPoint(x: x, y: (bounds.height - size.height) / 2), withAttributes: attributes)
+    }
+}
+
+final class MonogramView: NSView {
+    private let text: String
+    private let fill: NSColor
+    private let textColor: NSColor
+    private let symbol: String?
+
+    init(frame: NSRect, text: String, fill: NSColor, textColor: NSColor, symbol: String? = nil) {
+        self.text = text
+        self.fill = fill
+        self.textColor = textColor
+        self.symbol = symbol
+        super.init(frame: frame)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        fill.setFill()
+        NSBezierPath(ovalIn: bounds).fill()
+        if let symbol {
+            let config = NSImage.SymbolConfiguration(pointSize: bounds.height * 0.42, weight: .semibold)
+            guard let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return }
+            let tinted = image.tinted(with: textColor)
+            let size = tinted.size
+            tinted.draw(in: NSRect(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2, width: size.width, height: size.height))
+            return
+        }
+        let scale: CGFloat
+        switch text.count {
+        case 0, 1: scale = 0.44
+        case 2: scale = 0.38
+        case 3: scale = 0.31
+        default: scale = 0.26
+        }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: bounds.height * scale, weight: .semibold),
+            .foregroundColor: textColor
+        ]
+        let size = (text as NSString).size(withAttributes: attributes)
+        (text as NSString).draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attributes)
+    }
+}
+
+final class SymbolIconView: NSImageView {
+    init(frame: NSRect, symbol: String, color: NSColor, pointSize: CGFloat = 13, weight: NSFont.Weight = .semibold) {
+        super.init(frame: frame)
+        let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+        image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+        imageScaling = .scaleProportionallyDown
+        contentTintColor = color
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 
@@ -295,7 +658,6 @@ final class DotView: NSView {
     init(frame: NSRect, color: NSColor) {
         self.color = color
         super.init(frame: frame)
-        wantsLayer = true
     }
 
     required init?(coder: NSCoder) {
@@ -308,17 +670,25 @@ final class DotView: NSView {
     }
 }
 
-final class ProgressLineView: NSView {
-    private let color: NSColor
-    private let trackColor: NSColor
-    private let percent: CGFloat
+/// Two concentric Activity-style rings: outer = 5-hour window, inner = weekly.
+final class ActivityRingsView: NSView {
+    private let outerPercent: Int?
+    private let outerColor: NSColor
+    private let innerPercent: Int?
+    private let innerColor: NSColor
+    private let lineWidth: CGFloat
 
-    init(frame: NSRect, color: NSColor, trackColor: NSColor = NSColor.white.withAlphaComponent(0.11), percent: CGFloat) {
-        self.color = color
-        self.trackColor = trackColor
-        self.percent = max(0, min(1, percent))
+    init(frame: NSRect, outerPercent: Int?, outerColor: NSColor, innerPercent: Int?, innerColor: NSColor, lineWidth: CGFloat = 9) {
+        self.outerPercent = outerPercent
+        self.outerColor = outerColor
+        self.innerPercent = innerPercent
+        self.innerColor = innerColor
+        self.lineWidth = lineWidth
         super.init(frame: frame)
-        wantsLayer = true
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        let describe: (Int?) -> String = { $0.map { "\($0) percent left" } ?? "unknown" }
+        setAccessibilityLabel("5-hour \(describe(outerPercent)), weekly \(describe(innerPercent))")
     }
 
     required init?(coder: NSCoder) {
@@ -326,398 +696,196 @@ final class ProgressLineView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let track = bounds.insetBy(dx: 0, dy: 2)
-        trackColor.setFill()
-        track.roundedPath(radius: track.height / 2).fill()
-        let fill = NSRect(x: track.minX, y: track.minY, width: track.width * percent, height: track.height)
-        color.withAlphaComponent(min(color.alphaComponent, 0.92)).setFill()
-        fill.roundedPath(radius: track.height / 2).fill()
-    }
-}
-
-final class ResetTimeBadgeView: NSView {
-    private let text: String
-    private let color: NSColor
-    private let isActive: Bool
-
-    init(frame: NSRect, text: String, color: NSColor, isActive: Bool) {
-        self.text = text
-        self.color = color
-        self.isActive = isActive
-        super.init(frame: frame)
-        wantsLayer = true
+        let center = NSPoint(x: bounds.midX, y: bounds.midY)
+        let outerRadius = min(bounds.width, bounds.height) / 2 - lineWidth / 2
+        let innerRadius = outerRadius - lineWidth - 2
+        drawRing(center: center, radius: outerRadius, percent: outerPercent, color: outerColor)
+        drawRing(center: center, radius: innerRadius, percent: innerPercent, color: innerColor)
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: color.withAlphaComponent(isActive ? 0.95 : 0.58)
-        ]
-        let attributed = NSAttributedString(string: text, attributes: attributes)
-        let size = attributed.size()
-        attributed.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 0.5))
-    }
-}
-
-final class PercentCenterLabelView: NSView {
-    private let percent: Int?
-    private let color: NSColor
-
-    init(frame: NSRect, percent: Int?, color: NSColor) {
-        self.percent = percent
-        self.color = color
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let value = percent.map { "\(max(0, min(100, $0)))" } ?? "--"
-        let numberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 29, weight: .semibold),
-            .foregroundColor: color
-        ]
-        let percentAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 15, weight: .semibold),
-            .foregroundColor: color.withAlphaComponent(0.92),
-            .baselineOffset: -0.5
-        ]
-
-        let text = NSMutableAttributedString(string: value, attributes: numberAttributes)
-        text.append(NSAttributedString(string: "%", attributes: percentAttributes))
-        let size = text.size()
-        let point = NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2 - 1)
-        text.draw(at: point)
-    }
-}
-
-final class CenteredTextView: NSView {
-    private let text: String
-    private let size: CGFloat
-    private let weight: NSFont.Weight
-    private let color: NSColor
-    private let alignment: NSTextAlignment
-
-    init(frame: NSRect, text: String, size: CGFloat, weight: NSFont.Weight, color: NSColor, alignment: NSTextAlignment = .left) {
-        self.text = text
-        self.size = size
-        self.weight = weight
-        self.color = color
-        self.alignment = alignment
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: size, weight: weight),
-            .foregroundColor: color
-        ]
-        let attributed = NSAttributedString(string: text, attributes: attributes)
-        let textSize = attributed.size()
-        let x: CGFloat
-        switch alignment {
-        case .right:
-            x = max(0, bounds.width - textSize.width)
-        case .center:
-            x = max(0, (bounds.width - textSize.width) / 2)
-        default:
-            x = 0
-        }
-        attributed.draw(at: NSPoint(x: x, y: (bounds.height - textSize.height) / 2))
-    }
-}
-
-final class MiniSwitchButton: NSButton {
-    private let offColor: NSColor
-
-    init(frame: NSRect, isOn: Bool, offColor: NSColor = NSColor.white.withAlphaComponent(0.18)) {
-        self.offColor = offColor
-        super.init(frame: frame)
-        title = ""
-        isBordered = false
-        bezelStyle = .regularSquare
-        wantsLayer = true
-        state = isOn ? .on : .off
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let on = state == .on
-        let track = bounds.insetBy(dx: 1, dy: 3)
-        (on ? NSColor.systemGreen : offColor).setFill()
-        track.roundedPath(radius: track.height / 2).fill()
-
-        let knobSize = track.height - 4
-        let knobX = on ? track.maxX - knobSize - 2 : track.minX + 2
-        NSColor.white.withAlphaComponent(0.94).setFill()
-        NSBezierPath(ovalIn: NSRect(x: knobX, y: track.minY + 2, width: knobSize, height: knobSize)).fill()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        state = state == .on ? .off : .on
-        needsDisplay = true
-        sendAction(action, to: target)
-    }
-}
-
-final class UsageRingView: NSView {
-    private let color: NSColor
-    private let trackColor: NSColor
-    private let percent: CGFloat
-    private let isActive: Bool
-    private var isLowUsage: Bool {
-        percent > 0 && percent <= 0.10
-    }
-
-    init(frame: NSRect, color: NSColor, trackColor: NSColor = NSColor.white.withAlphaComponent(0.10), percent: CGFloat, isActive: Bool) {
-        self.color = color
-        self.trackColor = trackColor
-        self.percent = max(0, min(1, percent))
-        self.isActive = isActive
-        super.init(frame: frame)
-        wantsLayer = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let rect = bounds.insetBy(dx: 10, dy: 10)
-        let lineWidth: CGFloat = isActive ? 4 : 3
-        let center = NSPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
+    private func drawRing(center: NSPoint, radius: CGFloat, percent: Int?, color: NSColor) {
         let track = NSBezierPath()
         track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
         track.lineWidth = lineWidth
-        trackColor.withAlphaComponent(isLowUsage ? min(trackColor.alphaComponent + 0.08, 1) : trackColor.alphaComponent).setStroke()
+        color.withAlphaComponent(0.20).setStroke()
         track.stroke()
 
-        if isLowUsage {
-            let warningTrack = NSBezierPath()
-            warningTrack.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-            warningTrack.lineWidth = lineWidth
-            color.withAlphaComponent(0.22).setStroke()
-            warningTrack.stroke()
-        }
-
-        guard percent > 0 else { return }
-
-        let fill = NSBezierPath()
-        let visiblePercent = isLowUsage ? max(percent, 0.08) : percent
-        fill.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - (360 * visiblePercent), clockwise: true)
-        fill.lineWidth = lineWidth
-        fill.lineCapStyle = .round
-        color.withAlphaComponent(isActive ? 0.94 : min(color.alphaComponent, 0.54)).setStroke()
-        fill.stroke()
+        guard let percent, percent > 0 else { return }
+        let fraction = min(1, CGFloat(percent) / 100)
+        let arc = NSBezierPath()
+        arc.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - 360 * fraction, clockwise: true)
+        arc.lineWidth = lineWidth
+        arc.lineCapStyle = .round
+        color.setStroke()
+        arc.stroke()
     }
 }
 
-final class PillButton: NSButton {
-    private let pillColor: NSColor
-    private let showsDot: Bool
-    private let allowsHover: Bool
-    private var trackingArea: NSTrackingArea?
+/// Label, value and a thin bar — the compact usage meter used in account rows.
+final class MeterView: NSView {
+    private let title: String
+    private let value: String
+    private let percent: CGFloat?
+    private let color: NSColor
+    private let theme: PanelTheme
 
-    init(frame: NSRect, title: String, color: NSColor, showsDot: Bool = false, allowsHover: Bool = true) {
-        self.pillColor = color
-        self.showsDot = showsDot
-        self.allowsHover = allowsHover
-        super.init(frame: frame)
+    init(frame: NSRect, title: String, percent: Int?, color: NSColor, theme: PanelTheme) {
         self.title = title
-        bezelStyle = .rounded
-        isBordered = false
-        font = .systemFont(ofSize: frame.height <= 24 ? 9.5 : 11.5, weight: .bold)
-        contentTintColor = .white
-        focusRingType = .exterior
-        wantsLayer = true
-        layer?.cornerRadius = min(9, frame.height * 0.38)
-        layer?.backgroundColor = pillColor.cgColor
-        layer?.borderWidth = showsDot ? 1 : 0
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        guard allowsHover else { return }
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        guard allowsHover, isEnabled else { return }
-        layer?.backgroundColor = pillColor.blended(withFraction: 0.16, of: .white)?.cgColor ?? pillColor.cgColor
-        layer?.shadowColor = pillColor.cgColor
-        layer?.shadowOpacity = 0.22
-        layer?.shadowRadius = 8
-        layer?.shadowOffset = NSSize(width: 0, height: -2)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        guard allowsHover else { return }
-        layer?.backgroundColor = pillColor.cgColor
-        layer?.shadowOpacity = 0
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        if showsDot {
-            NSColor.white.withAlphaComponent(0.72).setFill()
-            NSBezierPath(ovalIn: NSRect(x: 15, y: (bounds.height - 6) / 2, width: 6, height: 6)).fill()
-        }
-        super.draw(dirtyRect)
-    }
-}
-
-final class AccountMoreButton: NSButton {
-    private let tintColor: NSColor
-    private let badgeLabel: String
-    private var trackingArea: NSTrackingArea?
-
-    init(frame: NSRect, tintColor: NSColor, label: String) {
-        self.tintColor = tintColor
-        self.badgeLabel = String(label.prefix(4)).uppercased()
+        self.value = percent.map { "\(max(0, min(100, $0)))%" } ?? "--"
+        self.percent = percent.map { CGFloat(max(0, min(100, $0))) / 100 }
+        self.color = color
+        self.theme = theme
         super.init(frame: frame)
-        title = ""
-        bezelStyle = .regularSquare
-        isBordered = false
-        focusRingType = .exterior
-        wantsLayer = true
-        layer?.cornerRadius = min(10, frame.height * 0.30)
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.08).cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
-        toolTip = "Edit account label"
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel("\(title) \(value) left")
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.13).cgColor
-        layer?.borderColor = tintColor.withAlphaComponent(0.52).cgColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.08).cgColor
-        layer?.borderColor = tintColor.withAlphaComponent(0.30).cgColor
-    }
+    override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        let fontSize: CGFloat
-        switch badgeLabel.count {
-        case 0, 1:
-            fontSize = 16
-        case 2:
-            fontSize = 14
-        case 3:
-            fontSize = 12.5
-        default:
-            fontSize = 11
-        }
-        let labelAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
-            .foregroundColor: tintColor.withAlphaComponent(0.96)
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10.5, weight: .regular),
+            .foregroundColor: theme.secondaryText
         ]
-        let attributed = NSAttributedString(string: badgeLabel, attributes: labelAttributes)
-        let labelSize = attributed.size()
-        attributed.draw(at: NSPoint(x: (bounds.width - labelSize.width) / 2, y: (bounds.height - labelSize.height) / 2))
+        let valueAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold),
+            .foregroundColor: theme.primaryText
+        ]
+        (title as NSString).draw(at: NSPoint(x: 0, y: 0), withAttributes: titleAttributes)
+        let valueSize = (value as NSString).size(withAttributes: valueAttributes)
+        (value as NSString).draw(at: NSPoint(x: bounds.width - valueSize.width, y: 0), withAttributes: valueAttributes)
+
+        let bar = NSRect(x: 0, y: bounds.height - 4, width: bounds.width, height: 4)
+        theme.trackFill.setFill()
+        NSBezierPath(roundedRect: bar, xRadius: 2, yRadius: 2).fill()
+        if let percent, percent > 0 {
+            let fill = NSRect(x: bar.minX, y: bar.minY, width: max(4, bar.width * percent), height: bar.height)
+            color.setFill()
+            NSBezierPath(roundedRect: fill, xRadius: 2, yRadius: 2).fill()
+        }
     }
 }
 
-final class SettingsActionButton: NSButton {
-    private let fillColor: NSColor
-    private let textColor: NSColor
-    private var trackingArea: NSTrackingArea?
+/// A row of proportional coloured segments separated by small gaps.
+final class StackedBarView: NSView {
+    private let segments: [(weight: CGFloat, color: NSColor)]
 
-    init(frame: NSRect, title: String, color: NSColor, textColor: NSColor) {
-        self.fillColor = color
-        self.textColor = textColor
+    init(frame: NSRect, segments: [(weight: CGFloat, color: NSColor)]) {
+        self.segments = segments.filter { $0.weight > 0 }
         super.init(frame: frame)
-        self.title = title
-        bezelStyle = .rounded
-        isBordered = false
-        font = .systemFont(ofSize: min(12, max(10, frame.height * 0.42)), weight: .semibold)
-        contentTintColor = textColor
-        focusRingType = .exterior
-        wantsLayer = true
-        layer?.cornerRadius = min(9, frame.height * 0.34)
-        layer?.backgroundColor = fillColor.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = textColor.withAlphaComponent(0.08).cgColor
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
+    override func draw(_ dirtyRect: NSRect) {
+        let total = segments.reduce(0) { $0 + $1.weight }
+        guard total > 0 else { return }
+        let gap: CGFloat = 3
+        let usable = bounds.width - gap * CGFloat(max(0, segments.count - 1))
+        var x: CGFloat = 0
+        let radius = bounds.height / 2
+        for segment in segments {
+            let width = usable * segment.weight / total
+            segment.color.setFill()
+            NSBezierPath(roundedRect: NSRect(x: x, y: 0, width: width, height: bounds.height), xRadius: radius, yRadius: radius).fill()
+            x += width + gap
         }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        guard isEnabled else { return }
-        layer?.backgroundColor = fillColor.blended(withFraction: 0.10, of: .white)?.cgColor ?? fillColor.cgColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = fillColor.cgColor
     }
 }
 
-extension NSRect {
-    func roundedPath(radius: CGFloat) -> NSBezierPath {
-        NSBezierPath(roundedRect: self, xRadius: radius, yRadius: radius)
+// MARK: - Menu bar glyphs
+
+enum MenuBarGlyph {
+    /// A small usage ring. The track uses the menu bar's own label colour, so it adapts to light and dark menu bars.
+    static func ring(percent: Int?, color: NSColor, diameter: CGFloat = 13, lineWidth: CGFloat = 2.2) -> NSImage {
+        let image = NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+            let radius = (min(rect.width, rect.height) - lineWidth) / 2
+            let center = NSPoint(x: rect.midX, y: rect.midY)
+            let track = NSBezierPath()
+            track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            track.lineWidth = lineWidth
+            NSColor.labelColor.withAlphaComponent(0.28).setStroke()
+            track.stroke()
+            if let percent, percent > 0 {
+                let fraction = min(1, CGFloat(percent) / 100)
+                let arc = NSBezierPath()
+                arc.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - 360 * fraction, clockwise: true)
+                arc.lineWidth = lineWidth
+                arc.lineCapStyle = .round
+                color.setStroke()
+                arc.stroke()
+            }
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    private static var spinnerCache: [String: NSImage] = [:]
+
+    /// A quarter arc rotated by `frame` steps — the switching / resetting spinner.
+    /// The 12 frames are drawn once per colour and size, then reused.
+    static func spinner(frame: Int, color: NSColor, diameter: CGFloat = 13, lineWidth: CGFloat = 2.2) -> NSImage {
+        let step = frame % 12
+        let key = "\(step)|\(diameter)|\(lineWidth)|\(color.description)"
+        if let cached = spinnerCache[key] { return cached }
+        let image = NSImage(size: NSSize(width: diameter, height: diameter), flipped: false) { rect in
+            let radius = (min(rect.width, rect.height) - lineWidth) / 2
+            let center = NSPoint(x: rect.midX, y: rect.midY)
+            let track = NSBezierPath()
+            track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            track.lineWidth = lineWidth
+            NSColor.labelColor.withAlphaComponent(0.22).setStroke()
+            track.stroke()
+            let start = 90 - CGFloat(step) * 30
+            let arc = NSBezierPath()
+            arc.appendArc(withCenter: center, radius: radius, startAngle: start, endAngle: start - 100, clockwise: true)
+            arc.lineWidth = lineWidth
+            arc.lineCapStyle = .round
+            color.setStroke()
+            arc.stroke()
+            return true
+        }
+        image.isTemplate = false
+        spinnerCache[key] = image
+        return image
+    }
+
+    static func symbol(_ name: String, color: NSColor?, pointSize: CGFloat = 12) -> NSImage? {
+        let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
+        guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) else { return nil }
+        guard let color else {
+            base.isTemplate = true
+            return base
+        }
+        let tinted = base.tinted(with: color)
+        tinted.isTemplate = false
+        return tinted
     }
 }
+
+extension NSImage {
+    func tinted(with color: NSColor) -> NSImage {
+        let source = self
+        let image = NSImage(size: size, flipped: false) { rect in
+            source.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+}
+
+// MARK: - Shared helpers
 
 extension DateFormatter {
     static let diagnosticStamp: DateFormatter = {
@@ -742,6 +910,14 @@ extension DateFormatter {
         return formatter
     }()
 
+    static let resetCreditShortDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE d MMM"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        return formatter
+    }()
+
     static let directFiveHourUsage: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
@@ -753,22 +929,6 @@ extension DateFormatter {
     static let directWeeklyUsage: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE HH:mm"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let apiDayKey: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        return formatter
-    }()
-
-    static let apiBackupStamp: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = .current
         return formatter

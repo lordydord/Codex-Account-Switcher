@@ -1,132 +1,134 @@
 <p align="center">
   <a href="https://lordydord.github.io/Codex-Account-Switcher/">
-    <img src="docs/assets/readme-hero.png" alt="Codex Account Switcher product website showing the macOS account panel" width="100%">
+    <img src="assets/readme-hero.png" alt="Codex Account Switcher: the account panel hanging from the Mac menu bar, showing 31% of the 5-hour limit left" width="100%">
   </a>
 </p>
 
+<h1 align="center">Codex Account Switcher</h1>
+
 <p align="center">
-  <a href="https://lordydord.github.io/Codex-Account-Switcher/"><strong>Product site</strong></a>
-  &nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/latest"><strong>Download</strong></a>
-  &nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="#build-from-source"><strong>Build from source</strong></a>
+  Switch Codex accounts without breaking your flow.<br>
+  A free menu bar app for Mac that shows how much of each ChatGPT account’s Codex limit is left, and switches accounts in one click.
 </p>
 
 <p align="center">
-  <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&logo=apple&logoColor=white">
-  <img alt="Swift 5.9+" src="https://img.shields.io/badge/Swift-5.9%2B-f97316?style=flat-square&logo=swift&logoColor=white">
-  <img alt="Native AppKit" src="https://img.shields.io/badge/Native-AppKit-1f2937?style=flat-square">
-  <img alt="Current release 1.8.3.2" src="https://img.shields.io/badge/release-v1.8.3.2-16a34a?style=flat-square">
-  <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-1f2937?style=flat-square">
+  <a href="https://github.com/lordydord/Codex-Account-Switcher/releases/latest"><strong>Download for Mac</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://lordydord.github.io/Codex-Account-Switcher/">Website</a>
+  &nbsp;·&nbsp;
+  <a href="CHANGELOG.md">What’s new</a>
 </p>
-
-# Codex Account Switcher
-
-Codex Account Switcher is a native macOS menu bar companion for people who use more than one ChatGPT account with Codex. It shows live account limits, makes the active account obvious, verifies switches, and can help continue work when a quota runs out.
-
-## The useful parts, immediately
-
-- **Live account limits** for five-hour and weekly usage windows.
-- **Fast account switching** from a compact four-account panel.
-- **Verified changes** with target checks and automatic rollback on failure.
-- **Reset-credit tracking** across saved accounts, grouped by expiry urgency.
-- **Optional auto-switching** when the active account reaches a chosen threshold.
-- **Optional task continuation** after a successful automatic switch.
-- **ChatGPT lifecycle following** so the companion opens and closes with the desktop app.
-- **Local diagnostics** that omit credentials, account IDs, and private usage snapshots.
 
 <p align="center">
-  <img src="assets/screenshot-menubar.png" alt="Codex Account Switcher menu bar status with privacy-safe demo labels" width="760">
+  <img alt="Version 3.0" src="https://img.shields.io/badge/version-3.0-0B6BDE?style=flat-square">
+  <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-22335C?style=flat-square&logo=apple&logoColor=white">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-AppKit-5F4670?style=flat-square&logo=swift&logoColor=white">
+  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-22335C?style=flat-square">
 </p>
+
+---
+
+## What it does
+
+If you use Codex with more than one ChatGPT account, you know the routine: a limit runs out mid-task, you sign out, sign in to another account, and hope it has room. Codex Account Switcher takes care of that from the menu bar.
+
+- **See every limit at once.** The 5-hour and weekly limits for each saved account, updated live.
+- **Switch in one click.** It saves your session, changes account, checks the change worked, then reopens ChatGPT. If anything goes wrong, it puts the previous account back.
+- **Know which account to use next.** The account with the most room left is marked “Best next”.
+- **Use reset credits before they expire.** Every credit across your accounts, soonest first, with a confirmation before any is spent.
+- **Let it run itself.** Optional auto-switch when a limit gets low, auto-resume to carry on the task, and usage reminders.
 
 <table>
   <tr>
-    <td width="50%"><img src="assets/screenshot-panel.png" alt="Account panel showing four privacy-safe demo accounts"></td>
-    <td width="50%"><img src="assets/screenshot-settings.png" alt="Settings screen showing display, automation, and health controls"></td>
+    <td width="33%" valign="top"><img src="assets/screenshot-accounts.png" alt="Accounts tab with the active account’s 5-hour and weekly rings and a second account to switch to"></td>
+    <td width="33%" valign="top"><img src="assets/screenshot-resets.png" alt="Resets tab listing five reset credits across two accounts, coloured by how soon they expire"></td>
+    <td width="33%" valign="top"><img src="assets/screenshot-settings.png" alt="Settings tab with menu bar options and automation switches"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Accounts</sub></td>
+    <td align="center"><sub>Resets</sub></td>
+    <td align="center"><sub>Settings</sub></td>
   </tr>
 </table>
 
-<p align="center">
-  <img src="assets/screenshot-resets.png" alt="Reset credits grouped by privacy-safe demo account with expiry colours" width="390">
-</p>
+## New in 3.0
 
-## Install v1.8.3.2
+A ground-up redesign for macOS 27, and a much lighter app underneath.
 
-1. Download `Codex-Account-Switcher-v1.8.3.2.zip` from the [latest release](https://github.com/lordydord/Codex-Account-Switcher/releases/latest).
-2. Extract the archive and move `Codex Account Switcher.app` to Applications.
-3. Right-click the app and choose **Open** on first launch if macOS asks.
-4. Install and configure [`codex-auth`](https://www.npmjs.com/package/@loongphy/codex-auth):
+- **Liquid Glass throughout.** One glass panel with a standard toolbar and tabs, in light and dark.
+- **Limits you can read at a glance.** Rings for the active account, slim meters for the rest.
+- **A calmer menu bar item.** A small usage ring that only turns red when you’re nearly out.
+- **Faster.** Switches finish seconds sooner, the panel opens instantly, and the app does far less in the background.
 
-```bash
-npm install -g @loongphy/codex-auth
-codex-auth login
-```
+Read the [full release notes](docs/release-notes/v3.0.md).
 
-Repeat `codex-auth login` for each account you want to use.
+## Install
 
-The release is ad-hoc signed and includes a SHA-256 checksum. It is not Apple-notarized, so macOS may show the standard warning for independently distributed software.
+1. Download the latest version from [Releases](https://github.com/lordydord/Codex-Account-Switcher/releases/latest), unzip it and move **Codex Account Switcher** to Applications.
+2. The app isn’t notarised yet, so the first time, right-click it and choose **Open**.
+3. Install [codex-auth](https://www.npmjs.com/package/@loongphy/codex-auth) and sign in once for each ChatGPT account:
 
-## Requirements
+   ```bash
+   npm install -g @loongphy/codex-auth
+   codex-auth login
+   ```
 
-- macOS 14 or later
-- ChatGPT Desktop in `/Applications/ChatGPT.app`
-- `codex-auth` with at least one saved ChatGPT account
-- Xcode command line tools only when building from source
+**You’ll need:** macOS 14 or later (designed for macOS 27), the ChatGPT desktop app in Applications, and codex-auth.
 
-## How switching stays safe
+Each release includes a SHA-256 checksum so you can check the download.
 
-Codex Desktop must relaunch after an account change. The switcher asks `codex-auth` to change accounts, verifies that the requested target became active, then relaunches ChatGPT. If verification fails, it restores the previous account and reports the failure.
+## How switching works
 
-Automatic selection considers both usage windows, login health, reset credits, and a cooldown that prevents rapid switching between accounts.
+Every switch follows the same routine:
 
-## Reset credits
+1. Save the current session, so nothing is lost.
+2. Ask codex-auth to change account, then confirm the new account really is active.
+3. If it isn’t, restore the previous account and explain what happened.
+4. Quit and reopen ChatGPT on the new account.
 
-The reset-credit screen reads available credits for every saved account, groups them by account, and highlights expiry urgency. Spending a credit always requires confirmation. The switcher does not automatically retry a spending request and only reports success after the credit and refreshed usage state agree.
+Auto-switch waits a short cooldown between switches, so it never bounces back and forth.
+
+Reset credits work the same careful way: using one always asks first. The app never retries a spend on its own, and only reports success once ChatGPT confirms the limit was reset.
+
+## Privacy
+
+- The app uses the sign-ins codex-auth already keeps on your Mac. It adds no analytics, no adverts and no extra account.
+- Your sign-ins are only used to talk to ChatGPT, to check your limits and reset credits.
+- This repository contains no credentials, tokens, account IDs or real email addresses. Every screenshot uses demo accounts.
+- **Diagnostics** in the ••• menu copies a health report you can share, without tokens or account IDs.
 
 ## Build from source
+
+You’ll need the Xcode command line tools.
 
 ```bash
 git clone https://github.com/lordydord/Codex-Account-Switcher.git
 cd Codex-Account-Switcher
-./run-tests.sh
-./build.sh
-./install.sh
-./verify-install.sh
+./run-tests.sh      # infrastructure and reset-logic checks
+./build.sh          # builds build/Codex Account Switcher.app
+./install.sh        # copies it to /Applications
 ```
 
-The built app is written to `build/Codex Account Switcher.app` and the install script copies it to `/Applications`.
+`./package-release.sh` creates a verified release zip and checksum.
 
-Create a checked release archive with:
-
-```bash
-./package-release.sh
-```
-
-## Privacy
-
-This repository does not contain ChatGPT credentials, auth tokens, account IDs, account registries, real email addresses, or private usage snapshots. Public screenshots use demo accounts and placeholder labels.
-
-The switcher works with local `codex-auth` sessions. It does not add analytics, advertising, or a separate cloud account.
-
-## Version 1.8.3.2
-
-Version 1.8.3.2 refreshes live five-hour and weekly limits for every saved account, preserves the last reliable reading when one account cannot refresh, and replaces the outer Liquid Glass effect with a softer frosted popover background.
-
-Read the full [1.8.3.2 release notes](docs/release-notes/v1.8.3.2.md), or see every published build on the [Releases page](https://github.com/lordydord/Codex-Account-Switcher/releases).
-
-## Project map
+<details>
+<summary>Project layout</summary>
 
 ```text
-Sources/main.swift             AppKit application and account workflows
-Sources/Models.swift           Shared app models and visual theme
-Sources/PanelComponents.swift  Account panel views and controls
-Sources/AppInfrastructure.swift  Networking, commands, and shared infrastructure
-Sources/LifecycleMonitor.swift Native ChatGPT lifecycle companion
-Tests                         Infrastructure and reset-logic regression checks
-docs                          GitHub Pages product site
-assets                        Privacy-safe app screenshots and repository artwork
+Sources/main.swift               App delegate, account workflows, switching and resets
+Sources/AccountPanelView.swift   The menu bar panel: Accounts, Resets, Settings
+Sources/PanelComponents.swift    Liquid Glass controls, rings, meters and menu bar glyphs
+Sources/Models.swift             Shared models and the panel theme
+Sources/AppInfrastructure.swift  Commands, networking and shared policies
+Sources/LifecycleMonitor.swift   Opens and closes the switcher alongside ChatGPT
+Tests/                           Infrastructure checks
+docs/                            The website (GitHub Pages)
 ```
 
-## License
+</details>
+
+## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+Codex Account Switcher is an independent open-source project. It isn’t affiliated with or endorsed by OpenAI.
